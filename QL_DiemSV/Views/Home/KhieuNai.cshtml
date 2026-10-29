@@ -1,0 +1,277 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1500px] mx-auto space-y-6">
+    <div>
+        <div class="text-xs text-text-muted font-medium mb-1">Điểm số & Phúc khảo &gt; Xử lý đơn phúc khảo</div>
+        <h1 class="text-2xl font-bold text-text-primary">Quản Lý Khiếu Nại & Phúc Khảo Điểm</h1>
+    </div>
+
+    <!-- Top Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="p-4 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="font-bold text-sm text-text-primary flex items-center gap-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i> Danh Sách Đơn Phúc Khảo Từ Sinh Viên
+            </h3>
+            <input id="kn-search" oninput="renderComplaints()" placeholder="Tìm Mã đơn, MSSV, Họ tên..."
+                   class="bg-canvas border border-surface-hover rounded-lg px-3 py-1.5 text-sm text-text-primary outline-none w-64" />
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="border-b border-surface-hover text-xs text-text-muted uppercase">
+                        <th class="px-5 py-3">Mã Đơn</th>
+                        <th class="px-5 py-3">Sinh Viên</th>
+                        <th class="px-5 py-3">Học Phần</th>
+                        <th class="px-5 py-3">Cột Điểm</th>
+                        <th class="px-5 py-3">Lý Do Khiếu Nại</th>
+                        <th class="px-5 py-3">Ngày Gửi</th>
+                        <th class="px-5 py-3 text-center">Trạng Thái</th>
+                        <th class="px-5 py-3 text-right">Xử Lý</th>
+                    </tr>
+                </thead>
+                <tbody id="kn-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+        <!-- Pagination Footer -->
+        <div class="px-5 py-3.5 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+            <div class="flex items-center gap-3">
+                <span id="kn-pagination-info">Đang tải...</span>
+                <div class="flex items-center gap-1.5">
+                    <span>Hiển thị</span>
+                    <select id="kn-page-size" onchange="changeKnPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span>/ trang</span>
+                </div>
+            </div>
+            <div id="kn-pagination-controls" class="flex items-center gap-1"></div>
+        </div>
+    </div>
+
+    <!-- Processing Panel -->
+    <div id="kn-detail-panel" class="hidden bg-surface border border-primary rounded-2xl p-6 space-y-5">
+        <div class="flex justify-between items-center border-b border-surface-hover pb-3">
+            <h3 id="kn-detail-title" class="font-bold text-base text-primary">Xử Lý Đơn Khiếu Nại</h3>
+            <button onclick="document.getElementById('kn-detail-panel').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-canvas p-4 rounded-xl border border-surface-hover space-y-2 text-xs">
+                <div class="text-text-muted uppercase font-bold">Thông tin đơn</div>
+                <div id="kn-info-sv" class="text-sm font-bold text-text-primary"></div>
+                <div id="kn-info-mon" class="text-primary font-semibold"></div>
+                <div id="kn-info-lydo" class="italic text-text-muted p-3 bg-surface rounded-lg border-l-4 border-l-amber-400 mt-2"></div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs" id="kn-old-grades"></div>
+
+                <div id="kn-action-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Điểm mới sau phúc khảo (0 - 10)</label>
+                        <input id="kn-new-grade" type="number" step="0.1" min="0" max="10" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary font-bold" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Phản hồi cho Sinh viên</label>
+                        <input id="kn-feedback" placeholder="Nhập ghi chú / lý do duyệt hoặc từ chối..." class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                    </div>
+                </div>
+
+                <div id="kn-action-btns" class="flex justify-end gap-3 pt-2">
+                    <button onclick="processComplaint('rejected')" class="px-4 py-2 rounded-xl border border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444]/10 text-xs font-bold">
+                        Từ Chối Khiếu Nại
+                    </button>
+                    <button onclick="processComplaint('approved')" class="px-5 py-2 rounded-xl bg-[#10B981] text-white hover:bg-[#10B981]/90 text-xs font-bold shadow-lg shadow-[#10B981]/20">
+                        Duyệt & Cập Nhật Điểm Tự Động
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let complaints = [], selectedKn = null;
+        let knCurrentPage = 1, knPageSize = 10;
+
+        const gradeLabels = {
+            quatrinh: 'Điểm Quá Trình (40%)',
+            cuoiky: 'Điểm Cuối Kỳ',
+            thiLan1: 'Điểm Thi Lần 1 (60%)',
+            thiLan2: 'Điểm Thi Lần 2'
+        };
+
+        async function loadComplaints() {
+            const res = await apiFetch('/api/khieunai');
+            complaints = res.data || [];
+            renderComplaints();
+        }
+
+        function getFilteredComplaints() {
+            const q = document.getElementById('kn-search').value.toLowerCase().trim();
+            return complaints.filter(c => !q || String(c.id).includes(q) || (c.studentId || '').toLowerCase().includes(q) || (c.studentName || '').toLowerCase().includes(q));
+        }
+
+        function renderComplaints(resetPage = false) {
+            if (resetPage) knCurrentPage = 1;
+            const filtered = getFilteredComplaints();
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / knPageSize));
+
+            if (knCurrentPage > totalPages) knCurrentPage = totalPages;
+            if (knCurrentPage < 1) knCurrentPage = 1;
+
+            const startIndex = (knCurrentPage - 1) * knPageSize;
+            const endIndex = Math.min(startIndex + knPageSize, totalItems);
+            const paged = filtered.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('kn-tbody');
+            if (paged.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-text-muted">Không có đơn khiếu nại nào</td></tr>`;
+            } else {
+                tbody.innerHTML = paged.map(c => {
+                    const badge = c.status === 'pending'
+                        ? '<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400">Chờ xử lý</span>'
+                        : c.status === 'approved'
+                            ? '<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#10B981]/15 text-[#10B981]">Đã duyệt</span>'
+                            : '<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ef4444]/15 text-[#ef4444]">Từ chối</span>';
+
+                    return `
+                        <tr class="hover:bg-surface-hover/40 cursor-pointer transition-colors" onclick="selectComplaint(${c.id})">
+                            <td class="px-5 py-3.5 font-bold text-primary">KN-${c.id}</td>
+                            <td class="px-5 py-3.5">
+                                <div class="font-semibold text-text-primary">${c.studentName}</div>
+                                <div class="text-xs text-text-muted">${c.studentId}</div>
+                            </td>
+                            <td class="px-5 py-3.5 font-medium text-text-primary">${c.courseName}</td>
+                            <td class="px-5 py-3.5 text-amber-400 font-semibold text-xs">${gradeLabels[c.appealedGrade] || c.appealedGrade}</td>
+                            <td class="px-5 py-3.5 text-xs text-text-muted max-w-xs truncate">${c.reason}</td>
+                            <td class="px-5 py-3.5 text-xs text-text-muted">${new Date(c.submitDate).toLocaleDateString('vi-VN')}</td>
+                            <td class="px-5 py-3.5 text-center">${badge}</td>
+                            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                                <button class="px-3 py-1 rounded-lg bg-primary/15 text-primary text-xs font-bold hover:bg-primary hover:text-white transition-all">Chi tiết</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            renderKnPagination(totalItems, totalPages, startIndex, endIndex);
+            lucide.createIcons();
+        }
+
+        function renderKnPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('kn-pagination-info');
+            if (infoEl) {
+                if (totalItems === 0) infoEl.textContent = '0 đơn';
+                else infoEl.textContent = `Hiển thị ${startIndex + 1} - ${endIndex} trên ${totalItems} đơn khiếu nại`;
+            }
+
+            const controlsEl = document.getElementById('kn-pagination-controls');
+            if (!controlsEl) return;
+            if (totalPages <= 1) {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = knCurrentPage === 1;
+            html += `<button onclick="changeKnPage(${knCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${prevDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, knCurrentPage - 2);
+            const endP = Math.min(totalPages, knCurrentPage + 2);
+
+            if (startP > 1) {
+                html += `<button onclick="changeKnPage(1)" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1 text-text-muted">...</span>`;
+            }
+
+            for (let p = startP; p <= endP; p++) {
+                const isActive = p === knCurrentPage;
+                html += `<button onclick="changeKnPage(${p})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-primary/20' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1 text-text-muted">...</span>`;
+                html += `<button onclick="changeKnPage(${totalPages})" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDisabled = knCurrentPage === totalPages;
+            html += `<button onclick="changeKnPage(${knCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${nextDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function changeKnPage(page) {
+            knCurrentPage = page;
+            renderComplaints();
+        }
+
+        function changeKnPageSize(size) {
+            knPageSize = parseInt(size, 10);
+            knCurrentPage = 1;
+            renderComplaints();
+        }
+
+        function selectComplaint(id) {
+            selectedKn = complaints.find(x => x.id === id);
+            if (!selectedKn) return;
+
+            document.getElementById('kn-detail-title').textContent = `Xử Lý Đơn Khiếu Nại #KN-${selectedKn.id}`;
+            document.getElementById('kn-info-sv').textContent = `${selectedKn.studentName} (${selectedKn.studentId})`;
+            document.getElementById('kn-info-mon').textContent = `${selectedKn.courseName} — Khiếu nại: ${gradeLabels[selectedKn.appealedGrade] || selectedKn.appealedGrade}`;
+            document.getElementById('kn-info-lydo').textContent = `"${selectedKn.reason}"`;
+
+            const og = selectedKn.oldGrades || {};
+            document.getElementById('kn-old-grades').innerHTML = Object.entries({
+                quatrinh: og.quatrinh,
+                thiLan1: og.thiLan1,
+                thiLan2: og.thiLan2,
+                cuoiky: og.cuoiky
+            }).map(([k, v]) => `
+                <div class="p-3 rounded-xl bg-canvas border ${k === selectedKn.appealedGrade ? 'border-amber-400' : 'border-surface-hover'}">
+                    <div class="text-text-muted">${gradeLabels[k] || k}</div>
+                    <div class="text-lg font-extrabold mt-1">${v ?? '--'}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('kn-new-grade').value = og[selectedKn.appealedGrade] ?? '';
+            document.getElementById('kn-feedback').value = selectedKn.feedback || '';
+
+            const isPending = selectedKn.status === 'pending';
+            document.getElementById('kn-action-form').classList.toggle('hidden', !isPending);
+            document.getElementById('kn-action-btns').classList.toggle('hidden', !isPending);
+            document.getElementById('kn-detail-panel').classList.remove('hidden');
+        }
+
+        async function processComplaint(status) {
+            if (!selectedKn) return;
+            const newGradeVal = document.getElementById('kn-new-grade').value;
+            const feedback = document.getElementById('kn-feedback').value.trim();
+
+            if (status === 'approved' && newGradeVal === '') return showToast('Vui lòng nhập điểm mới!', 'warning');
+            if (status === 'rejected' && !feedback) return showToast('Vui lòng nhập lý do từ chối!', 'warning');
+
+            try {
+                const res = await apiFetch(`/api/khieunai/${selectedKn.id}/process`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        status,
+                        newGrade: newGradeVal === '' ? null : Number(newGradeVal),
+                        feedback
+                    })
+                });
+                showToast(res.message);
+                document.getElementById('kn-detail-panel').classList.add('hidden');
+                await loadComplaints();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        loadComplaints();
+    </script>
+}

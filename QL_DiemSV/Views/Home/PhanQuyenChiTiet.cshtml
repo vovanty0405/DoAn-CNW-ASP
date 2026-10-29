@@ -1,0 +1,117 @@
+@{
+    Layout = "_Layout";
+    var initialRoleId = ViewData["SelectedRoleId"] ?? 1;
+}
+
+<div class="max-w-[1500px] mx-auto space-y-6">
+    <!-- Top Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <a href="/tai-khoan" class="p-2 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-text-muted hover:text-text-primary">
+                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </a>
+            <div>
+                <div class="text-xs text-text-muted">Thiết lập Ma trận Phân quyền (RBAC)</div>
+                <div class="flex items-center gap-3 mt-1">
+                    <h1 class="text-xl font-bold text-text-primary">Nhóm quyền:</h1>
+                    <select id="pq-role" onchange="loadRoleMatrix()" class="bg-canvas border border-primary rounded-lg px-3 py-1.5 text-sm font-bold text-primary outline-none"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+            <button onclick="grantAll(true)" class="px-3.5 py-2 rounded-xl border border-[#10B981]/50 text-[#10B981] hover:bg-[#10B981]/10 text-xs font-bold">
+                + Cấp toàn bộ quyền
+            </button>
+            <button onclick="grantAll(false)" class="px-3.5 py-2 rounded-xl border border-[#ef4444]/50 text-[#ef4444] hover:bg-[#ef4444]/10 text-xs font-bold">
+                - Thu hồi toàn bộ
+            </button>
+            <button onclick="saveMatrix()" class="px-5 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5">
+                <i data-lucide="save" class="w-4 h-4"></i> Lưu Phân Quyền
+            </button>
+        </div>
+    </div>
+
+    <!-- Matrix Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="p-4 border-b border-surface-hover bg-surface-header">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-text-primary">Ma Trận Quyền Hạn Theo Chức Năng & Hành Động</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead id="pq-thead" class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase"></thead>
+                <tbody id="pq-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let selectedRoleId = @initialRoleId;
+        let modules = [], actions = [], permissions = {};
+
+        async function initPage() {
+            const resRoles = await apiFetch('/api/phanquyen/roles');
+            const roles = resRoles.data || [];
+            const sel = document.getElementById('pq-role');
+            sel.innerHTML = roles.map(r => `<option value="${r.id}" ${r.id == selectedRoleId ? 'selected' : ''}>${r.name}</option>`).join('');
+            await loadRoleMatrix();
+        }
+
+        async function loadRoleMatrix() {
+            selectedRoleId = Number(document.getElementById('pq-role').value);
+            const res = await apiFetch(`/api/phanquyen/${selectedRoleId}/permissions`);
+            modules = res.data.modules || [];
+            actions = res.data.actions || [];
+            permissions = res.data.permissions || {};
+            renderMatrix();
+        }
+
+        function renderMatrix() {
+            document.getElementById('pq-thead').innerHTML = `
+                <tr>
+                    <th class="p-4 border-r border-surface-hover">Phân hệ Chức năng</th>
+                    ${actions.map(a => `<th class="p-4 text-center">${a.name} (${a.id})</th>`).join('')}
+                </tr>
+            `;
+
+            document.getElementById('pq-tbody').innerHTML = modules.map(m => `
+                <tr class="hover:bg-surface-hover/40">
+                    <td class="p-4 border-r border-surface-hover font-semibold text-text-primary">
+                        <div>${m.name}</div>
+                        <div class="text-xs text-text-muted font-normal">${m.id}</div>
+                    </td>
+                    ${actions.map(a => {
+                        const checked = permissions[m.id]?.[a.id] ? 'checked' : '';
+                        return `
+                            <td class="p-4 text-center">
+                                <input type="checkbox" ${checked} onchange="permissions['${m.id}']['${a.id}']=this.checked" class="w-4 h-4 accent-primary cursor-pointer" />
+                            </td>
+                        `;
+                    }).join('')}
+                </tr>
+            `).join('');
+        }
+
+        function grantAll(val) {
+            modules.forEach(m => {
+                permissions[m.id] = permissions[m.id] || {};
+                actions.forEach(a => permissions[m.id][a.id] = val);
+            });
+            renderMatrix();
+        }
+
+        async function saveMatrix() {
+            try {
+                const res = await apiFetch(`/api/phanquyen/${selectedRoleId}/permissions`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ permissions })
+                });
+                showToast(res.message);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        initPage();
+    </script>
+}

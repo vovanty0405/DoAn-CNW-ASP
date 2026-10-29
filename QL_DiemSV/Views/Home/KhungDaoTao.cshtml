@@ -1,0 +1,223 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Chuẩn đầu ra & Tín chỉ</div>
+            <h1 class="text-2xl font-bold text-text-primary">Khung Chương Trình Đào Tạo & Quy Định Tốt Nghiệp</h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <label class="text-sm font-semibold text-text-muted">Chọn Ngành Đào Tạo:</label>
+            <select id="kdt-nganh" onchange="loadCurriculum()" class="bg-surface border border-primary rounded-xl px-4 py-2 text-sm font-bold text-primary outline-none"></select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left: Quy định tốt nghiệp -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
+                <h3 class="font-bold text-text-primary flex items-center gap-2">
+                    <i data-lucide="award" class="w-5 h-5 text-[#10B981]"></i> Chuẩn Đầu Ra & Điều Kiện Tốt Nghiệp
+                </h3>
+                <p class="text-xs text-text-muted">Thông số này dùng để xét điều kiện tốt nghiệp tự động tại trang Tra cứu điểm.</p>
+                <form onsubmit="saveQuyDinh(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Tổng Tín Chỉ Yêu Cầu</label>
+                        <input id="qd-tong" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary font-bold" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Tín Chỉ Bắt Buộc</label>
+                            <input id="qd-bb" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Tín Chỉ Tự Chọn</label>
+                            <input id="qd-tc" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">GPA Hệ 4 Tối Thiểu</label>
+                        <input id="qd-gpa" type="number" step="0.1" min="1" max="4" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                    </div>
+                    <button type="submit" class="w-full py-2.5 rounded-xl bg-[#10B981] text-white text-sm font-bold hover:bg-[#10B981]/90 transition-all">
+                        Lưu Quy Định Tốt Nghiệp
+                    </button>
+                </form>
+            </div>
+
+            <!-- Form Thêm Môn vào Khung -->
+            <div class="bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
+                <h3 class="font-bold text-text-primary flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-primary"></i> Thêm Môn Vào Khung Đào Tạo
+                </h3>
+                <form onsubmit="addMonToKhung(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Môn Học</label>
+                        <select id="add-mamon" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Học Kỳ Dự Kiến</label>
+                            <select id="add-hk" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+                                <option value="1">Học kỳ 1</option>
+                                <option value="2">Học kỳ 2</option>
+                                <option value="3">Học kỳ 3</option>
+                                <option value="4">Học kỳ 4</option>
+                                <option value="5">Học kỳ 5</option>
+                                <option value="6">Học kỳ 6</option>
+                                <option value="7">Học kỳ 7</option>
+                                <option value="8">Học kỳ 8</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Loại Học Phần</label>
+                            <select id="add-loai" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+                                <option value="Bắt buộc">Bắt buộc</option>
+                                <option value="Tự chọn">Tự chọn</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90">
+                        Thêm Vào Khung Chương Trình
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Danh sách môn theo từng học kỳ -->
+        <div class="lg:col-span-8 space-y-4" id="kdt-semesters"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let nganhs = [], monHocs = [];
+
+        async function initPage() {
+            const [resNganh, resMh] = await Promise.all([apiFetch('/api/nganh'), apiFetch('/api/monhoc')]);
+            nganhs = resNganh.data || [];
+            monHocs = resMh.data || [];
+
+            document.getElementById('kdt-nganh').innerHTML = nganhs.map(n => `<option value="${n.MaNganh}">${n.MaNganh} - ${n.TenNganh}</option>`).join('');
+            document.getElementById('add-mamon').innerHTML = monHocs.map(m => `<option value="${m.MaMon}">${m.MaMon} - ${m.TenMon} (${m.SoTinChi} TC)</option>`).join('');
+
+            await loadCurriculum();
+        }
+
+        async function loadCurriculum() {
+            const maNganh = document.getElementById('kdt-nganh').value;
+            if (!maNganh) return;
+
+            const res = await apiFetch(`/api/khungchuongtrinh/${maNganh}`);
+            const qd = res.data.quyDinh;
+            const list = res.data.danhSachMon || [];
+
+            document.getElementById('qd-tong').value = qd.TongTTC;
+            document.getElementById('qd-bb').value = qd.TCBatBuoc;
+            document.getElementById('qd-tc').value = qd.TCTuChon;
+            document.getElementById('qd-gpa').value = qd.MinGPA;
+
+            const byHk = {};
+            list.forEach(item => {
+                byHk[item.HocKyDuKien] = byHk[item.HocKyDuKien] || [];
+                byHk[item.HocKyDuKien].push(item);
+            });
+
+            const container = document.getElementById('kdt-semesters');
+            const keys = Object.keys(byHk).sort((a, b) => Number(a) - Number(b));
+
+            if (keys.length === 0) {
+                container.innerHTML = `<div class="bg-surface border border-surface-hover rounded-2xl p-10 text-center text-text-muted">Chưa có môn học nào trong khung đào tạo của ngành này.</div>`;
+                return;
+            }
+
+            container.innerHTML = keys.map(hk => {
+                const items = byHk[hk];
+                const totalTC = items.reduce((s, x) => s + (x.MonHoc?.SoTinChi || 0), 0);
+                return `
+                    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden">
+                        <div class="px-5 py-3.5 bg-surface-header border-b border-surface-hover flex justify-between items-center">
+                            <span class="font-bold text-sm text-primary">Học Kỳ ${hk}</span>
+                            <span class="text-xs text-text-muted font-semibold">Tổng: ${totalTC} Tín chỉ (${items.length} môn)</span>
+                        </div>
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-surface-hover text-xs text-text-muted uppercase">
+                                    <th class="px-5 py-2.5">Mã Môn</th>
+                                    <th class="px-5 py-2.5">Tên Môn Học</th>
+                                    <th class="px-5 py-2.5 text-center">Số TC</th>
+                                    <th class="px-5 py-2.5 text-center">Loại</th>
+                                    <th class="px-5 py-2.5 text-right">Xóa</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-surface-hover">
+                                ${items.map(x => `
+                                    <tr class="hover:bg-surface-hover/40">
+                                        <td class="px-5 py-3 font-bold text-primary">${x.MaMon}</td>
+                                        <td class="px-5 py-3 font-medium text-text-primary">${x.MonHoc?.TenMon || ''}</td>
+                                        <td class="px-5 py-3 text-center font-bold">${x.MonHoc?.SoTinChi || 0}</td>
+                                        <td class="px-5 py-3 text-center">
+                                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${x.LoaiMon === 'Bắt buộc' ? 'bg-primary/15 text-primary' : 'bg-amber-500/15 text-amber-400'}">${x.LoaiMon}</span>
+                                        </td>
+                                        <td class="px-5 py-3 text-right">
+                                            <button onclick="removeMonFromKhung(${x.ID})" class="text-[#ef4444] hover:underline text-xs">Gỡ bỏ</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function saveQuyDinh(e) {
+            e.preventDefault();
+            const maNganh = document.getElementById('kdt-nganh').value;
+            try {
+                await apiFetch(`/api/khungchuongtrinh/${maNganh}/quydinh`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        MaNganh: maNganh,
+                        TongTTC: Number(document.getElementById('qd-tong').value),
+                        TCBatBuoc: Number(document.getElementById('qd-bb').value),
+                        TCTuChon: Number(document.getElementById('qd-tc').value),
+                        MinGPA: Number(document.getElementById('qd-gpa').value)
+                    })
+                });
+                showToast('Đã cập nhật quy định tốt nghiệp!');
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function addMonToKhung(e) {
+            e.preventDefault();
+            try {
+                await apiFetch('/api/khungchuongtrinh', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        MaNganh: document.getElementById('kdt-nganh').value,
+                        MaMon: document.getElementById('add-mamon').value,
+                        HocKyDuKien: Number(document.getElementById('add-hk').value),
+                        LoaiMon: document.getElementById('add-loai').value
+                    })
+                });
+                showToast('Đã thêm môn vào khung chương trình!');
+                await loadCurriculum();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function removeMonFromKhung(id) {
+            if (!confirm('Gỡ môn học này khỏi khung đào tạo?')) return;
+            try {
+                await apiFetch(`/api/khungchuongtrinh/${id}`, { method: 'DELETE' });
+                showToast('Đã gỡ môn học!');
+                await loadCurriculum();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        initPage();
+    </script>
+}

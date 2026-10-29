@@ -1,0 +1,180 @@
+@using System.Security.Claims
+@{
+    var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "SinhVien";
+    var hoTen = User.FindFirst("HoTen")?.Value ?? User.Identity?.Name ?? "Người dùng";
+    var username = User.Identity?.Name ?? "";
+}
+
+<div class="max-w-[1400px] mx-auto space-y-6">
+    <!-- Hero Banner -->
+    <div class="bg-gradient-to-r from-[#1d2027] via-[#191b23] to-primary/20 border border-surface-hover rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-lg">
+        <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-bold mb-3">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Cổng thông tin Đào tạo Tín chỉ
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-text-primary">
+                Xin chào, <span class="text-primary">@hoTen</span>!
+            </h1>
+            <p class="text-sm text-text-muted mt-1.5 max-w-2xl">
+                Chào mừng bạn quay trở lại Hệ thống Quản lý Điểm Sinh viên. Bạn đang đăng nhập với vai trò <strong class="text-text-primary">@roleName (@username)</strong>.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            @if (roleName == "Admin" || roleName == "GiangVien" || roleName == "KhaoThi")
+            {
+                <a href="/diem-so" class="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all flex items-center gap-2">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Quản lý Điểm số
+                </a>
+            }
+            <a href="/tra-cuu-diem" class="px-4 py-2.5 rounded-xl bg-surface border border-surface-hover hover:border-primary text-text-primary text-sm font-semibold transition-all flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-primary"></i> Tra cứu Điểm & Tốt nghiệp
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="bg-surface border border-surface-hover rounded-2xl p-5 flex items-center justify-between">
+            <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-text-muted">Tổng Sinh Viên</div>
+                <div id="stat-sv" class="text-3xl font-extrabold text-text-primary mt-1">--</div>
+                <div class="text-xs text-[#10B981] mt-1">Đang theo học chính quy</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                <i data-lucide="users" class="w-6 h-6"></i>
+            </div>
+        </div>
+
+        <div class="bg-surface border border-surface-hover rounded-2xl p-5 flex items-center justify-between">
+            <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-text-muted">Giảng Viên</div>
+                <div id="stat-gv" class="text-3xl font-extrabold text-text-primary mt-1">--</div>
+                <div class="text-xs text-primary mt-1">Cơ hữu & Thỉnh giảng</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-[#10B981]/10 text-[#10B981] flex items-center justify-center">
+                <i data-lucide="user-check" class="w-6 h-6"></i>
+            </div>
+        </div>
+
+        <div class="bg-surface border border-surface-hover rounded-2xl p-5 flex items-center justify-between">
+            <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-text-muted">Lớp Học Phần</div>
+                <div id="stat-lhp" class="text-3xl font-extrabold text-text-primary mt-1">--</div>
+                <div class="text-xs text-amber-400 mt-1">Đang mở & Đã chốt</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                <i data-lucide="calendar-range" class="w-6 h-6"></i>
+            </div>
+        </div>
+
+        <div class="bg-surface border border-surface-hover rounded-2xl p-5 flex items-center justify-between">
+            <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-text-muted">Môn Học Đào Tạo</div>
+                <div id="stat-mh" class="text-3xl font-extrabold text-text-primary mt-1">--</div>
+                <div class="text-xs text-purple-400 mt-1">Tín chỉ đại cương & chuyên ngành</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                <i data-lucide="book-open" class="w-6 h-6"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Announcements -->
+        <div class="lg:col-span-2 bg-surface border border-surface-hover rounded-2xl overflow-hidden">
+            <div class="p-5 border-b border-surface-hover bg-surface-header flex items-center justify-between">
+                <h2 class="font-bold text-text-primary flex items-center gap-2">
+                    <i data-lucide="megaphone" class="w-4 h-4 text-primary"></i> Thông báo & Tin tức Đào tạo
+                </h2>
+                <span class="text-xs text-text-muted">Năm học 2024 - 2025</span>
+            </div>
+            <div class="divide-y divide-surface-hover p-5 space-y-4">
+                <div class="pb-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2 py-0.5 rounded bg-[#ef4444]/15 text-[#ef4444] text-[10px] font-bold uppercase">Quan trọng</span>
+                        <span class="text-xs text-text-muted">Phòng Đào Tạo</span>
+                    </div>
+                    <h3 class="font-bold text-text-primary text-sm">Thông báo kế hoạch nhập điểm Quá trình (40%) và Thi kết thúc học phần (60%)</h3>
+                    <p class="text-xs text-text-muted mt-1 leading-relaxed">
+                        Giảng viên phụ trách các lớp học phần thực hiện cấu hình cột điểm thành phần (tổng trọng số 100%) và khóa sổ điểm đúng thời hạn. Quy chế điểm thi lại lần 2 áp dụng mức trần tối đa 6.0 điểm (QC 6.0).
+                    </p>
+                </div>
+                <div class="pt-2 pb-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2 py-0.5 rounded bg-primary/15 text-primary text-[10px] font-bold uppercase">Học vụ</span>
+                        <span class="text-xs text-text-muted">Phòng Khảo Thí</span>
+                    </div>
+                    <h3 class="font-bold text-text-primary text-sm">Hướng dẫn Sinh viên gửi đơn Khiếu nại & Phúc khảo điểm trực tuyến</h3>
+                    <p class="text-xs text-text-muted mt-1 leading-relaxed">
+                        Sinh viên có thể tra cứu điểm chi tiết từng học kỳ, kiểm tra tiến độ xét tốt nghiệp và gửi đơn phúc khảo trực tiếp tại mục "Tra cứu điểm & Tốt nghiệp".
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Navigation Shortcuts -->
+        <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden">
+            <div class="p-5 border-b border-surface-hover bg-surface-header">
+                <h2 class="font-bold text-text-primary flex items-center gap-2">
+                    <i data-lucide="compass" class="w-4 h-4 text-[#10B981]"></i> Lối tắt Nghiệp vụ
+                </h2>
+            </div>
+            <div class="p-4 grid grid-cols-1 gap-2.5">
+                <a href="/tra-cuu-diem" class="p-3 rounded-xl bg-canvas border border-surface-hover hover:border-primary flex items-center justify-between transition-all">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="search" class="w-4 h-4 text-primary"></i>
+                        <span class="text-sm font-medium text-text-primary">Tra cứu Bảng điểm & GPA</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-text-muted"></i>
+                </a>
+                @if (roleName == "Admin" || roleName == "GiangVien" || roleName == "KhaoThi")
+                {
+                    <a href="/diem-so" class="p-3 rounded-xl bg-canvas border border-surface-hover hover:border-primary flex items-center justify-between transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="edit-3" class="w-4 h-4 text-[#10B981]"></i>
+                            <span class="text-sm font-medium text-text-primary">Nhập điểm Lớp học phần</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-text-muted"></i>
+                    </a>
+                }
+                @if (roleName == "Admin" || roleName == "GiangVien")
+                {
+                    <a href="/khieu-nai" class="p-3 rounded-xl bg-canvas border border-surface-hover hover:border-primary flex items-center justify-between transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="message-square-warning" class="w-4 h-4 text-amber-400"></i>
+                            <span class="text-sm font-medium text-text-primary">Xử lý Đơn phúc khảo</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-text-muted"></i>
+                    </a>
+                    <a href="/thong-ke" class="p-3 rounded-xl bg-canvas border border-surface-hover hover:border-primary flex items-center justify-between transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="pie-chart" class="w-4 h-4 text-purple-400"></i>
+                            <span class="text-sm font-medium text-text-primary">Biểu đồ Phổ điểm & Học lực</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-text-muted"></i>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (async function () {
+            try {
+                const [sv, gv, lhp, mh] = await Promise.all([
+                    fetch('/api/sinhvien').then(r => r.json()),
+                    fetch('/api/giangvien').then(r => r.json()),
+                    fetch('/api/lophocphan').then(r => r.json()),
+                    fetch('/api/monhoc').then(r => r.json())
+                ]);
+                document.getElementById('stat-sv').textContent = (sv.data || []).length;
+                document.getElementById('stat-gv').textContent = (gv.data || []).length;
+                document.getElementById('stat-lhp').textContent = (lhp.data || []).length;
+                document.getElementById('stat-mh').textContent = (mh.data || []).length;
+            } catch (e) { }
+        })();
+    </script>
+}

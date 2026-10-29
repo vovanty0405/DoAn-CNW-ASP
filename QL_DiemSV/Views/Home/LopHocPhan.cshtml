@@ -1,0 +1,687 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Xếp lớp & Học kỳ</div>
+            <h1 class="text-2xl font-bold text-text-primary">Quản Lý Lớp Học Phần & Đăng Ký Sinh Viên</h1>
+        </div>
+        <div class="flex flex-wrap gap-2.5">
+            <button onclick="document.getElementById('hk-modal').classList.remove('hidden')" class="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-sm font-bold flex items-center gap-2">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i> Quản lý Học Kỳ
+            </button>
+            <button onclick="openLhpModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> Mở Lớp Học Phần Mới
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="lhp-search" oninput="renderLhpTable()" type="text" placeholder="Tìm Mã LHP, Tên lớp, Phòng..."
+                   class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
+        </div>
+        <select id="lhp-hk" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <option value="">Tất cả Học kỳ</option>
+        </select>
+        <select id="lhp-mon" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <option value="">Tất cả Môn học</option>
+        </select>
+        <select id="lhp-gv" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <option value="">Tất cả Giảng viên</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
+                        <th class="px-5 py-3.5 font-semibold">Mã LHP</th>
+                        <th class="px-5 py-3.5 font-semibold">Tên Lớp Học Phần / Môn</th>
+                        <th class="px-5 py-3.5 font-semibold">Học kỳ</th>
+                        <th class="px-5 py-3.5 font-semibold">Giảng viên</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">Phòng</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">Sĩ số</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">Trạng thái</th>
+                        <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="lhp-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+        <!-- Pagination Footer -->
+        <div class="px-5 py-3.5 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+            <div class="flex items-center gap-3">
+                <span id="lhp-pagination-info">Đang tải...</span>
+                <div class="flex items-center gap-1.5">
+                    <span>Hiển thị</span>
+                    <select id="lhp-page-size" onchange="changeLhpPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span>/ trang</span>
+                </div>
+            </div>
+            <div id="lhp-pagination-controls" class="flex items-center gap-1"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Dual-Listbox Xếp Lớp Sinh Viên -->
+<div id="enroll-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <div>
+                <h3 id="enroll-title" class="text-lg font-bold text-text-primary">Xếp Lớp Sinh Viên</h3>
+                <p class="text-xs text-text-muted mt-0.5">Hệ thống tự động lọc các sinh viên đủ điều kiện tiên quyết và chưa học trùng môn trong kỳ.</p>
+            </div>
+            <button onclick="document.getElementById('enroll-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-hidden">
+            <!-- Left: Available Students -->
+            <div class="border border-surface-hover rounded-xl flex flex-col overflow-hidden bg-canvas">
+                <div class="p-3 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-text-primary">SV Đủ Điều Kiện Đăng Ký</span>
+                    <button onclick="enrollSelectedStudents()" class="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90">+ Thêm vào lớp</button>
+                </div>
+                <div id="avail-list" class="p-3 overflow-y-auto max-h-80 space-y-1.5 custom-scrollbar"></div>
+            </div>
+
+            <!-- Right: Enrolled Students -->
+            <div class="border border-surface-hover rounded-xl flex flex-col overflow-hidden bg-canvas">
+                <div class="p-3 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-[#10B981]">SV Đã Trong Lớp Học Phần</span>
+                    <button onclick="removeSelectedStudents()" class="px-3 py-1 rounded-lg bg-[#ef4444]/15 text-[#ef4444] text-xs font-bold hover:bg-[#ef4444]/25">- Xóa khỏi lớp</button>
+                </div>
+                <div id="enrolled-list" class="p-3 overflow-y-auto max-h-80 space-y-1.5 custom-scrollbar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm/Sửa LHP -->
+<div id="lhp-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 id="lhp-modal-title" class="text-lg font-bold text-text-primary">Mở Lớp Học Phần</h3>
+            <button onclick="document.getElementById('lhp-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form onsubmit="saveLopHocPhan(event)" class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Mã Lớp Học Phần *</label>
+                    <input id="p-malhp" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Tên Lớp Học Phần *</label>
+                    <input id="p-tenlhp" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Môn Học</label>
+                    <select id="p-mamon" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Học Kỳ</label>
+                    <select id="p-mahk" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Giảng Viên Phụ Trách</label>
+                    <select id="p-magv" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Phòng Học</label>
+                    <input id="p-phong" value="A101" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Sĩ Số Tối Đa</label>
+                    <input id="p-siso" type="number" value="40" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Trạng Thái Lớp</label>
+                    <select id="p-trangthai" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+                        <option value="MoDangKy">Đang mở đăng ký</option>
+                        <option value="Đã chốt">Đã chốt</option>
+                        <option value="Hủy">Hủy</option>
+                    </select>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('lhp-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover text-sm text-text-muted">Hủy</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-bold">Lưu Lớp Học Phần</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Quản lý Học Kỳ -->
+<div id="hk-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-text-primary">Quản Lý Danh Mục Học Kỳ</h3>
+                    <p class="text-xs text-text-muted">Thêm mới, điều chỉnh niên khóa và thời gian học kỳ trong chương trình đào tạo</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('hk-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+            <!-- Form bên trái -->
+            <form id="form-hk" onsubmit="saveHocKy(event)" class="lg:col-span-4 bg-canvas border border-surface-hover rounded-xl p-4 space-y-3.5 h-fit">
+                <div class="border-b border-surface-hover pb-2.5 flex items-center justify-between">
+                    <h4 id="hk-form-title" class="font-bold text-sm text-primary flex items-center gap-1.5">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Thêm Học Kỳ Mới
+                    </h4>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-text-muted mb-1">Mã Học Kỳ *</label>
+                    <input id="h-mahk" required placeholder="VD: HK1_2526" class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-text-muted mb-1">Tên Học Kỳ *</label>
+                    <input id="h-tenhk" required placeholder="VD: Học kỳ 1 (2025 - 2026)" class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none transition-colors" />
+                </div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-text-muted mb-1">Năm Bắt Đầu *</label>
+                        <input id="h-bd" type="number" value="2025" required class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none transition-colors" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-text-muted mb-1">Năm Kết Thúc *</label>
+                        <input id="h-kt" type="number" value="2026" required class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none transition-colors" />
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center gap-2">
+                    <button type="button" id="btn-cancel-edit-hk" onclick="cancelEditHk()" class="hidden flex-1 py-2 rounded-lg border border-surface-hover text-xs font-semibold text-text-muted hover:bg-surface-hover transition-colors">
+                        Hủy Sửa
+                    </button>
+                    <button type="submit" id="btn-save-hk" class="flex-1 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-md shadow-primary/20 flex items-center justify-center gap-1.5 transition-all">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Thêm Học Kỳ
+                    </button>
+                </div>
+            </form>
+
+            <!-- Bảng danh sách bên phải -->
+            <div class="lg:col-span-8 overflow-hidden border border-surface-hover rounded-xl flex flex-col bg-canvas">
+                <div class="p-3 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                        <i data-lucide="list" class="w-3.5 h-3.5 text-primary"></i> Danh Sách Học Kỳ Đã Tạo
+                    </span>
+                    <span id="hk-count-badge" class="text-xs text-text-muted">0 học kỳ</span>
+                </div>
+                <div class="overflow-y-auto max-h-[420px] custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="sticky top-0 z-10 bg-surface-header border-b border-surface-hover shadow-sm">
+                            <tr class="text-xs text-text-muted uppercase tracking-wider">
+                                <th class="p-3.5 font-semibold">Mã HK</th>
+                                <th class="p-3.5 font-semibold">Tên Học Kỳ</th>
+                                <th class="p-3.5 font-semibold">Năm Học</th>
+                                <th class="p-3.5 font-semibold text-right">THAO TÁC</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hk-tbody" class="divide-y divide-surface-hover"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác Thực Mật Khẩu Khi Xóa -->
+<div id="pwd-confirm-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="text-base font-bold text-text-primary flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-5 h-5 text-[#ef4444]"></i> Xác Thực Mật Khẩu Xóa
+            </h3>
+            <button onclick="closePwdConfirmModal()" class="text-text-muted hover:text-[#ef4444] transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <form onsubmit="handlePwdConfirmSubmit(event)" class="p-6 space-y-4">
+            <p class="text-xs text-text-muted leading-relaxed">
+                Hành động này mang tính chất quan trọng và không thể hoàn tác. Để tiếp tục xóa <span id="pwd-confirm-item-name" class="font-bold text-text-primary"></span>, vui lòng nhập mật khẩu tài khoản của bạn để xác thực:
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Mật khẩu tài khoản *</label>
+                <div class="relative">
+                    <i data-lucide="lock" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input id="pwd-confirm-input" type="password" required placeholder="Nhập mật khẩu của bạn..."
+                           class="w-full bg-canvas border border-surface-hover rounded-xl pl-9 pr-3 py-2.5 text-sm text-text-primary focus:border-[#ef4444] focus:outline-none transition-colors" />
+                </div>
+                <p id="pwd-confirm-error" class="hidden text-xs text-[#ef4444] font-medium mt-1.5 flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span id="pwd-confirm-error-msg">Mật khẩu xác thực không chính xác!</span>
+                </p>
+            </div>
+            <div class="pt-2 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="closePwdConfirmModal()" class="px-4 py-2 rounded-xl border border-surface-hover text-xs font-semibold text-text-muted hover:bg-surface-hover transition-colors">Hủy bỏ</button>
+                <button type="submit" id="btn-pwd-confirm-submit" class="px-5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white text-xs font-bold shadow-lg shadow-[#ef4444]/20 flex items-center gap-1.5 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Xác nhận xóa
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let lhpList = [], hks = [], mons = [], gvs = [], editingMaLHP = null, activeEnrollLHP = null, editingMaHK = null;
+        let lhpCurrentPage = 1, lhpPageSize = 10;
+        let pendingDeleteAction = null;
+
+        async function loadData() {
+            const [resLhp, resHk, resMon, resGv] = await Promise.all([
+                apiFetch('/api/lophocphan'),
+                apiFetch('/api/hocky'),
+                apiFetch('/api/monhoc'),
+                apiFetch('/api/giangvien')
+            ]);
+            lhpList = resLhp.data || [];
+            hks = resHk.data || [];
+            mons = resMon.data || [];
+            gvs = resGv.data || [];
+
+            document.getElementById('lhp-hk').innerHTML = '<option value="">Tất cả Học kỳ</option>' + hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
+            document.getElementById('lhp-mon').innerHTML = '<option value="">Tất cả Môn học</option>' + mons.map(m => `<option value="${m.MaMon}">${m.TenMon}</option>`).join('');
+            document.getElementById('lhp-gv').innerHTML = '<option value="">Tất cả Giảng viên</option>' + gvs.map(g => `<option value="${g.MaGV}">${g.HoTen}</option>`).join('');
+
+            document.getElementById('p-mamon').innerHTML = mons.map(m => `<option value="${m.MaMon}">${m.MaMon} - ${m.TenMon}</option>`).join('');
+            document.getElementById('p-mahk').innerHTML = hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
+            document.getElementById('p-magv').innerHTML = gvs.map(g => `<option value="${g.MaGV}">${g.MaGV} - ${g.HoTen}</option>`).join('');
+
+            renderLhpTable();
+            renderHkTable();
+        }
+
+        function getFilteredLhp() {
+            const q = document.getElementById('lhp-search').value.toLowerCase().trim();
+            const maHK = document.getElementById('lhp-hk').value;
+            const maMon = document.getElementById('lhp-mon').value;
+            const maGV = document.getElementById('lhp-gv').value;
+
+            return lhpList.filter(l => {
+                const mQ = !q || l.MaLHP.toLowerCase().includes(q) || (l.TenLopHP || '').toLowerCase().includes(q) || (l.PhongHoc || '').toLowerCase().includes(q);
+                const mH = !maHK || l.MaHK === maHK;
+                const mM = !maMon || l.MaMon === maMon;
+                const mG = !maGV || l.MaGV === maGV;
+                return mQ && mH && mM && mG;
+            });
+        }
+
+        function renderLhpTable(resetPage = false) {
+            if (resetPage) lhpCurrentPage = 1;
+            const filtered = getFilteredLhp();
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / lhpPageSize));
+
+            if (lhpCurrentPage > totalPages) lhpCurrentPage = totalPages;
+            if (lhpCurrentPage < 1) lhpCurrentPage = 1;
+
+            const startIndex = (lhpCurrentPage - 1) * lhpPageSize;
+            const endIndex = Math.min(startIndex + lhpPageSize, totalItems);
+            const paged = filtered.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('lhp-tbody');
+            if (paged.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-text-muted">Không tìm thấy lớp học phần nào phù hợp</td></tr>`;
+            } else {
+                tbody.innerHTML = paged.map(l => `
+                    <tr class="hover:bg-surface-hover/40 transition-colors">
+                        <td class="px-5 py-3.5 font-bold text-primary">${l.MaLHP}</td>
+                        <td class="px-5 py-3.5">
+                            <div class="font-semibold text-text-primary">${l.TenLopHP || ''}</div>
+                            <div class="text-xs text-text-muted">${l.MonHoc?.TenMon || l.MaMon} (${l.MonHoc?.SoTinChi || 3} TC)</div>
+                        </td>
+                        <td class="px-5 py-3.5 text-text-muted">${l.HocKy ? `${l.HocKy.TenHK} (${l.HocKy.NamHocBatDau}-${l.HocKy.NamHocKetThuc})` : l.MaHK}</td>
+                        <td class="px-5 py-3.5 text-text-primary">${l.GiangVien?.HoTen || l.MaGV || ''}</td>
+                        <td class="px-5 py-3.5 text-center">${l.PhongHoc || ''}</td>
+                        <td class="px-5 py-3.5 text-center font-bold">${l.SiSoHienTai || 0} / ${l.SiSoToiDa || 40}</td>
+                        <td class="px-5 py-3.5 text-center">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${l.TrangThai === 'MoDangKy' ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-primary/15 text-primary'}">${l.TrangThai === 'MoDangKy' ? 'Đang mở' : l.TrangThai}</span>
+                        </td>
+                        <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center gap-1.5">
+                                <button onclick="openEnrollModal('${l.MaLHP}')" title="Xếp lớp sinh viên" class="px-2.5 py-1 rounded-lg bg-[#10B981]/15 text-[#10B981] text-xs font-bold hover:bg-[#10B981]/25 flex items-center gap-1 transition-colors">
+                                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Xếp SV
+                                </button>
+                                <button onclick='openLhpModal(${JSON.stringify(l).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick='confirmDeleteLhp("${l.MaLHP}", "${(l.TenLopHP || '').replace(/"/g, '&quot;')}")' class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderLhpPagination(totalItems, totalPages, startIndex, endIndex);
+            lucide.createIcons();
+        }
+
+        function renderLhpPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('lhp-pagination-info');
+            if (infoEl) {
+                if (totalItems === 0) infoEl.textContent = '0 lớp';
+                else infoEl.textContent = `Hiển thị ${startIndex + 1} - ${endIndex} trên ${totalItems} lớp học phần`;
+            }
+
+            const controlsEl = document.getElementById('lhp-pagination-controls');
+            if (!controlsEl) return;
+            if (totalPages <= 1) {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = lhpCurrentPage === 1;
+            html += `<button onclick="changeLhpPage(${lhpCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${prevDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, lhpCurrentPage - 2);
+            const endP = Math.min(totalPages, lhpCurrentPage + 2);
+
+            if (startP > 1) {
+                html += `<button onclick="changeLhpPage(1)" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1 text-text-muted">...</span>`;
+            }
+
+            for (let p = startP; p <= endP; p++) {
+                const isActive = p === lhpCurrentPage;
+                html += `<button onclick="changeLhpPage(${p})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-primary/20' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1 text-text-muted">...</span>`;
+                html += `<button onclick="changeLhpPage(${totalPages})" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDisabled = lhpCurrentPage === totalPages;
+            html += `<button onclick="changeLhpPage(${lhpCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${nextDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function changeLhpPage(page) {
+            lhpCurrentPage = page;
+            renderLhpTable();
+        }
+
+        function changeLhpPageSize(size) {
+            lhpPageSize = parseInt(size, 10);
+            lhpCurrentPage = 1;
+            renderLhpTable();
+        }
+
+        async function openEnrollModal(maLHP) {
+            activeEnrollLHP = maLHP;
+            document.getElementById('enroll-title').textContent = `Xếp Lớp Sinh Viên — ${maLHP}`;
+            document.getElementById('enroll-modal').classList.remove('hidden');
+            await refreshEnrollLists();
+        }
+
+        async function refreshEnrollLists() {
+            const [resDetail, resAvail] = await Promise.all([
+                apiFetch(`/api/lophocphan/${activeEnrollLHP}`),
+                apiFetch(`/api/lophocphan/${activeEnrollLHP}/available-students`)
+            ]);
+            const enrolled = resDetail.data.students || [];
+            const avail = resAvail.data || [];
+
+            document.getElementById('avail-list').innerHTML = avail.length === 0
+                ? `<div class="p-4 text-center text-xs text-text-muted">Không còn sinh viên khả dụng</div>`
+                : avail.map(s => `
+                    <label class="flex items-center justify-between p-2.5 rounded-lg bg-surface hover:bg-surface-hover cursor-pointer text-xs">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" name="chk-avail" value="${s.MaSV}" class="accent-primary" />
+                            <span class="font-bold text-primary">${s.MaSV}</span>
+                            <span class="text-text-primary font-medium">${s.HoTen}</span>
+                        </div>
+                        <span class="text-text-muted">${s.MaLop || ''}</span>
+                    </label>
+                `).join('');
+
+            document.getElementById('enrolled-list').innerHTML = enrolled.length === 0
+                ? `<div class="p-4 text-center text-xs text-text-muted">Chưa có sinh viên trong lớp</div>`
+                : enrolled.map(s => `
+                    <label class="flex items-center justify-between p-2.5 rounded-lg bg-surface hover:bg-surface-hover cursor-pointer text-xs">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" name="chk-enrolled" value="${s.MaSV}" class="accent-[#ef4444]" />
+                            <span class="font-bold text-[#10B981]">${s.MaSV}</span>
+                            <span class="text-text-primary font-medium">${s.HoTen}</span>
+                        </div>
+                        <span class="text-text-muted">${s.MaLop || ''}</span>
+                    </label>
+                `).join('');
+        }
+
+        async function enrollSelectedStudents() {
+            const ids = Array.from(document.querySelectorAll('input[name="chk-avail"]:checked')).map(el => el.value);
+            if (ids.length === 0) return showToast('Vui lòng chọn sinh viên cần thêm!', 'warning');
+            try {
+                const res = await apiFetch(`/api/lophocphan/${activeEnrollLHP}/students`, { method: 'POST', body: JSON.stringify({ studentIds: ids }) });
+                showToast(res.message);
+                await refreshEnrollLists();
+                await loadData();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function removeSelectedStudents() {
+            const ids = Array.from(document.querySelectorAll('input[name="chk-enrolled"]:checked')).map(el => el.value);
+            if (ids.length === 0) return showToast('Vui lòng chọn sinh viên cần xóa!', 'warning');
+            try {
+                const res = await apiFetch(`/api/lophocphan/${activeEnrollLHP}/students`, { method: 'DELETE', body: JSON.stringify({ studentIds: ids }) });
+                showToast(res.message);
+                await refreshEnrollLists();
+                await loadData();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function openLhpModal(l = null) {
+            editingMaLHP = l ? l.MaLHP : null;
+            document.getElementById('lhp-modal-title').textContent = l ? 'Cập Nhật Lớp Học Phần' : 'Mở Lớp Học Phần Mới';
+            document.getElementById('p-malhp').value = l ? l.MaLHP : '';
+            document.getElementById('p-malhp').disabled = !!l;
+            document.getElementById('p-tenlhp').value = l ? l.TenLopHP : '';
+            document.getElementById('p-mamon').value = l ? l.MaMon : (mons[0]?.MaMon || '');
+            document.getElementById('p-mahk').value = l ? l.MaHK : (hks[0]?.MaHK || '');
+            document.getElementById('p-magv').value = l ? l.MaGV : (gvs[0]?.MaGV || '');
+            document.getElementById('p-phong').value = l ? (l.PhongHoc || 'A101') : 'A101';
+            document.getElementById('p-siso').value = l ? (l.SiSoToiDa || 40) : 40;
+            document.getElementById('p-trangthai').value = l ? (l.TrangThai || 'MoDangKy') : 'MoDangKy';
+            document.getElementById('lhp-modal').classList.remove('hidden');
+        }
+
+        async function saveLopHocPhan(e) {
+            e.preventDefault();
+            const payload = {
+                MaLHP: document.getElementById('p-malhp').value.trim(),
+                TenLopHP: document.getElementById('p-tenlhp').value.trim(),
+                MaMon: document.getElementById('p-mamon').value,
+                MaHK: document.getElementById('p-mahk').value,
+                MaGV: document.getElementById('p-magv').value,
+                PhongHoc: document.getElementById('p-phong').value.trim(),
+                SiSoToiDa: Number(document.getElementById('p-siso').value),
+                TrangThai: document.getElementById('p-trangthai').value
+            };
+            try {
+                if (editingMaLHP) await apiFetch(`/api/lophocphan/${editingMaLHP}`, { method: 'PUT', body: JSON.stringify(payload) });
+                else await apiFetch('/api/lophocphan', { method: 'POST', body: JSON.stringify(payload) });
+                showToast('Đã lưu lớp học phần!');
+                document.getElementById('lhp-modal').classList.add('hidden');
+                await loadData();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function confirmDeleteLhp(id, name) {
+            requestSecureDelete(`Lớp học phần "${id} - ${name}"`, async () => {
+                await apiFetch(`/api/lophocphan/${id}`, { method: 'DELETE' });
+                showToast('Đã xóa lớp học phần!');
+                await loadData();
+            });
+        }
+        function deleteLhp(id) { confirmDeleteLhp(id, id); }
+
+        // --- QUẢN LÝ HỌC KỲ ---
+        function renderHkTable() {
+            const countBadge = document.getElementById('hk-count-badge');
+            if (countBadge) countBadge.textContent = `${hks.length} học kỳ`;
+
+            const tbody = document.getElementById('hk-tbody');
+            if (!hks || hks.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-text-muted">Chưa có học kỳ nào</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = hks.map(h => `
+                <tr class="hover:bg-surface-hover/30 transition-colors">
+                    <td class="p-3.5 font-bold text-primary">${h.MaHK}</td>
+                    <td class="p-3.5 font-medium text-text-primary">${h.TenHK}</td>
+                    <td class="p-3.5 text-xs text-text-muted">${h.NamHocBatDau} - ${h.NamHocKetThuc}</td>
+                    <td class="p-3.5 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                            <button type="button" onclick="editHk('${h.MaHK}')" class="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/25 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Sửa
+                            </button>
+                            <button type="button" onclick="confirmDeleteHk('${h.MaHK}', '${(h.TenHK || '').replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 rounded-lg bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/25 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function editHk(maHK) {
+            const item = hks.find(h => h.MaHK === maHK);
+            if (!item) return;
+
+            editingMaHK = maHK;
+            document.getElementById('hk-form-title').innerHTML = '<i data-lucide="edit-3" class="w-4 h-4 text-amber-400"></i> Cập Nhật Học Kỳ';
+            document.getElementById('h-mahk').value = item.MaHK;
+            document.getElementById('h-mahk').disabled = true;
+            document.getElementById('h-tenhk').value = item.TenHK;
+            document.getElementById('h-bd').value = item.NamHocBatDau || 2025;
+            document.getElementById('h-kt').value = item.NamHocKetThuc || 2026;
+
+            document.getElementById('btn-save-hk').innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Cập Nhật Học Kỳ';
+            document.getElementById('btn-cancel-edit-hk').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function cancelEditHk() {
+            editingMaHK = null;
+            document.getElementById('hk-form-title').innerHTML = '<i data-lucide="plus-circle" class="w-4 h-4 text-primary"></i> Thêm Học Kỳ Mới';
+            document.getElementById('h-mahk').value = '';
+            document.getElementById('h-mahk').disabled = false;
+            document.getElementById('h-tenhk').value = '';
+            document.getElementById('h-bd').value = 2025;
+            document.getElementById('h-kt').value = 2026;
+
+            document.getElementById('btn-save-hk').innerHTML = '<i data-lucide="plus" class="w-3.5 h-3.5"></i> Thêm Học Kỳ';
+            document.getElementById('btn-cancel-edit-hk').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        async function saveHocKy(e) {
+            e.preventDefault();
+            const payload = {
+                MaHK: document.getElementById('h-mahk').value.trim(),
+                TenHK: document.getElementById('h-tenhk').value.trim(),
+                NamHocBatDau: Number(document.getElementById('h-bd').value),
+                NamHocKetThuc: Number(document.getElementById('h-kt').value)
+            };
+
+            try {
+                if (editingMaHK) {
+                    await apiFetch(`/api/hocky/${editingMaHK}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                    showToast('Đã cập nhật học kỳ!');
+                } else {
+                    await apiFetch('/api/hocky', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    showToast('Đã thêm học kỳ mới!');
+                }
+                cancelEditHk();
+                await loadData();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function confirmDeleteHk(id, name) {
+            requestSecureDelete(`Học kỳ "${id} - ${name}"`, async () => {
+                await apiFetch(`/api/hocky/${id}`, { method: 'DELETE' });
+                showToast('Đã xóa học kỳ!');
+                if (editingMaHK === id) cancelEditHk();
+                await loadData();
+            });
+        }
+
+        // --- PASSWORD CONFIRMATION MODAL LOGIC ---
+        function requestSecureDelete(itemName, callback) {
+            pendingDeleteAction = callback;
+            document.getElementById('pwd-confirm-item-name').textContent = itemName;
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+            document.getElementById('pwd-confirm-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pwd-confirm-input').focus(), 100);
+            lucide.createIcons();
+        }
+
+        function closePwdConfirmModal() {
+            pendingDeleteAction = null;
+            document.getElementById('pwd-confirm-modal').classList.add('hidden');
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+        }
+
+        async function handlePwdConfirmSubmit(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('pwd-confirm-input').value;
+            const errBox = document.getElementById('pwd-confirm-error');
+            const errMsg = document.getElementById('pwd-confirm-error-msg');
+            const btnSubmit = document.getElementById('btn-pwd-confirm-submit');
+
+            errBox.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70');
+
+            try {
+                // Xác thực mật khẩu tài khoản hiện tại qua API
+                await apiFetch('/api/auth/verify-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ Password: pwd })
+                });
+
+                // Nếu mật khẩu chính xác, thực hiện hành động xóa
+                if (typeof pendingDeleteAction === 'function') {
+                    await pendingDeleteAction();
+                }
+                closePwdConfirmModal();
+            } catch (err) {
+                errBox.classList.remove('hidden');
+                errMsg.textContent = err.message || 'Mật khẩu xác thực không chính xác!';
+                lucide.createIcons();
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70');
+            }
+        }
+
+        loadData();
+    </script>
+}

@@ -1,0 +1,307 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Học phần & Tiên quyết</div>
+            <h1 class="text-2xl font-bold text-text-primary">Quản Lý Môn Học</h1>
+        </div>
+        <div class="flex flex-wrap gap-2.5">
+            <button onclick="exportMonHocExcel()" class="px-4 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-sm font-semibold text-text-primary flex items-center gap-2">
+                <i data-lucide="download" class="w-4 h-4 text-primary"></i> Xuất Excel
+            </button>
+            <button onclick="openMhModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> Thêm Môn Học
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="mh-search" oninput="renderMhTable()" type="text" placeholder="Tìm Mã môn, Tên môn học..."
+                   class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
+        </div>
+        <select id="mh-khoa" onchange="renderMhTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <option value="">Tất cả Khoa phụ trách</option>
+        </select>
+        <select id="mh-tc" onchange="renderMhTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <option value="">Tất cả Số tín chỉ</option>
+            <option value="2">2 Tín chỉ</option>
+            <option value="3">3 Tín chỉ</option>
+            <option value="4">4 Tín chỉ</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
+                        <th class="px-5 py-3.5 font-semibold">Mã Môn</th>
+                        <th class="px-5 py-3.5 font-semibold">Tên Môn Học</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">Tín chỉ</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">LT / TH</th>
+                        <th class="px-5 py-3.5 font-semibold">Khoa quản lý</th>
+                        <th class="px-5 py-3.5 font-semibold">Môn Tiên Quyết</th>
+                        <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="mh-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+        <!-- Pagination Footer -->
+        <div class="px-5 py-3.5 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+            <div class="flex items-center gap-3">
+                <span id="mh-pagination-info">Đang tải...</span>
+                <div class="flex items-center gap-1.5">
+                    <span>Hiển thị</span>
+                    <select id="mh-page-size" onchange="changeMhPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span>/ trang</span>
+                </div>
+            </div>
+            <div id="mh-pagination-controls" class="flex items-center gap-1"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Môn Học -->
+<div id="mh-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 id="mh-modal-title" class="text-lg font-bold text-text-primary">Thêm Môn Học</h3>
+            <button onclick="document.getElementById('mh-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form onsubmit="saveMonHoc(event)" class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Mã Môn *</label>
+                    <input id="mh-mamon" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Số Tín Chỉ *</label>
+                    <input id="mh-sotc" type="number" min="1" max="10" value="3" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs text-text-muted mb-1">Tên Môn Học *</label>
+                    <input id="mh-tenmon" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Số tiết Lý thuyết</label>
+                    <input id="mh-lt" type="number" value="30" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Số tiết Thực hành</label>
+                    <input id="mh-th" type="number" value="15" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs text-text-muted mb-1">Khoa phụ trách</label>
+                    <select id="mh-makhoa" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none"></select>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs text-text-muted mb-1">Môn Tiên Quyết (Có thể chọn nhiều, kiểm tra chống vòng lặp)</label>
+                    <div id="mh-prereq-list" class="max-h-36 overflow-y-auto p-3 rounded-lg bg-canvas border border-surface-hover grid grid-cols-2 gap-2 text-xs"></div>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('mh-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover text-sm text-text-muted">Hủy</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-bold">Lưu Môn Học</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let mhList = [], khoas = [], editingMaMon = null;
+        let mhCurrentPage = 1, mhPageSize = 10;
+
+        async function loadData() {
+            const [resMh, resKhoa] = await Promise.all([apiFetch('/api/monhoc'), apiFetch('/api/khoa')]);
+            mhList = resMh.data || [];
+            khoas = resKhoa.data || [];
+
+            document.getElementById('mh-khoa').innerHTML = '<option value="">Tất cả Khoa phụ trách</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+            document.getElementById('mh-makhoa').innerHTML = khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+
+            renderMhTable();
+        }
+
+        function getFilteredMh() {
+            const q = document.getElementById('mh-search').value.toLowerCase().trim();
+            const maKhoa = document.getElementById('mh-khoa').value;
+            const tc = document.getElementById('mh-tc').value;
+
+            return mhList.filter(m => {
+                const mQ = !q || m.MaMon.toLowerCase().includes(q) || m.TenMon.toLowerCase().includes(q);
+                const mK = !maKhoa || m.MaKhoa === maKhoa;
+                const mTC = !tc || String(m.SoTinChi) === tc;
+                return mQ && mK && mTC;
+            });
+        }
+
+        function renderMhTable(resetPage = false) {
+            if (resetPage) mhCurrentPage = 1;
+            const filtered = getFilteredMh();
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / mhPageSize));
+
+            if (mhCurrentPage > totalPages) mhCurrentPage = totalPages;
+            if (mhCurrentPage < 1) mhCurrentPage = 1;
+
+            const startIndex = (mhCurrentPage - 1) * mhPageSize;
+            const endIndex = Math.min(startIndex + mhPageSize, totalItems);
+            const paged = filtered.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('mh-tbody');
+            if (paged.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-text-muted">Không tìm thấy môn học nào phù hợp</td></tr>`;
+            } else {
+                tbody.innerHTML = paged.map(m => {
+                    const prereqs = (m.DieuKienTienQuyets || []).map(d => `<span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 text-xs font-semibold mr-1">${d.MaMonTienQuyet}</span>`).join('');
+                    return `
+                        <tr class="hover:bg-surface-hover/40 transition-colors">
+                            <td class="px-5 py-3.5 font-bold text-primary">${m.MaMon}</td>
+                            <td class="px-5 py-3.5 font-semibold text-text-primary">${m.TenMon}</td>
+                            <td class="px-5 py-3.5 text-center font-bold">${m.SoTinChi}</td>
+                            <td class="px-5 py-3.5 text-center text-text-muted">${m.SoTietLyThuyet || 0} / ${m.SoTietThucHanh || 0}</td>
+                            <td class="px-5 py-3.5 text-text-muted">${m.Khoa?.TenKhoa || m.MaKhoa || ''}</td>
+                            <td class="px-5 py-3.5">${prereqs || '<span class="text-xs text-text-muted">Không có</span>'}</td>
+                            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                                <button onclick='openMhModal(${JSON.stringify(m).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="deleteMh('${m.MaMon}')" class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            renderMhPagination(totalItems, totalPages, startIndex, endIndex);
+            lucide.createIcons();
+        }
+
+        function renderMhPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('mh-pagination-info');
+            if (infoEl) {
+                if (totalItems === 0) infoEl.textContent = '0 môn học';
+                else infoEl.textContent = `Hiển thị ${startIndex + 1} - ${endIndex} trên ${totalItems} môn học`;
+            }
+
+            const controlsEl = document.getElementById('mh-pagination-controls');
+            if (!controlsEl) return;
+            if (totalPages <= 1) {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = mhCurrentPage === 1;
+            html += `<button onclick="changeMhPage(${mhCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${prevDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, mhCurrentPage - 2);
+            const endP = Math.min(totalPages, mhCurrentPage + 2);
+
+            if (startP > 1) {
+                html += `<button onclick="changeMhPage(1)" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1 text-text-muted">...</span>`;
+            }
+
+            for (let p = startP; p <= endP; p++) {
+                const isActive = p === mhCurrentPage;
+                html += `<button onclick="changeMhPage(${p})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-primary/20' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1 text-text-muted">...</span>`;
+                html += `<button onclick="changeMhPage(${totalPages})" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDisabled = mhCurrentPage === totalPages;
+            html += `<button onclick="changeMhPage(${mhCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${nextDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function changeMhPage(page) {
+            mhCurrentPage = page;
+            renderMhTable();
+        }
+
+        function changeMhPageSize(size) {
+            mhPageSize = parseInt(size, 10);
+            mhCurrentPage = 1;
+            renderMhTable();
+        }
+
+        function openMhModal(mh = null) {
+            editingMaMon = mh ? mh.MaMon : null;
+            document.getElementById('mh-modal-title').textContent = mh ? 'Cập Nhật Môn Học' : 'Thêm Môn Học Mới';
+            document.getElementById('mh-mamon').value = mh ? mh.MaMon : '';
+            document.getElementById('mh-mamon').disabled = !!mh;
+            document.getElementById('mh-tenmon').value = mh ? mh.TenMon : '';
+            document.getElementById('mh-sotc').value = mh ? mh.SoTinChi : 3;
+            document.getElementById('mh-lt').value = mh ? (mh.SoTietLyThuyet ?? 30) : 30;
+            document.getElementById('mh-th').value = mh ? (mh.SoTietThucHanh ?? 15) : 15;
+            document.getElementById('mh-makhoa').value = mh ? (mh.MaKhoa || khoas[0]?.MaKhoa || '') : (khoas[0]?.MaKhoa || '');
+
+            const selectedPrereqs = new Set((mh?.DieuKienTienQuyets || []).map(d => d.MaMonTienQuyet));
+            const listEl = document.getElementById('mh-prereq-list');
+            listEl.innerHTML = mhList.filter(x => x.MaMon !== editingMaMon).map(x => `
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="prereq" value="${x.MaMon}" ${selectedPrereqs.has(x.MaMon) ? 'checked' : ''} class="accent-primary" />
+                    <span>${x.MaMon} - ${x.TenMon}</span>
+                </label>
+            `).join('');
+
+            document.getElementById('mh-modal').classList.remove('hidden');
+        }
+
+        async function saveMonHoc(e) {
+            e.preventDefault();
+            const checkedPrereqs = Array.from(document.querySelectorAll('input[name="prereq"]:checked')).map(el => el.value);
+            const payload = {
+                MaMon: document.getElementById('mh-mamon').value.trim(),
+                TenMon: document.getElementById('mh-tenmon').value.trim(),
+                SoTinChi: Number(document.getElementById('mh-sotc').value),
+                SoTietLyThuyet: Number(document.getElementById('mh-lt').value),
+                SoTietThucHanh: Number(document.getElementById('mh-th').value),
+                MaKhoa: document.getElementById('mh-makhoa').value,
+                MonTienQuyet: checkedPrereqs
+            };
+            try {
+                if (editingMaMon) await apiFetch(`/api/monhoc/${editingMaMon}`, { method: 'PUT', body: JSON.stringify(payload) });
+                else await apiFetch('/api/monhoc', { method: 'POST', body: JSON.stringify(payload) });
+                showToast('Đã lưu môn học!');
+                document.getElementById('mh-modal').classList.add('hidden');
+                await loadData();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function deleteMh(id) {
+            if (!confirm(`Xóa môn học ${id}?`)) return;
+            try {
+                await apiFetch(`/api/monhoc/${id}`, { method: 'DELETE' });
+                showToast('Đã xóa môn học!');
+                await loadData();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function exportMonHocExcel() {
+            const ws = XLSX.utils.json_to_sheet(mhList.map(m => ({ MaMon: m.MaMon, TenMon: m.TenMon, SoTinChi: m.SoTinChi, SoTietLyThuyet: m.SoTietLyThuyet, SoTietThucHanh: m.SoTietThucHanh, MaKhoa: m.MaKhoa })));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'MonHoc');
+            XLSX.writeFile(wb, 'DanhSach_MonHoc.xlsx');
+        }
+
+        loadData();
+    </script>
+}

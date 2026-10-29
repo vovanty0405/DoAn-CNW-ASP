@@ -1,0 +1,154 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using QL_DiemSV.Data;
+using QL_DiemSV.Models;
+using QL_DiemSV.Services;
+
+namespace QL_DiemSV.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class TaiKhoanController : ControllerBase
+{
+    private readonly ApplicationDbContext _db;
+
+    public TaiKhoanController(ApplicationDbContext db)
+    {
+        _db = db;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] string? role, [FromQuery] string? status)
+    {
+        var query = _db.UserAccounts
+            .Include(u => u.Role)
+            .Include(u => u.GiangVien)
+            .Include(u => u.SinhVien)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(role) && int.TryParse(role, out int rId))
+        {
+            query = query.Where(u => u.RoleID == rId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status == "active") query = query.Where(u => u.IsActive);
+            else if (status == "inactive") query = query.Where(u => !u.IsActive);
+        }
+
+        var list = await query.OrderBy(u => u.UserID).ToListAsync();
+        var data = list.Select(u =>
+        {
+            string refObj = "Quản trị hệ thống";
+            if (u.GiangVien != null) refObj = $"GV: {u.GiangVien.MaGV} - {u.GiangVien.HoTen}";
+            else if (u.SinhVien != null) refObj = $"SV: {u.SinhVien.MaSV} - {u.SinhVien.HoTen}";
+            else if (!string.IsNullOrEmpty(u.MaGV)) refObj = $"GV: {u.MaGV}";
+
+            return new
+            {
+                id = u.UserID,
+                UserID = u.UserID,
+                username = u.Username,
+                roleId = u.RoleID,
+                role = u.Role?.RoleName ?? "Chưa phân quyền",
+                refId = refObj,
+                status = u.IsActive,
+                IsActive = u.IsActive,
+                NgayTao = u.NgayTao
+            };
+        });
+
+        return Ok(new { status = "success", data });
+    }
+
+    public class TaiKhoanDto
+    {
+        public string? username { get; set; }
+        public string? password { get; set; }
+        public int? roleId { get; set; }
+        public string? refType { get; set; }
+        public string? refId { get; set; }
+        public bool isActive { get; set; } = true;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] TaiKhoanDto req)
+    {
+        if (string.IsNullOrWhiteSpace(req.username) || string.IsNullOrWhiteSpace(req.password))
+            return BadRequest(new { status = "error", message = "Tên đăng nhập và mật khẩu không được để trống!" });
+
+        var uname = req.username.Trim();
+        if (await _db.UserAccounts.AnyAsync(u => u.Username == uname))
+            return BadRequest(new { status = "error", message = $"Tài khoản {uname} đã tồn tại!" });
+
+        var ua = new UserAccount
+        {
+            Username = uname,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password),
+            RoleID = req.roleId ?? 3,
+            IsActive = req.isActive,
+            MaGV = req.refType == "Giảng Viên" ? req.refId : null,
+            NgayTao = DateTime.Now
+        };
+
+        _db.UserAccounts.Add(ua);
+        await _db.SaveChangesAsync();
+
+        if (!string.IsNullOrWhiteSpace(req.refId))
+        {
+            if (req.refType == "Giảng Viên")
+            {
+                var gv = await _db.GiangViens.FindAsync(req.refId.Trim());
+                if (gv != null) gv.UserID = ua.UserID;
+            }
+            else if (req.refType == "Sinh Viên")
+            {
+                var sv = await _db.SinhViens.FindAsync(req.refId.Trim());
+                if (sv != null) sv.UserID = ua.UserID;
+            }
+            await _db.SaveChangesAsync();
+        }
+
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Tạo tài khoản", $"Đã tạo tài khoản {uname}");
+        return Ok(new { status = "success", message = "Thêm tài khoản thành công!" });
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] TaiKhoanDto req)
+    {
+        var ua = await _db.UserAccounts.FindAsync(id);
+        if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
+
+        if (!string.IsNullOrWhiteSpace(req.username)) ua.Username = req.username.Trim();
+        if (!string.IsNullOrWhiteSpace(req.password)) ua.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password);
+        if (req.roleId != null) ua.RoleID = req.roleId;
+        ua.IsActive = req.isActive;
+
+        await _db.SaveChangesAsync();
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật tài khoản", $"Đã cập nhật tài khoản #{id} ({ua.Username})");
+        return Ok(new { status = "success", message = "Cập nhật tài khoản thành công!" });
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var ua = await _db.UserAccounts.FindAsync(id);
+        if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
+
+        if (ua.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { status = "error", message = "Không thể xóa tài khoản Quản trị viên gốc!" });
+
+        var gv = await _db.GiangViens.FirstOrDefaultAsync(g => g.UserID == id);
+        if (gv != null) gv.UserID = null;
+
+        var sv = await _db.SinhViens.FirstOrDefaultAsync(s => s.UserID == id);
+        if (sv != null) sv.UserID = null;
+
+        _db.UserAccounts.Remove(ua);
+        await _db.SaveChangesAsync();
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa tài khoản", $"Đã xóa tài khoản {ua.Username}", "Cảnh báo");
+        return Ok(new { status = "success", message = "Xóa tài khoản thành công!" });
+    }
+}
+

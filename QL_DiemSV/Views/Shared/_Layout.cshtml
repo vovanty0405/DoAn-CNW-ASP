@@ -1,0 +1,470 @@
+@using System.Security.Claims
+@{
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var currentPath = Context.Request.Path.Value?.ToLower() ?? "/";
+    var isLoginPage = currentPath.StartsWith("/login");
+    var username = User.Identity?.Name ?? "Khách";
+    var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "SinhVien";
+    var hoTen = User.FindFirst("HoTen")?.Value ?? username;
+    var maGV = User.FindFirst("MaGV")?.Value ?? "";
+    var maSV = User.FindFirst("MaSV")?.Value ?? "";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Quản Lý Điểm Sinh Viên</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN with Custom Theme Colors matching NodeJS+ReactJS project -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        canvas: 'var(--color-canvas)',
+                        surface: 'var(--color-surface)',
+                        'surface-hover': 'var(--color-surface-hover)',
+                        'surface-header': 'var(--color-surface-header)',
+                        primary: 'var(--color-primary)',
+                        'primary-hover': 'var(--color-primary-hover)',
+                        'text-primary': 'var(--color-text-primary)',
+                        'text-muted': 'var(--color-text-muted)',
+                        'semantic-success': 'var(--color-semantic-success)',
+                        'semantic-error': 'var(--color-semantic-error)',
+                        'semantic-warning': 'var(--color-semantic-warning)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons, SheetJS (XLSX), Chart.js -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --font-sans: 'Inter', sans-serif;
+            --color-canvas: #10131a;
+            --color-surface: #1d2027;
+            --color-surface-hover: #32353c;
+            --color-surface-header: #191b23;
+            --color-primary: #4d8eff;
+            --color-primary-hover: #adc6ff;
+            --color-text-primary: #e1e2ec;
+            --color-text-muted: #9ca3af;
+            --color-semantic-success: #10B981;
+            --color-semantic-error: #ffb4ab;
+            --color-semantic-warning: #df7412;
+        }
+
+        html.light {
+            --color-canvas: #f3f4f6;
+            --color-surface: #ffffff;
+            --color-surface-hover: #e5e7eb;
+            --color-surface-header: #f9fafb;
+            --color-primary: #2563eb;
+            --color-primary-hover: #1d4ed8;
+            --color-text-primary: #111827;
+            --color-text-muted: #6b7280;
+            --color-semantic-success: #10B981;
+            --color-semantic-error: #ef4444;
+            --color-semantic-warning: #f59e0b;
+        }
+
+        body {
+            background-color: var(--color-canvas);
+            color: var(--color-text-primary);
+            font-family: var(--font-sans);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-surface-hover); border-radius: 9999px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+    </style>
+
+    <script>
+        // Restore theme & font before paint
+        (function () {
+            const savedTheme = localStorage.getItem('app-theme') || 'dark';
+            if (savedTheme === 'light') document.documentElement.classList.add('light');
+            const savedFont = localStorage.getItem('app-font') || 'Inter';
+            document.documentElement.style.setProperty('--font-sans', `'${savedFont}', sans-serif`);
+        })();
+
+        window.CURRENT_USER = {
+            isAuthenticated: @(isAuthenticated ? "true" : "false"),
+            username: "@Html.Raw(username)",
+            role: "@Html.Raw(roleName)",
+            hoTen: "@Html.Raw(hoTen)",
+            maGV: "@Html.Raw(maGV)",
+            maSV: "@Html.Raw(maSV)"
+        };
+
+        window.showToast = function (message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bgClass = type === 'error'
+                ? 'bg-[#ef4444] text-white border-[#ef4444]'
+                : type === 'warning'
+                    ? 'bg-[#df7412] text-white border-[#df7412]'
+                    : 'bg-[#10B981] text-white border-[#10B981]';
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border ${bgClass} text-sm font-medium transform transition-all duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        };
+
+        window.apiFetch = async function (url, options = {}) {
+            const defaultHeaders = { 'Content-Type': 'application/json' };
+            const res = await fetch(url, {
+                ...options,
+                headers: { ...defaultHeaders, ...(options.headers || {}) }
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.status === 'error') {
+                throw new Error(json.message || `Lỗi HTTP ${res.status}`);
+            }
+            return json;
+        };
+    </script>
+</head>
+<body class="min-h-screen flex bg-canvas text-text-primary selection:bg-primary selection:text-white">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-2 max-w-sm"></div>
+
+    @if (isLoginPage || !isAuthenticated)
+    {
+        <main class="w-full min-h-screen">
+            @RenderBody()
+        </main>
+    }
+    else
+    {
+        <!-- Fixed Sidebar -->
+        <aside class="w-64 bg-surface border-r border-surface-hover flex flex-col fixed inset-y-0 left-0 z-40 select-none">
+            <!-- Brand Header -->
+            <div class="p-5 border-b border-surface-hover flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-inner">
+                    <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-tight text-text-primary leading-tight">Academic Ledger</h1>
+                    <span class="text-[11px] font-medium text-primary">ASP.NET Core MVC</span>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+                <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Tổng quan</div>
+                <a href="/" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath == "/" ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    <span>Trang chủ</span>
+                </a>
+
+                @if (roleName == "Admin" || roleName == "GiangVien")
+                {
+                    <a href="/thong-ke" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/thong-ke") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        <span>Thống kê & Báo cáo</span>
+                    </a>
+                }
+
+                @if (roleName == "Admin")
+                {
+                    <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Quản lý Đào tạo</div>
+                    <a href="/sinh-vien" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/sinh-vien") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span>Sinh viên</span>
+                    </a>
+                    <a href="/giang-vien" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/giang-vien") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="user-check" class="w-4 h-4"></i>
+                        <span>Giảng viên & Khoa</span>
+                    </a>
+                    <a href="/mon-hoc" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/mon-hoc") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                        <span>Môn học</span>
+                    </a>
+                    <a href="/khung-dao-tao" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/khung-dao-tao") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        <span>Khung đào tạo</span>
+                    </a>
+                    <a href="/lop-hanh-chinh" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/lop-hanh-chinh") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="building-2" class="w-4 h-4"></i>
+                        <span>Lớp hành chính & Ngành</span>
+                    </a>
+                    <a href="/lop-hoc-phan" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/lop-hoc-phan") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
+                        <span>Lớp học phần & Học kỳ</span>
+                    </a>
+                }
+
+                <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Điểm số & Phúc khảo</div>
+                @if (roleName == "Admin" || roleName == "GiangVien" || roleName == "KhaoThi")
+                {
+                    <a href="/diem-so" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/diem-so") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span>Quản lý Điểm số</span>
+                    </a>
+                }
+                <a href="/tra-cuu-diem" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/tra-cuu-diem") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                    <span>Tra cứu điểm & Tốt nghiệp</span>
+                </a>
+                @if (roleName == "Admin" || roleName == "GiangVien")
+                {
+                    <a href="/khieu-nai" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/khieu-nai") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="message-square-warning" class="w-4 h-4"></i>
+                        <span>Khiếu nại & Phúc khảo</span>
+                    </a>
+                }
+
+                @if (roleName == "Admin")
+                {
+                    <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Quản trị Hệ thống</div>
+                    <a href="/tai-khoan" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/tai-khoan") || currentPath.StartsWith("/phan-quyen") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                        <span>Tài khoản & Phân quyền</span>
+                    </a>
+                    <a href="/nhat-ky-he-thong" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/nhat-ky-he-thong") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
+                        <i data-lucide="history" class="w-4 h-4"></i>
+                        <span>Nhật ký hệ thống</span>
+                    </a>
+                }
+            </nav>
+
+            <!-- User Footer -->
+            <div class="p-4 border-t border-surface-hover bg-surface-header space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center text-sm shrink-0">
+                            @(hoTen.Length > 0 ? hoTen.Substring(0, 1).ToUpper() : "U")
+                        </div>
+                        <div class="truncate">
+                            <div class="text-sm font-semibold text-text-primary truncate" title="@hoTen">@hoTen</div>
+                            <div class="text-[11px] text-primary font-medium">@roleName (@username)</div>
+                        </div>
+                    </div>
+                    <button onclick="toggleSettingsDrawer()" title="Cài đặt Giao diện" class="p-2 text-text-muted hover:text-primary hover:bg-surface-hover rounded-lg transition-colors">
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-[#ef4444]/10 hover:bg-[#ef4444]/20 text-[#ef4444] text-xs font-semibold transition-colors">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Đăng xuất
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 ml-64 flex flex-col min-h-screen min-w-0">
+            <!-- Top Header Bar with Notification Bell -->
+            <header class="h-16 bg-surface/80 backdrop-blur-md border-b border-surface-hover px-8 flex items-center justify-between sticky top-0 z-30">
+                <div class="flex items-center gap-2 text-sm text-text-muted">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
+                    <span>Hệ thống Quản lý Điểm Sinh viên — <strong class="text-text-primary">@ViewData["Title"]</strong></span>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <!-- Quick Theme Toggle -->
+                    <button onclick="quickToggleTheme()" class="p-2 rounded-lg bg-canvas border border-surface-hover text-text-muted hover:text-primary transition-colors" title="Đổi giao diện Sáng/Tối">
+                        <i data-lucide="sun-moon" class="w-4 h-4"></i>
+                    </button>
+
+                    <!-- Notification Bell -->
+                    <div class="relative" id="notif-wrapper">
+                        <button onclick="toggleNotificationDropdown()" class="relative p-2 rounded-lg bg-canvas border border-surface-hover text-text-muted hover:text-primary transition-colors">
+                            <i data-lucide="bell" class="w-4 h-4"></i>
+                            <span id="notif-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#ef4444] text-white text-[10px] font-bold flex items-center justify-center">0</span>
+                        </button>
+
+                        <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-surface border border-surface-hover rounded-2xl shadow-2xl overflow-hidden z-50">
+                            <div class="p-3.5 border-b border-surface-hover bg-surface-header flex items-center justify-between">
+                                <span class="text-xs font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
+                                    <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-primary"></i> Thông báo hệ thống
+                                </span>
+                                <button onclick="markAllNotificationsRead()" class="text-xs text-primary hover:underline">Đọc tất cả</button>
+                            </div>
+                            <div id="notif-list" class="max-h-80 overflow-y-auto divide-y divide-surface-hover custom-scrollbar">
+                                <div class="p-6 text-center text-xs text-text-muted">Đang tải thông báo...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Body -->
+            <main class="flex-1 p-6 md:p-8">
+                @RenderBody()
+            </main>
+        </div>
+
+        <!-- Settings Drawer Modal -->
+        <div id="settings-drawer" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+            <div class="w-80 bg-surface h-full border-l border-surface-hover p-6 flex flex-col justify-between shadow-2xl">
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between border-b border-surface-hover pb-4">
+                        <h3 class="font-bold text-text-primary flex items-center gap-2">
+                            <i data-lucide="Sliders" class="w-4 h-4 text-primary"></i> Cá nhân hóa Giao diện
+                        </h3>
+                        <button onclick="toggleSettingsDrawer()" class="text-text-muted hover:text-text-primary">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">Chế độ màu sắc</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="setAppTheme('dark')" class="p-3 rounded-xl border border-surface-hover bg-[#10131a] text-white text-xs font-semibold flex items-center justify-center gap-2 hover:border-primary">
+                                <i data-lucide="moon" class="w-4 h-4 text-primary"></i> Tối (Dark)
+                            </button>
+                            <button onclick="setAppTheme('light')" class="p-3 rounded-xl border border-surface-hover bg-white text-gray-900 text-xs font-semibold flex items-center justify-center gap-2 hover:border-primary">
+                                <i data-lucide="sun" class="w-4 h-4 text-amber-500"></i> Sáng (Light)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">Phông chữ hệ thống</label>
+                        <div class="space-y-2">
+                            <button onclick="setAppFont('Inter')" class="w-full text-left px-4 py-2.5 rounded-lg border border-surface-hover bg-canvas hover:border-primary text-sm">Inter (Mặc định)</button>
+                            <button onclick="setAppFont('Plus Jakarta Sans')" class="w-full text-left px-4 py-2.5 rounded-lg border border-surface-hover bg-canvas hover:border-primary text-sm">Plus Jakarta Sans</button>
+                            <button onclick="setAppFont('Roboto')" class="w-full text-left px-4 py-2.5 rounded-lg border border-surface-hover bg-canvas hover:border-primary text-sm">Roboto</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-text-muted border-t border-surface-hover pt-4">
+                    Phiên bản ASP.NET Core 8.0 MVC • SQL Server
+                </div>
+            </div>
+        </div>
+    }
+
+    <script>
+        lucide.createIcons();
+
+        function toggleSettingsDrawer() {
+            const el = document.getElementById('settings-drawer');
+            if (el) el.classList.toggle('hidden');
+        }
+
+        function setAppTheme(mode) {
+            localStorage.setItem('app-theme', mode);
+            if (mode === 'light') document.documentElement.classList.add('light');
+            else document.documentElement.classList.remove('light');
+        }
+
+        function quickToggleTheme() {
+            const isLight = document.documentElement.classList.contains('light');
+            setAppTheme(isLight ? 'dark' : 'light');
+        }
+
+        function setAppFont(fontName) {
+            localStorage.setItem('app-font', fontName);
+            document.documentElement.style.setProperty('--font-sans', `'${fontName}', sans-serif`);
+        }
+
+        async function handleLogout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+            } catch (e) { }
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        // Notification Bell Logic
+        function getRecipientCode() {
+            const u = window.CURRENT_USER;
+            if (!u || !u.isAuthenticated) return null;
+            if (u.role === 'Admin') return 'ADMIN';
+            if (u.role === 'GiangVien') return u.maGV || u.username;
+            if (u.role === 'SinhVien') return u.maSV || u.username;
+            return u.username;
+        }
+
+        async function loadNotifications() {
+            const code = getRecipientCode();
+            if (!code) return;
+            try {
+                const res = await fetch(`/api/thongbao/${encodeURIComponent(code)}`);
+                const json = await res.json();
+                const list = json.data || [];
+                const unread = list.filter(n => !n.DaDoc).length;
+                const badge = document.getElementById('notif-badge');
+                if (badge) {
+                    if (unread > 0) {
+                        badge.textContent = unread > 9 ? '9+' : unread;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+                const container = document.getElementById('notif-list');
+                if (container) {
+                    if (list.length === 0) {
+                        container.innerHTML = `<div class="p-6 text-center text-xs text-text-muted">Chưa có thông báo nào</div>`;
+                    } else {
+                        container.innerHTML = list.map(n => `
+                            <div onclick="handleNotificationClick(${n.MaThongBao}, '${n.LoaiThongBao || ''}', '${n.ThamChieuID || ''}')"
+                                 class="p-3.5 hover:bg-surface-hover/50 cursor-pointer transition-colors ${!n.DaDoc ? 'bg-primary/5 border-l-2 border-l-primary' : ''}">
+                                <div class="flex justify-between items-start gap-2">
+                                    <div class="text-xs font-bold text-text-primary">${n.TieuDe || 'Thông báo'}</div>
+                                    <span class="text-[10px] text-text-muted whitespace-nowrap">${new Date(n.NgayGui).toLocaleDateString('vi-VN')}</span>
+                                </div>
+                                <p class="text-xs text-text-muted mt-1 leading-relaxed">${n.NoiDung || ''}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (err) { }
+        }
+
+        function toggleNotificationDropdown() {
+            const dd = document.getElementById('notif-dropdown');
+            if (dd) dd.classList.toggle('hidden');
+        }
+
+        async function handleNotificationClick(id, type, refId) {
+            try {
+                await fetch(`/api/thongbao/${id}/read`, { method: 'PUT' });
+                await loadNotifications();
+                if (type === 'COMPLAINT_NEW') window.location.href = '/khieu-nai';
+                else if (type === 'COMPLAINT_PROCESSED') window.location.href = '/tra-cuu-diem';
+                else if (type === 'UNLOCK_REQUEST' || type === 'UNLOCK_APPROVED') window.location.href = '/diem-so';
+            } catch (e) { }
+        }
+
+        async function markAllNotificationsRead() {
+            const code = getRecipientCode();
+            if (!code) return;
+            await fetch(`/api/thongbao/read-all/${encodeURIComponent(code)}`, { method: 'PUT' });
+            await loadNotifications();
+        }
+
+        if (window.CURRENT_USER && window.CURRENT_USER.isAuthenticated) {
+            loadNotifications();
+        }
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

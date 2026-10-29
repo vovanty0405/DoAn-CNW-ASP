@@ -1,0 +1,426 @@
+@using System.Security.Claims
+@{
+    Layout = "_Layout";
+    var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "SinhVien";
+    var maGV = User.FindFirst("MaGV")?.Value ?? "";
+}
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-text-muted font-medium mb-1">Điểm số & Phúc khảo &gt; Sổ điểm Học phần</div>
+            <h1 class="text-2xl font-bold text-text-primary">Quản Lý Điểm Số Lớp Học Phần</h1>
+            <p class="text-xs text-text-muted mt-1">
+                Công thức chuẩn: <strong class="text-primary">Tổng kết = Điểm Quá trình (40%) + Điểm Thi Kết thúc (60%)</strong> • Quy chế thi lại Lần 2 tối đa <strong class="text-amber-400">6.0 điểm (QC 6.0)</strong>.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <button onclick="openCauHinhModal()" id="btn-config-cols" class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-primary"></i> Cấu hình cột QT (100%)
+            </button>
+            <button onclick="exportBangDiemExcel()" class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <i data-lucide="download" class="w-4 h-4 text-[#10B981]"></i> Xuất Excel
+            </button>
+            <button id="btn-lock-action" onclick="handleStatusTransition()" class="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-xs font-bold flex items-center gap-1.5">
+                <i data-lucide="lock" class="w-4 h-4"></i> <span id="lock-action-text">Chốt sổ điểm</span>
+            </button>
+            <button id="btn-save-grades" onclick="openPasswordConfirmModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-lg shadow-primary/25 flex items-center gap-1.5">
+                <i data-lucide="save" class="w-4 h-4"></i> Lưu Bảng Điểm
+            </button>
+        </div>
+    </div>
+
+    <!-- Top Selector Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-3 flex-1">
+            <div>
+                <label class="block text-[11px] text-text-muted mb-1">Học kỳ</label>
+                <select id="ds-hk" onchange="filterLhpOptions()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none"></select>
+            </div>
+            <div class="min-w-[320px] flex-1 max-w-md">
+                <label class="block text-[11px] text-text-muted mb-1">Chọn Lớp Học Phần</label>
+                <select id="ds-lhp" onchange="loadBangDiem()" class="w-full bg-canvas border border-primary rounded-lg px-3 py-2 text-sm font-bold text-primary outline-none"></select>
+            </div>
+            <div class="relative min-w-[220px]">
+                <label class="block text-[11px] text-text-muted mb-1">Tìm sinh viên</label>
+                <input id="ds-search" oninput="renderGradeRows()" placeholder="Tìm Mã SV, Họ tên..." class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="text-right">
+                <div class="text-[11px] text-text-muted">Trạng thái sổ điểm</div>
+                <div id="ds-status-badge" class="text-xs font-bold text-[#10B981] mt-0.5">--</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grade Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead id="ds-thead" class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase"></thead>
+                <tbody id="ds-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cấu hình Cột điểm Quá trình -->
+<div id="col-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="text-lg font-bold text-text-primary">Cấu Hình Cột Điểm Quá Trình (Tổng 100%)</h3>
+            <button onclick="document.getElementById('col-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-xs text-text-muted">Các cột điểm thành phần bên dưới sẽ kết hợp theo trọng số để tạo thành <strong class="text-primary">Điểm Quá Trình Tổng (chiếm 40% điểm học phần)</strong>.</p>
+            <div id="col-list" class="space-y-2.5"></div>
+            <button type="button" onclick="addColItem()" class="w-full py-2 rounded-lg border border-dashed border-primary text-primary text-xs font-bold hover:bg-primary/10">+ Thêm cột điểm thành phần</button>
+            <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('col-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover text-xs text-text-muted">Hủy</button>
+                <button type="button" onclick="saveCauHinhCols()" class="px-5 py-2 rounded-lg bg-primary text-white text-xs font-bold">Lưu Cấu Hình</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Xác nhận Mật khẩu khi Lưu điểm -->
+<div id="pwd-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Xác Thực Bảo Mật Khi Lưu Điểm
+            </h3>
+            <button onclick="document.getElementById('pwd-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <form onsubmit="confirmSaveBangDiem(event)" class="p-6 space-y-4">
+            <p class="text-xs text-text-muted leading-relaxed">
+                Vui lòng nhập mật khẩu đăng nhập hiện tại của bạn để xác nhận ghi nhận điểm vào Cơ sở dữ liệu.
+            </p>
+            <input id="confirm-pwd" type="password" required placeholder="Nhập mật khẩu tài khoản..."
+                   class="w-full bg-canvas border border-surface-hover rounded-lg px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-amber-400" />
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm hover:bg-amber-400">
+                Xác Nhận Lưu Điểm
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const USER_ROLE = "@roleName";
+        const USER_MAGV = "@maGV";
+        let allLhps = [], hks = [];
+        let currentLhpInfo = null;
+        let cauHinhCols = [];
+        let editingColsTemp = [];
+        let rowsData = [];
+
+        async function initPage() {
+            const [resHk, resLhp] = await Promise.all([apiFetch('/api/hocky'), apiFetch('/api/lophocphan')]);
+            hks = resHk.data || [];
+            allLhps = resLhp.data || [];
+
+            if (USER_ROLE === 'GiangVien' && USER_MAGV) {
+                allLhps = allLhps.filter(l => l.MaGV === USER_MAGV);
+            }
+
+            document.getElementById('ds-hk').innerHTML = '<option value="">Tất cả Học kỳ</option>' +
+                hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
+
+            filterLhpOptions();
+        }
+
+        function filterLhpOptions() {
+            const maHK = document.getElementById('ds-hk').value;
+            const filtered = allLhps.filter(l => !maHK || l.MaHK === maHK);
+            const sel = document.getElementById('ds-lhp');
+            sel.innerHTML = filtered.map(l => `<option value="${l.MaLHP}">${l.MaLHP} - ${l.TenLopHP} (${l.TrangThaiNhapDiem || 'Đang nhập'})</option>`).join('');
+            if (filtered.length > 0) loadBangDiem();
+            else {
+                document.getElementById('ds-tbody').innerHTML = `<tr><td colspan="10" class="p-8 text-center text-text-muted">Không có lớp học phần nào</td></tr>`;
+            }
+        }
+
+        async function loadBangDiem() {
+            const maLHP = document.getElementById('ds-lhp').value;
+            if (!maLHP) return;
+
+            const res = await apiFetch(`/api/diem/lophocphan/${maLHP}`);
+            currentLhpInfo = res.data.thongTinLHP;
+            cauHinhCols = currentLhpInfo.CauHinhDiem || [
+                { id: 'col_cc', name: 'Chuyên cần', weight: 25 },
+                { id: 'col_gk', name: 'Giữa kỳ', weight: 75 }
+            ];
+            rowsData = (res.data.danhSachDiem || []).map(r => ({
+                ...r,
+                ChiTietDiemQT: r.ChiTietDiemQT || {}
+            }));
+
+            updateLockUI();
+            renderTableHeader();
+            renderGradeRows();
+        }
+
+        function updateLockUI() {
+            const st = currentLhpInfo?.TrangThaiNhapDiem || 'Đang nhập';
+            const badge = document.getElementById('ds-status-badge');
+            badge.textContent = st;
+            badge.className = st === 'Đã khóa' ? 'text-xs font-bold text-[#ef4444]' : st === 'Chờ mở khóa' ? 'text-xs font-bold text-amber-400' : 'text-xs font-bold text-[#10B981]';
+
+            const btnText = document.getElementById('lock-action-text');
+            if (USER_ROLE === 'Admin') {
+                btnText.textContent = st === 'Đã khóa' || st === 'Chờ mở khóa' ? 'Phê duyệt Mở khóa' : 'Khóa sổ điểm';
+            } else {
+                btnText.textContent = st === 'Đã khóa' ? 'Xin mở khóa điểm' : st === 'Chờ mở khóa' ? 'Đang chờ Admin mở khóa' : 'Chốt sổ điểm';
+            }
+        }
+
+        function renderTableHeader() {
+            const colHeaders = cauHinhCols.map(c => `
+                <th class="px-3 py-3 text-center">${c.name}<br/><span class="text-[10px] text-primary">(${c.weight}% QT)</span></th>
+            `).join('');
+
+            document.getElementById('ds-thead').innerHTML = `
+                <tr>
+                    <th class="px-4 py-3 text-center w-12">STT</th>
+                    <th class="px-4 py-3">Mã SV</th>
+                    <th class="px-4 py-3">Họ và Tên</th>
+                    ${colHeaders}
+                    <th class="px-3 py-3 text-center bg-primary/5">Điểm QT Tổng<br/><span class="text-[10px] text-primary">(40%)</span></th>
+                    <th class="px-3 py-3 text-center">Thi Lần 1<br/><span class="text-[10px] text-text-muted">(60%)</span></th>
+                    <th class="px-3 py-3 text-center">Thi Lần 2<br/><span class="text-[10px] text-amber-400">(QC 6.0)</span></th>
+                    <th class="px-3 py-3 text-center">Tổng Kết</th>
+                    <th class="px-3 py-3 text-center">Điểm Chữ</th>
+                    <th class="px-4 py-3 text-center">Ghi Chú</th>
+                </tr>
+            `;
+        }
+
+        function recalcRow(row) {
+            const hasAllQt = cauHinhCols.every(c => row.ChiTietDiemQT[c.id] !== undefined && row.ChiTietDiemQT[c.id] !== null && row.ChiTietDiemQT[c.id] !== '');
+            if (hasAllQt) {
+                const sumQt = cauHinhCols.reduce((acc, c) => acc + Number(row.ChiTietDiemQT[c.id]) * (c.weight / 100.0), 0);
+                row.DiemCK = Math.round(sumQt * 10) / 10;
+            }
+
+            if (row.DiemCK != null && row.DiemThiLan1 != null && row.DiemThiLan1 !== '') {
+                const qt = Number(row.DiemCK);
+                const t1 = Number(row.DiemThiLan1);
+                const tk1 = Math.round((qt * 0.4 + t1 * 0.6) * 10) / 10;
+
+                if (row.DiemThiLan2 != null && row.DiemThiLan2 !== '') {
+                    const t2 = Number(row.DiemThiLan2);
+                    const tk2Raw = Math.round((qt * 0.4 + t2 * 0.6) * 10) / 10;
+                    if (tk1 < 4.0) {
+                        row.DiemTongKet = Math.min(tk2Raw, 6.0);
+                        row.GhiChu = row.DiemTongKet >= 4.0 ? 'Đạt (Thi lại)' : 'Học lại';
+                    } else {
+                        const capped = tk1 < 6.0 ? Math.min(tk2Raw, 6.0) : tk2Raw;
+                        row.DiemTongKet = Math.max(tk1, capped);
+                        row.GhiChu = row.DiemTongKet >= 4.0 ? 'Đạt' : 'Học lại';
+                    }
+                } else {
+                    row.DiemTongKet = tk1;
+                    row.GhiChu = tk1 >= 4.0 ? 'Đạt' : 'Học lại';
+                }
+
+                const tk = row.DiemTongKet;
+                row.DiemChu = tk >= 9.0 ? 'A+' : tk >= 8.5 ? 'A' : tk >= 8.0 ? 'B+' : tk >= 7.0 ? 'B' : tk >= 6.5 ? 'C+' : tk >= 5.5 ? 'C' : tk >= 5.0 ? 'D+' : tk >= 4.0 ? 'D' : 'F';
+            }
+        }
+
+        function renderGradeRows() {
+            const q = document.getElementById('ds-search').value.toLowerCase().trim();
+            const isLocked = currentLhpInfo?.TrangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi';
+
+            const filtered = rowsData.filter(r => !q || (r.MaSV || '').toLowerCase().includes(q) || (r.SinhVien?.HoTen || '').toLowerCase().includes(q));
+            const tbody = document.getElementById('ds-tbody');
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${cauHinhCols.length + 8}" class="p-8 text-center text-text-muted">Chưa có sinh viên trong lớp học phần này</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((r, idx) => {
+                const qtInputs = cauHinhCols.map(c => {
+                    const val = r.ChiTietDiemQT[c.id] ?? '';
+                    return `
+                        <td class="px-2 py-2.5 text-center">
+                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
+                                   value="${val}"
+                                   oninput="onQtColChange('${r.MaSV}', '${c.id}', this.value)"
+                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-text-primary focus:border-primary outline-none disabled:opacity-50" />
+                        </td>
+                    `;
+                }).join('');
+
+                return `
+                    <tr class="hover:bg-surface-hover/40" id="row-${r.MaSV}">
+                        <td class="px-4 py-2.5 text-center text-text-muted">${idx + 1}</td>
+                        <td class="px-4 py-2.5 font-bold text-primary">${r.MaSV}</td>
+                        <td class="px-4 py-2.5 font-medium text-text-primary">${r.SinhVien?.HoTen || ''}</td>
+                        ${qtInputs}
+                        <td class="px-3 py-2.5 text-center font-bold text-primary bg-primary/5" id="cell-qt-${r.MaSV}">${r.DiemCK ?? '-'}</td>
+                        <td class="px-2 py-2.5 text-center">
+                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
+                                   value="${r.DiemThiLan1 ?? ''}"
+                                   oninput="onExamColChange('${r.MaSV}', 'DiemThiLan1', this.value)"
+                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-text-primary focus:border-primary outline-none disabled:opacity-50" />
+                        </td>
+                        <td class="px-2 py-2.5 text-center">
+                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
+                                   value="${r.DiemThiLan2 ?? ''}"
+                                   oninput="onExamColChange('${r.MaSV}', 'DiemThiLan2', this.value)"
+                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-amber-400 focus:border-amber-400 outline-none disabled:opacity-50" />
+                        </td>
+                        <td class="px-3 py-2.5 text-center font-extrabold text-text-primary" id="cell-tk-${r.MaSV}">${r.DiemTongKet ?? '-'}</td>
+                        <td class="px-3 py-2.5 text-center font-bold" id="cell-dc-${r.MaSV}">${r.DiemChu ?? '-'}</td>
+                        <td class="px-4 py-2.5 text-center text-xs" id="cell-gc-${r.MaSV}">${r.GhiChu ?? ''}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function onQtColChange(maSV, colId, val) {
+            const row = rowsData.find(x => x.MaSV === maSV);
+            if (!row) return;
+            row.ChiTietDiemQT[colId] = val === '' ? null : Number(val);
+            recalcRow(row);
+            updateRowSummaryDOM(row);
+        }
+
+        function onExamColChange(maSV, field, val) {
+            const row = rowsData.find(x => x.MaSV === maSV);
+            if (!row) return;
+            row[field] = val === '' ? null : Number(val);
+            recalcRow(row);
+            updateRowSummaryDOM(row);
+        }
+
+        function updateRowSummaryDOM(row) {
+            document.getElementById(`cell-qt-${row.MaSV}`).textContent = row.DiemCK ?? '-';
+            document.getElementById(`cell-tk-${row.MaSV}`).textContent = row.DiemTongKet ?? '-';
+            document.getElementById(`cell-dc-${row.MaSV}`).textContent = row.DiemChu ?? '-';
+            document.getElementById(`cell-gc-${row.MaSV}`).textContent = row.GhiChu ?? '';
+        }
+
+        function openPasswordConfirmModal() {
+            document.getElementById('confirm-pwd').value = '';
+            document.getElementById('pwd-modal').classList.remove('hidden');
+        }
+
+        async function confirmSaveBangDiem(e) {
+            e.preventDefault();
+            const maLHP = document.getElementById('ds-lhp').value;
+            const password = document.getElementById('confirm-pwd').value;
+
+            try {
+                const payload = {
+                    password,
+                    danhSachDiem: rowsData.map(r => ({
+                        MaSV: r.MaSV,
+                        DiemCK: r.DiemCK,
+                        DiemThiLan1: r.DiemThiLan1,
+                        DiemThiLan2: r.DiemThiLan2,
+                        ChiTietDiemQT: r.ChiTietDiemQT
+                    }))
+                };
+                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/hang-loat`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                showToast(res.message);
+                document.getElementById('pwd-modal').classList.add('hidden');
+                await loadBangDiem();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function handleStatusTransition() {
+            const maLHP = document.getElementById('ds-lhp').value;
+            if (!maLHP || !currentLhpInfo) return;
+            const st = currentLhpInfo.TrangThaiNhapDiem;
+            let nextStatus = 'Đã khóa';
+
+            if (USER_ROLE === 'Admin') {
+                nextStatus = (st === 'Đã khóa' || st === 'Chờ mở khóa') ? 'Đang nhập' : 'Đã khóa';
+            } else {
+                if (st === 'Đã khóa') nextStatus = 'Chờ mở khóa';
+                else if (st === 'Chờ mở khóa') return showToast('Yêu cầu mở khóa đang chờ Quản trị viên phê duyệt!', 'warning');
+                else nextStatus = 'Đã khóa';
+            }
+
+            try {
+                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/trang-thai`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ TrangThaiNhapDiem: nextStatus })
+                });
+                showToast(res.message);
+                await loadBangDiem();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function openCauHinhModal() {
+            editingColsTemp = JSON.parse(JSON.stringify(cauHinhCols));
+            renderColConfigItems();
+            document.getElementById('col-modal').classList.remove('hidden');
+        }
+
+        function renderColConfigItems() {
+            document.getElementById('col-list').innerHTML = editingColsTemp.map((c, idx) => `
+                <div class="flex items-center gap-2">
+                    <input value="${c.name}" oninput="editingColsTemp[${idx}].name=this.value" placeholder="Tên cột..."
+                           class="flex-1 bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-xs text-text-primary" />
+                    <input type="number" value="${c.weight}" oninput="editingColsTemp[${idx}].weight=Number(this.value)"
+                           class="w-20 bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-xs text-center text-primary font-bold" />
+                    <span class="text-xs text-text-muted">%</span>
+                    <button onclick="editingColsTemp.splice(${idx},1);renderColConfigItems()" class="text-[#ef4444] p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function addColItem() {
+            editingColsTemp.push({ id: 'col_' + Date.now(), name: 'Cột điểm mới', weight: 0 });
+            renderColConfigItems();
+        }
+
+        async function saveCauHinhCols() {
+            const maLHP = document.getElementById('ds-lhp').value;
+            try {
+                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/cau-hinh`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ cauHinhDiem: editingColsTemp })
+                });
+                showToast(res.message);
+                document.getElementById('col-modal').classList.add('hidden');
+                await loadBangDiem();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function exportBangDiemExcel() {
+            const rows = rowsData.map((r, i) => ({
+                'STT': i + 1,
+                'Mã SV': r.MaSV,
+                'Họ Tên': r.SinhVien?.HoTen || '',
+                'Điểm Quá Trình (40%)': r.DiemCK ?? '',
+                'Thi Lần 1 (60%)': r.DiemThiLan1 ?? '',
+                'Thi Lần 2': r.DiemThiLan2 ?? '',
+                'Tổng Kết': r.DiemTongKet ?? '',
+                'Điểm Chữ': r.DiemChu ?? '',
+                'Kết Quả': r.GhiChu ?? ''
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'BangDiem');
+            XLSX.writeFile(wb, `BangDiem_${document.getElementById('ds-lhp').value}.xlsx`);
+        }
+
+        initPage();
+    </script>
+}

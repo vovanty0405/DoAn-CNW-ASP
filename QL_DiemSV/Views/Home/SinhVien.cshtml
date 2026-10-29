@@ -1,0 +1,439 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Hồ sơ Sinh viên</div>
+            <h1 class="text-2xl font-bold text-text-primary">Quản Lý Sinh Viên</h1>
+        </div>
+        <div class="flex flex-wrap gap-2.5">
+            <label class="cursor-pointer px-4 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-sm font-semibold text-text-primary flex items-center gap-2 transition-all">
+                <i data-lucide="upload" class="w-4 h-4 text-[#10B981]"></i> Nhập Excel
+                <input type="file" accept=".xlsx,.xls" class="hidden" onchange="handleExcelUpload(event)" />
+            </label>
+            <button onclick="exportSinhVienExcel()" class="px-4 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-sm font-semibold text-text-primary flex items-center gap-2 transition-all">
+                <i data-lucide="download" class="w-4 h-4 text-primary"></i> Xuất Excel
+            </button>
+            <button onclick="openSvModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i> Thêm Sinh Viên
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="sv-search" oninput="renderSvTable()" type="text" placeholder="Tìm Mã SV, Họ tên, Email..."
+                   class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+        </div>
+        <select id="sv-khoa" onchange="onFilterKhoaChange()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+            <option value="">Tất cả Khoa</option>
+        </select>
+        <select id="sv-nganh" onchange="onFilterNganhChange()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+            <option value="">Tất cả Ngành</option>
+        </select>
+        <select id="sv-lop" onchange="renderSvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+            <option value="">Tất cả Lớp hành chính</option>
+        </select>
+        <select id="sv-status" onchange="renderSvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+            <option value="">Tất cả Trạng thái</option>
+            <option value="Đang học">Đang học</option>
+            <option value="Bảo lưu">Bảo lưu</option>
+            <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
+            <option value="Thôi học">Thôi học</option>
+        </select>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider">
+                        <th class="px-5 py-3.5 font-semibold">Mã SV</th>
+                        <th class="px-5 py-3.5 font-semibold">Họ và Tên</th>
+                        <th class="px-5 py-3.5 font-semibold">Giới tính</th>
+                        <th class="px-5 py-3.5 font-semibold">Ngày sinh</th>
+                        <th class="px-5 py-3.5 font-semibold">Lớp hành chính</th>
+                        <th class="px-5 py-3.5 font-semibold">Ngành / Khoa</th>
+                        <th class="px-5 py-3.5 font-semibold text-center">Trạng thái</th>
+                        <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="sv-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+        <!-- Pagination Footer -->
+        <div class="px-5 py-3.5 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+            <div class="flex items-center gap-3">
+                <span id="sv-pagination-info">Đang tải...</span>
+                <div class="flex items-center gap-1.5">
+                    <span>Hiển thị</span>
+                    <select id="sv-page-size" onchange="changeSvPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <span>/ trang</span>
+                </div>
+            </div>
+            <div id="sv-pagination-controls" class="flex items-center gap-1"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add/Edit Sinh Vien -->
+<div id="sv-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 id="sv-modal-title" class="text-lg font-bold text-text-primary">Thêm Sinh Viên Mới</h3>
+            <button onclick="closeSvModal()" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form onsubmit="saveSinhVien(event)" class="p-6 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Mã Sinh Viên *</label>
+                    <input id="m-masv" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Họ và Tên *</label>
+                    <input id="m-hoten" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Ngày sinh</label>
+                    <input id="m-ngaysinh" type="date" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Giới tính</label>
+                    <select id="m-gioitinh" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Lớp Hành Chính</label>
+                    <select id="m-malop" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Trạng thái học tập</label>
+                    <select id="m-trangthai" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+                        <option value="Đang học">Đang học</option>
+                        <option value="Bảo lưu">Bảo lưu</option>
+                        <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
+                        <option value="Thôi học">Thôi học</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Email</label>
+                    <input id="m-email" type="email" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Số điện thoại</label>
+                    <input id="m-sdt" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Số CCCD</label>
+                    <input id="m-cccd" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Địa chỉ</label>
+                    <input id="m-diachi" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                </div>
+            </div>
+            <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="closeSvModal()" class="px-4 py-2 rounded-lg border border-surface-hover text-sm text-text-muted hover:bg-surface-hover">Hủy</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90">Lưu Dữ Liệu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let svList = [], khoas = [], nganhs = [], lops = [];
+        let editingMaSV = null;
+        let svCurrentPage = 1, svPageSize = 10;
+
+        async function loadData() {
+            const [resSv, resKhoa, resNganh, resLop] = await Promise.all([
+                apiFetch('/api/sinhvien'),
+                apiFetch('/api/khoa'),
+                apiFetch('/api/nganh'),
+                apiFetch('/api/lophanhchinh')
+            ]);
+            svList = resSv.data || [];
+            khoas = resKhoa.data || [];
+            nganhs = resNganh.data || [];
+            lops = resLop.data || [];
+
+            const selKhoa = document.getElementById('sv-khoa');
+            selKhoa.innerHTML = '<option value="">Tất cả Khoa</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+
+            const mLop = document.getElementById('m-malop');
+            mLop.innerHTML = lops.map(l => `<option value="${l.MaLop}">${l.MaLop} - ${l.TenLop}</option>`).join('');
+
+            onFilterKhoaChange();
+        }
+
+        function onFilterKhoaChange() {
+            const maKhoa = document.getElementById('sv-khoa').value;
+            const selNganh = document.getElementById('sv-nganh');
+            selNganh.innerHTML = '<option value="">Tất cả Ngành</option>' +
+                nganhs.filter(n => !maKhoa || n.MaKhoa === maKhoa).map(n => `<option value="${n.MaNganh}">${n.TenNganh}</option>`).join('');
+            onFilterNganhChange();
+        }
+
+        function onFilterNganhChange() {
+            const maNganh = document.getElementById('sv-nganh').value;
+            const selLop = document.getElementById('sv-lop');
+            selLop.innerHTML = '<option value="">Tất cả Lớp hành chính</option>' +
+                lops.filter(l => !maNganh || l.MaNganh === maNganh).map(l => `<option value="${l.MaLop}">${l.MaLop} - ${l.TenLop}</option>`).join('');
+            renderSvTable(true);
+        }
+
+        function getFilteredSv() {
+            const q = document.getElementById('sv-search').value.toLowerCase().trim();
+            const maKhoa = document.getElementById('sv-khoa').value;
+            const maNganh = document.getElementById('sv-nganh').value;
+            const maLop = document.getElementById('sv-lop').value;
+            const status = document.getElementById('sv-status').value;
+
+            return svList.filter(s => {
+                const matchQ = !q || s.MaSV.toLowerCase().includes(q) || s.HoTen.toLowerCase().includes(q) || (s.Email || '').toLowerCase().includes(q);
+                const matchLop = !maLop || s.MaLop === maLop;
+                const matchNganh = !maNganh || s.LopHanhChinh?.MaNganh === maNganh;
+                const matchKhoa = !maKhoa || s.LopHanhChinh?.Nganh?.MaKhoa === maKhoa;
+                const matchStatus = !status || s.TrangThai === status;
+                return matchQ && matchLop && matchNganh && matchKhoa && matchStatus;
+            });
+        }
+
+        function renderSvTable(resetPage = false) {
+            if (resetPage) svCurrentPage = 1;
+            const filtered = getFilteredSv();
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / svPageSize));
+
+            if (svCurrentPage > totalPages) svCurrentPage = totalPages;
+            if (svCurrentPage < 1) svCurrentPage = 1;
+
+            const startIndex = (svCurrentPage - 1) * svPageSize;
+            const endIndex = Math.min(startIndex + svPageSize, totalItems);
+            const paged = filtered.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('sv-tbody');
+
+            if (paged.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-text-muted">Không tìm thấy sinh viên nào phù hợp</td></tr>`;
+            } else {
+                tbody.innerHTML = paged.map(s => {
+                    const statusBadge = s.TrangThai === 'Đang học'
+                        ? 'bg-[#10B981]/15 text-[#10B981]'
+                        : s.TrangThai === 'Bảo lưu'
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-surface-hover text-text-muted';
+                    return `
+                        <tr class="hover:bg-surface-hover/40 transition-colors">
+                            <td class="px-5 py-3.5 font-bold text-primary">${s.MaSV}</td>
+                            <td class="px-5 py-3.5 font-medium text-text-primary">
+                                <div>${s.HoTen}</div>
+                                <div class="text-xs text-text-muted">${s.Email || ''}</div>
+                            </td>
+                            <td class="px-5 py-3.5 text-text-muted">${s.GioiTinh || ''}</td>
+                            <td class="px-5 py-3.5 text-text-muted">${s.NgaySinh ? new Date(s.NgaySinh).toLocaleDateString('vi-VN') : ''}</td>
+                            <td class="px-5 py-3.5 font-medium text-text-primary">${s.MaLop || ''}</td>
+                            <td class="px-5 py-3.5 text-xs text-text-muted">
+                                <div class="text-text-primary font-medium">${s.LopHanhChinh?.Nganh?.TenNganh || ''}</div>
+                                <div>${s.LopHanhChinh?.Nganh?.Khoa?.TenKhoa || ''}</div>
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge}">${s.TrangThai || 'Đang học'}</span>
+                            </td>
+                            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                                <div class="inline-flex items-center justify-end gap-1.5">
+                                    <a href="/tra-cuu-diem?maSV=${s.MaSV}" title="Xem bảng điểm" class="p-1.5 rounded-lg text-text-muted hover:text-[#10B981] hover:bg-[#10B981]/10 transition-colors"><i data-lucide="award" class="w-4 h-4"></i></a>
+                                    <button onclick='openSvModal(${JSON.stringify(s).replace(/'/g, "&apos;")})' class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                    <button onclick="deleteSv('${s.MaSV}')" class="p-1.5 rounded-lg text-text-muted hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            renderSvPagination(totalItems, totalPages, startIndex, endIndex);
+            lucide.createIcons();
+        }
+
+        function renderSvPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('sv-pagination-info');
+            if (infoEl) {
+                if (totalItems === 0) infoEl.textContent = '0 sinh viên';
+                else infoEl.textContent = `Hiển thị ${startIndex + 1} - ${endIndex} trên ${totalItems} sinh viên`;
+            }
+
+            const controlsEl = document.getElementById('sv-pagination-controls');
+            if (!controlsEl) return;
+            if (totalPages <= 1) {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = svCurrentPage === 1;
+            html += `<button onclick="changeSvPage(${svCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${prevDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, svCurrentPage - 2);
+            const endP = Math.min(totalPages, svCurrentPage + 2);
+
+            if (startP > 1) {
+                html += `<button onclick="changeSvPage(1)" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1 text-text-muted">...</span>`;
+            }
+
+            for (let p = startP; p <= endP; p++) {
+                const isActive = p === svCurrentPage;
+                html += `<button onclick="changeSvPage(${p})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-primary/20' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1 text-text-muted">...</span>`;
+                html += `<button onclick="changeSvPage(${totalPages})" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDisabled = svCurrentPage === totalPages;
+            html += `<button onclick="changeSvPage(${svCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${nextDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function changeSvPage(page) {
+            svCurrentPage = page;
+            renderSvTable();
+        }
+
+        function changeSvPageSize(size) {
+            svPageSize = parseInt(size, 10);
+            svCurrentPage = 1;
+            renderSvTable();
+        }
+
+        function openSvModal(sv = null) {
+            editingMaSV = sv ? sv.MaSV : null;
+            document.getElementById('sv-modal-title').textContent = sv ? 'Cập Nhật Hồ Sơ Sinh Viên' : 'Thêm Sinh Viên Mới';
+            const maSvInput = document.getElementById('m-masv');
+            maSvInput.value = sv ? sv.MaSV : '';
+            maSvInput.disabled = !!sv;
+            document.getElementById('m-hoten').value = sv ? sv.HoTen : '';
+            document.getElementById('m-ngaysinh').value = sv && sv.NgaySinh ? sv.NgaySinh.substring(0, 10) : '2004-01-01';
+            document.getElementById('m-gioitinh').value = sv ? (sv.GioiTinh || 'Nam') : 'Nam';
+            document.getElementById('m-malop').value = sv ? (sv.MaLop || (lops[0]?.MaLop || '')) : (lops[0]?.MaLop || '');
+            document.getElementById('m-trangthai').value = sv ? (sv.TrangThai || 'Đang học') : 'Đang học';
+            document.getElementById('m-email').value = sv ? (sv.Email || '') : '';
+            document.getElementById('m-sdt').value = sv ? (sv.SDT || '') : '';
+            document.getElementById('m-cccd').value = sv ? (sv.CCCD || '') : '';
+            document.getElementById('m-diachi').value = sv ? (sv.DiaChi || '') : '';
+            document.getElementById('sv-modal').classList.remove('hidden');
+        }
+
+        function closeSvModal() {
+            document.getElementById('sv-modal').classList.add('hidden');
+        }
+
+        async function saveSinhVien(e) {
+            e.preventDefault();
+            const payload = {
+                MaSV: document.getElementById('m-masv').value.trim(),
+                HoTen: document.getElementById('m-hoten').value.trim(),
+                NgaySinh: document.getElementById('m-ngaysinh').value || null,
+                GioiTinh: document.getElementById('m-gioitinh').value,
+                MaLop: document.getElementById('m-malop').value,
+                TrangThai: document.getElementById('m-trangthai').value,
+                Email: document.getElementById('m-email').value.trim(),
+                SDT: document.getElementById('m-sdt').value.trim(),
+                CCCD: document.getElementById('m-cccd').value.trim(),
+                DiaChi: document.getElementById('m-diachi').value.trim()
+            };
+
+            try {
+                if (editingMaSV) {
+                    await apiFetch(`/api/sinhvien/${editingMaSV}`, { method: 'PUT', body: JSON.stringify(payload) });
+                    showToast('Đã cập nhật sinh viên!');
+                } else {
+                    await apiFetch('/api/sinhvien', { method: 'POST', body: JSON.stringify(payload) });
+                    showToast('Đã thêm sinh viên mới!');
+                }
+                closeSvModal();
+                await loadData();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function deleteSv(maSV) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa sinh viên ${maSV}?`)) return;
+            try {
+                await apiFetch(`/api/sinhvien/${maSV}`, { method: 'DELETE' });
+                showToast('Đã xóa sinh viên!');
+                await loadData();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function exportSinhVienExcel() {
+            const rows = getFilteredSv().map((s, idx) => ({
+                'STT': idx + 1,
+                'MaSV': s.MaSV,
+                'HoTen': s.HoTen,
+                'GioiTinh': s.GioiTinh,
+                'NgaySinh': s.NgaySinh ? s.NgaySinh.substring(0, 10) : '',
+                'MaLop': s.MaLop,
+                'Email': s.Email,
+                'SDT': s.SDT,
+                'TrangThai': s.TrangThai
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSinhVien');
+            XLSX.writeFile(wb, 'DanhSach_SinhVien.xlsx');
+        }
+
+        function handleExcelUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws);
+                const mapped = json.map(r => ({
+                    MaSV: String(r.MaSV || r['Mã SV'] || '').trim(),
+                    HoTen: String(r.HoTen || r['Họ Tên'] || '').trim(),
+                    GioiTinh: r.GioiTinh || r['Giới tính'] || 'Nam',
+                    MaLop: String(r.MaLop || r['Mã Lớp'] || lops[0]?.MaLop || '').trim(),
+                    Email: r.Email || '',
+                    SDT: String(r.SDT || ''),
+                    TrangThai: r.TrangThai || 'Đang học'
+                })).filter(x => x.MaSV && x.HoTen);
+
+                try {
+                    const res = await apiFetch('/api/sinhvien/bulk', { method: 'POST', body: JSON.stringify(mapped) });
+                    showToast(res.message || 'Nhập Excel thành công!');
+                    await loadData();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            };
+            reader.readAsBinaryString(file);
+            e.target.value = '';
+        }
+
+        loadData();
+    </script>
+}

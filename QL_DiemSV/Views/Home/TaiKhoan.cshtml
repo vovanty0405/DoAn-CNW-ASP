@@ -1,0 +1,393 @@
+@{
+    Layout = "_Layout";
+}
+
+<div class="max-w-[1500px] mx-auto space-y-6">
+    <div>
+        <div class="text-xs text-text-muted font-medium mb-1">Quản trị Hệ thống &gt; Bảo mật & RBAC</div>
+        <h1 class="text-2xl font-bold text-text-primary">Quản Lý Tài Khoản & Nhóm Quyền</h1>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex items-center gap-6 border-b border-surface-hover">
+        <button id="tab-btn-acc" onclick="switchTab('acc')" class="pb-3 text-sm font-bold text-primary border-b-2 border-primary">
+            Danh Sách Tài Khoản
+        </button>
+        <button id="tab-btn-role" onclick="switchTab('role')" class="pb-3 text-sm font-bold text-text-muted hover:text-text-primary">
+            Nhóm Quyền (Roles & Ma Trận Phân Quyền)
+        </button>
+    </div>
+
+    <!-- Tab 1: Accounts -->
+    <div id="tab-acc" class="space-y-4">
+        <div class="bg-surface border border-surface-hover rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                <input id="acc-search" oninput="renderAccounts()" placeholder="Tìm tên đăng nhập..."
+                       class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none w-64" />
+                <select id="acc-role" onchange="loadAccounts()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
+                    <option value="">Tất cả Nhóm quyền</option>
+                </select>
+            </div>
+            <button onclick="openAccModal()" class="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> Thêm Tài Khoản
+            </button>
+        </div>
+
+        <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider">
+                            <th class="px-5 py-3.5">ID</th>
+                            <th class="px-5 py-3.5">Tên Đăng Nhập</th>
+                            <th class="px-5 py-3.5">Nhóm Quyền</th>
+                            <th class="px-5 py-3.5">Đối Tượng Liên Kết</th>
+                            <th class="px-5 py-3.5 text-center">Trạng Thái</th>
+                            <th class="px-5 py-3.5 text-right">Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="acc-tbody" class="divide-y divide-surface-hover"></tbody>
+                </table>
+            </div>
+            <!-- Pagination Footer -->
+            <div class="px-5 py-3.5 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
+                <div class="flex items-center gap-3">
+                    <span id="acc-pagination-info">Đang tải...</span>
+                    <div class="flex items-center gap-1.5">
+                        <span>Hiển thị</span>
+                        <select id="acc-page-size" onchange="changeAccPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                        <span>/ trang</span>
+                    </div>
+                </div>
+                <div id="acc-pagination-controls" class="flex items-center gap-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Roles -->
+    <div id="tab-role" class="hidden space-y-4">
+        <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
+                        <th class="px-5 py-3.5">ID</th>
+                        <th class="px-5 py-3.5">Tên Nhóm Quyền</th>
+                        <th class="px-5 py-3.5">Mô Tả Quyền Hạn</th>
+                        <th class="px-5 py-3.5 text-center">Số Tài Khoản</th>
+                        <th class="px-5 py-3.5 text-right">Ma Trận Phân Quyền</th>
+                    </tr>
+                </thead>
+                <tbody id="role-tbody" class="divide-y divide-surface-hover"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tài khoản -->
+<div id="acc-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 id="acc-modal-title" class="text-lg font-bold text-text-primary">Thêm Tài Khoản</h3>
+            <button onclick="document.getElementById('acc-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <form onsubmit="saveAccount(event)" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Tên đăng nhập *</label>
+                <input id="u-username" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+            </div>
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Mật khẩu (Bỏ trống nếu không đổi khi sửa)</label>
+                <input id="u-password" type="text" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+            </div>
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Nhóm Quyền</label>
+                <select id="u-roleid" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+            </div>
+            <div class="flex items-center justify-between pt-2">
+                <span class="text-sm text-text-primary">Kích hoạt tài khoản</span>
+                <input id="u-active" type="checkbox" checked class="w-4 h-4 accent-primary" />
+            </div>
+            <div class="pt-4 border-t border-surface-hover flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('acc-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover text-xs text-text-muted">Hủy</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white text-xs font-bold">Lưu Tài Khoản</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Xác Thực Mật Khẩu Khi Xóa -->
+<div id="pwd-confirm-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="text-base font-bold text-text-primary flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-5 h-5 text-[#ef4444]"></i> Xác Thực Mật Khẩu Xóa
+            </h3>
+            <button onclick="closePwdConfirmModal()" class="text-text-muted hover:text-[#ef4444] transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <form onsubmit="handlePwdConfirmSubmit(event)" class="p-6 space-y-4">
+            <p class="text-xs text-text-muted leading-relaxed">
+                Hành động này mang tính chất quan trọng và không thể hoàn tác. Để tiếp tục xóa tài khoản <span id="pwd-confirm-item-name" class="font-bold text-text-primary"></span>, vui lòng nhập mật khẩu tài khoản của bạn để xác thực:
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Mật khẩu tài khoản *</label>
+                <div class="relative">
+                    <i data-lucide="lock" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input id="pwd-confirm-input" type="password" required placeholder="Nhập mật khẩu của bạn..."
+                           class="w-full bg-canvas border border-surface-hover rounded-xl pl-9 pr-3 py-2.5 text-sm text-text-primary focus:border-[#ef4444] focus:outline-none transition-colors" />
+                </div>
+                <p id="pwd-confirm-error" class="hidden text-xs text-[#ef4444] font-medium mt-1.5 flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span id="pwd-confirm-error-msg">Mật khẩu xác thực không chính xác!</span>
+                </p>
+            </div>
+            <div class="pt-2 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="closePwdConfirmModal()" class="px-4 py-2 rounded-xl border border-surface-hover text-xs font-semibold text-text-muted hover:bg-surface-hover transition-colors">Hủy bỏ</button>
+                <button type="submit" id="btn-pwd-confirm-submit" class="px-5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white text-xs font-bold shadow-lg shadow-[#ef4444]/20 flex items-center gap-1.5 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Xác nhận xóa
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let accounts = [], roles = [], editingAccId = null;
+        let accCurrentPage = 1, accPageSize = 10;
+        let pendingDeleteAction = null;
+
+        async function initPage() {
+            const resRoles = await apiFetch('/api/phanquyen/roles');
+            roles = resRoles.data || [];
+
+            document.getElementById('acc-role').innerHTML = '<option value="">Tất cả Nhóm quyền</option>' + roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+            document.getElementById('u-roleid').innerHTML = roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+
+            renderRoles();
+            await loadAccounts();
+        }
+
+        function switchTab(tab) {
+            const isAcc = tab === 'acc';
+            document.getElementById('tab-acc').classList.toggle('hidden', !isAcc);
+            document.getElementById('tab-role').classList.toggle('hidden', isAcc);
+            document.getElementById('tab-btn-acc').className = isAcc ? 'pb-3 text-sm font-bold text-primary border-b-2 border-primary' : 'pb-3 text-sm font-bold text-text-muted';
+            document.getElementById('tab-btn-role').className = !isAcc ? 'pb-3 text-sm font-bold text-primary border-b-2 border-primary' : 'pb-3 text-sm font-bold text-text-muted';
+        }
+
+        async function loadAccounts() {
+            const role = document.getElementById('acc-role').value;
+            const res = await apiFetch(`/api/taikhoan?role=${role}`);
+            accounts = res.data || [];
+            accCurrentPage = 1;
+            renderAccounts();
+        }
+
+        function getFilteredAccounts() {
+            const q = document.getElementById('acc-search').value.toLowerCase().trim();
+            return accounts.filter(a => !q || a.username.toLowerCase().includes(q) || (a.refId || '').toLowerCase().includes(q));
+        }
+
+        function renderAccounts(resetPage = false) {
+            if (resetPage) accCurrentPage = 1;
+            const filtered = getFilteredAccounts();
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / accPageSize));
+
+            if (accCurrentPage > totalPages) accCurrentPage = totalPages;
+            if (accCurrentPage < 1) accCurrentPage = 1;
+
+            const startIndex = (accCurrentPage - 1) * accPageSize;
+            const endIndex = Math.min(startIndex + accPageSize, totalItems);
+            const paged = filtered.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('acc-tbody');
+            if (paged.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-text-muted">Không tìm thấy tài khoản nào phù hợp</td></tr>`;
+            } else {
+                tbody.innerHTML = paged.map(a => `
+                    <tr class="hover:bg-surface-hover/40 transition-colors">
+                        <td class="px-5 py-3.5 text-text-muted">${a.id}</td>
+                        <td class="px-5 py-3.5 font-bold text-primary">${a.username}</td>
+                        <td class="px-5 py-3.5"><span class="px-2.5 py-1 rounded-md bg-surface-hover text-xs font-semibold">${a.role}</span></td>
+                        <td class="px-5 py-3.5 text-text-muted">${a.refId || '--'}</td>
+                        <td class="px-5 py-3.5 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${a.status ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${a.status ? 'Hoạt động' : 'Đã khóa'}</span>
+                        </td>
+                        <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <button onclick='openAccModal(${JSON.stringify(a).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="confirmDeleteAcc(${a.id}, '${a.username.replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderAccPagination(totalItems, totalPages, startIndex, endIndex);
+            lucide.createIcons();
+        }
+
+        function renderAccPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('acc-pagination-info');
+            if (infoEl) {
+                if (totalItems === 0) infoEl.textContent = '0 bản ghi';
+                else infoEl.textContent = `Hiển thị ${startIndex + 1} - ${endIndex} trên ${totalItems} tài khoản`;
+            }
+
+            const controlsEl = document.getElementById('acc-pagination-controls');
+            if (!controlsEl) return;
+            if (totalPages <= 1) {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDisabled = accCurrentPage === 1;
+            html += `<button onclick="changeAccPage(${accCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${prevDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, accCurrentPage - 2);
+            const endP = Math.min(totalPages, accCurrentPage + 2);
+
+            if (startP > 1) {
+                html += `<button onclick="changeAccPage(1)" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1 text-text-muted">...</span>`;
+            }
+
+            for (let p = startP; p <= endP; p++) {
+                const isActive = p === accCurrentPage;
+                html += `<button onclick="changeAccPage(${p})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-primary/20' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1 text-text-muted">...</span>`;
+                html += `<button onclick="changeAccPage(${totalPages})" class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDisabled = accCurrentPage === totalPages;
+            html += `<button onclick="changeAccPage(${accCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-surface-hover text-xs font-semibold ${nextDisabled ? 'opacity-40 cursor-not-allowed text-text-muted' : 'hover:bg-surface-hover text-text-primary transition-colors'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function changeAccPage(page) {
+            accCurrentPage = page;
+            renderAccounts();
+        }
+
+        function changeAccPageSize(size) {
+            accPageSize = parseInt(size, 10);
+            accCurrentPage = 1;
+            renderAccounts();
+        }
+
+        function renderRoles() {
+            document.getElementById('role-tbody').innerHTML = roles.map(r => `
+                <tr class="hover:bg-surface-hover/40 transition-colors">
+                    <td class="px-5 py-4 text-text-muted">${r.id}</td>
+                    <td class="px-5 py-4 font-bold text-primary">${r.name}</td>
+                    <td class="px-5 py-4 text-text-muted">${r.description}</td>
+                    <td class="px-5 py-4 text-center font-bold">${r.userCount} user(s)</td>
+                    <td class="px-5 py-4 text-right">
+                        <a href="/phan-quyen-chi-tiet/${r.id}" class="px-3.5 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5">
+                            <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Cấu hình Ma trận Quyền
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function openAccModal(acc = null) {
+            editingAccId = acc ? acc.id : null;
+            document.getElementById('acc-modal-title').textContent = acc ? 'Cập Nhật Tài Khoản' : 'Thêm Tài Khoản Mới';
+            document.getElementById('u-username').value = acc ? acc.username : '';
+            document.getElementById('u-password').value = '';
+            document.getElementById('u-roleid').value = acc ? (acc.roleId || roles[0]?.id) : (roles[0]?.id || 1);
+            document.getElementById('u-active').checked = acc ? acc.status : true;
+            document.getElementById('acc-modal').classList.remove('hidden');
+        }
+
+        async function saveAccount(e) {
+            e.preventDefault();
+            const payload = {
+                username: document.getElementById('u-username').value.trim(),
+                password: document.getElementById('u-password').value,
+                roleId: Number(document.getElementById('u-roleid').value),
+                isActive: document.getElementById('u-active').checked
+            };
+            try {
+                if (editingAccId) await apiFetch(`/api/taikhoan/${editingAccId}`, { method: 'PUT', body: JSON.stringify(payload) });
+                else await apiFetch('/api/taikhoan', { method: 'POST', body: JSON.stringify(payload) });
+                showToast('Đã lưu tài khoản!');
+                document.getElementById('acc-modal').classList.add('hidden');
+                await loadAccounts();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function confirmDeleteAcc(id, username) {
+            requestSecureDelete(`Tài khoản "${username}"`, async () => {
+                await apiFetch(`/api/taikhoan/${id}`, { method: 'DELETE' });
+                showToast('Đã xóa tài khoản!');
+                await loadAccounts();
+            });
+        }
+        function deleteAcc(id) { confirmDeleteAcc(id, `ID ${id}`); }
+
+        // --- PASSWORD CONFIRMATION MODAL LOGIC ---
+        function requestSecureDelete(itemName, callback) {
+            pendingDeleteAction = callback;
+            document.getElementById('pwd-confirm-item-name').textContent = itemName;
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+            document.getElementById('pwd-confirm-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pwd-confirm-input').focus(), 100);
+            lucide.createIcons();
+        }
+
+        function closePwdConfirmModal() {
+            pendingDeleteAction = null;
+            document.getElementById('pwd-confirm-modal').classList.add('hidden');
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+        }
+
+        async function handlePwdConfirmSubmit(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('pwd-confirm-input').value;
+            const errBox = document.getElementById('pwd-confirm-error');
+            const errMsg = document.getElementById('pwd-confirm-error-msg');
+            const btnSubmit = document.getElementById('btn-pwd-confirm-submit');
+
+            errBox.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70');
+
+            try {
+                await apiFetch('/api/auth/verify-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ Password: pwd })
+                });
+
+                if (typeof pendingDeleteAction === 'function') {
+                    await pendingDeleteAction();
+                }
+                closePwdConfirmModal();
+            } catch (err) {
+                errBox.classList.remove('hidden');
+                errMsg.textContent = err.message || 'Mật khẩu xác thực không chính xác!';
+                lucide.createIcons();
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70');
+            }
+        }
+
+        initPage();
+    </script>
+}
