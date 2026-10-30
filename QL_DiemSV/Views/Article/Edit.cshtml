@@ -1,0 +1,17 @@
+@model QL_DiemSV.ViewModels.ArticleEditViewModel
+@using QL_DiemSV.Services
+@{ViewData["Title"]=Model.Id==0?"Thêm bài viết":"Sửa bài viết";}
+<div class="academic"><div class="section-heading"><div><p class="muted">Biên tập nội dung / @(Model.Id==0?"Bài mới":"Chỉnh sửa")</p><h1>@ViewData["Title"]</h1></div><a href="/bai-viet" class="button secondary">← Danh sách bài viết</a></div>
+<form method="post" action="/bai-viet/luu" enctype="multipart/form-data" class="panel" id="article-form">@Html.AntiForgeryToken()<input asp-for="Id" type="hidden" /><div asp-validation-summary="All" class="error notice" role="alert"></div>
+<label>Tiêu đề<input asp-for="TieuDe" maxlength="250" required /></label>
+<div class="toolbar" style="margin-top:16px"><label>Danh mục<select asp-for="DanhMuc">@foreach(var c in PortalRules.Categories){<option value="@c.Key">@c.Value</option>}</select></label><label>Đơn vị / Khoa / Người đăng<input asp-for="DonViDang" required maxlength="200" /></label><label>Trạng thái<select asp-for="TrangThai"><option value="BanNhap">Bản nháp</option><option value="DaXuatBan">Đã xuất bản</option></select></label><label><span>Ưu tiên</span><span><input asp-for="GhimDauTrang" /> Ghim đầu trang</span></label></div>
+<label>Tóm tắt<textarea asp-for="TomTat" maxlength="1000" rows="3" class="article-textarea"></textarea></label>
+<label style="margin-top:16px">Nội dung bài viết (Rich Text)</label><div class="rich-toolbar" role="toolbar" aria-label="Định dạng nội dung"><button type="button" data-command="bold" class="secondary"><b>B</b></button><button type="button" data-command="italic" class="secondary"><i>I</i></button><button type="button" data-command="underline" class="secondary"><u>U</u></button><button type="button" data-command="insertUnorderedList" class="secondary">• Danh sách</button><button type="button" data-command="insertOrderedList" class="secondary">1. Danh sách</button><button type="button" id="editor-link" class="secondary">Liên kết</button></div>
+<div id="rich-editor" class="rich-editor" contenteditable="true" role="textbox" aria-label="Nội dung bài viết" aria-multiline="true">@Html.Raw(PortalRules.SanitizeHtml(Model.NoiDung))</div>
+<textarea asp-for="NoiDung" id="article-html" rows="10" class="article-textarea" aria-label="Nội dung HTML dự phòng"></textarea>
+<noscript><p class="notice muted">Nhập HTML vào ô Nội dung HTML bên dưới khi JavaScript bị tắt.</p></noscript>
+<div class="toolbar" style="margin-top:16px"><label>URL ảnh thumbnail (HTTPS hoặc /images/)<input asp-for="ThumbnailUrl" maxlength="500" placeholder="/images/portal-news.svg" /></label><label>File đính kèm (tối đa 5 MB)<input asp-for="File" type="file" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg" /></label></div>
+@if(Model.CurrentAttachment!=null){<p class="notice">Tệp hiện tại: @Model.CurrentAttachment <label><span><input asp-for="RemoveAttachment" /> Gỡ tệp hiện tại</span></label></p>}
+<p class="notice muted">Bản nháp chỉ hiển thị cho tác giả và Admin. Chọn Đã xuất bản để bài viết xuất hiện trên Portal.</p><button>Lưu bài viết</button> <a class="button secondary" href="/bai-viet">Hủy</a>
+</form></div>
+@section Scripts{<script src="~/js/article-editor.js" asp-append-version="true"></script>}

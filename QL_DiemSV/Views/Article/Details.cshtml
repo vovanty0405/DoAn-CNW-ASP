@@ -1,0 +1,9 @@
+@model QL_DiemSV.Models.Article
+@using QL_DiemSV.Services
+@{Layout="_PortalLayout";ViewData["Title"]=Model.TieuDe;}
+<div class="portal-breadcrumb"><a href="/portal#articles">Bài viết & Thông báo</a> / @PortalRules.Categories.GetValueOrDefault(Model.DanhMuc,Model.DanhMuc)</div>
+<article class="portal-panel article-detail">@if(Model.TrangThai!="DaXuatBan"){<p class="portal-alert">BẢN NHÁP — Chưa hiển thị công khai</p>}<span class="category-badge">@PortalRules.Categories.GetValueOrDefault(Model.DanhMuc,Model.DanhMuc)</span><h1>@(Model.GhimDauTrang?"📌 ":"")@Model.TieuDe</h1><div class="article-meta"><span>♙ @Model.DonViDang</span><time datetime="@Model.NgayDang.ToString("O")">@PortalRules.Local(Model.NgayDang).ToString("dd/MM/yyyy HH:mm")</time></div><p class="article-summary">@Model.TomTat</p>
+@if(PortalRules.SafeUrl(Model.ThumbnailUrl,true)){<img class="article-thumbnail" src="@Model.ThumbnailUrl" alt="" />}
+<div class="article-content">@Html.Raw(PortalRules.SanitizeHtml(Model.NoiDung))</div>
+@if(Model.FileDinhKemUrl!=null){<a class="attachment-link" href="@Model.FileDinhKemUrl">↓ @Model.TenFileDinhKem <small>(@PortalRules.Size(Model.DungLuongFile??0))</small></a>}
+<a class="widget-link" href="/portal#articles">← Trở về danh sách bài viết</a></article>

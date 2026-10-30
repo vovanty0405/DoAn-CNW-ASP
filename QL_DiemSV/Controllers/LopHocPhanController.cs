@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin,GiangVien")]
 public class LopHocPhanController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -103,6 +105,7 @@ public class LopHocPhanController : ControllerBase
     public async Task<IActionResult> GetAvailableStudents(string id)
     {
         var lhp = await _db.LopHocPhans
+            .Include(l => l.LichHocs)
             .Include(l => l.KetQuaHocTaps)
             .FirstOrDefaultAsync(l => l.MaLHP == id);
 
@@ -171,9 +174,12 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpPost("{id}/students")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddStudentsToClass(string id, [FromBody] EnrollDto req)
     {
+        await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans
+            .Include(l => l.LichHocs)
             .Include(l => l.KetQuaHocTaps)
             .FirstOrDefaultAsync(l => l.MaLHP == id);
 
@@ -192,6 +198,13 @@ public class LopHocPhanController : ControllerBase
             return BadRequest(new { status = "error", message = $"Vượt quá sĩ số tối đa ({maxCount} sinh viên)! Hiện tại: {currentCount}." });
         }
 
+        if (await _db.SinhViens.CountAsync(x => newIds.Contains(x.MaSV) && x.TrangThai == "Đang học") != newIds.Count)
+            return BadRequest(new { status = "error", message = "Có sinh viên không tồn tại hoặc không còn đang học." });
+        var enrolled = await _db.KetQuaHocTaps.Include(x => x.LopHocPhan).ThenInclude(x => x!.LichHocs)
+            .Where(x => newIds.Contains(x.MaSV!) && x.LopHocPhan!.MaHK == lhp.MaHK).ToListAsync();
+        foreach (var k in enrolled)
+            if (k.LopHocPhan!.MaMon == lhp.MaMon || k.LopHocPhan.LichHocs.Any(a => lhp.LichHocs.Any(b => ScheduleRules.Overlaps(a,b))))
+                return BadRequest(new { status = "error", message = $"Sinh viên {k.MaSV} đã đăng ký môn này hoặc bị trùng lịch." });
         foreach (var maSV in newIds)
         {
             _db.KetQuaHocTaps.Add(new KetQuaHocTap
@@ -202,11 +215,13 @@ public class LopHocPhanController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await tx.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xếp lớp học phần", $"Đã thêm {newIds.Count} sinh viên vào lớp {id}");
         return Ok(new { status = "success", message = $"Đã thêm {newIds.Count} sinh viên vào lớp học phần" });
     }
 
     [HttpDelete("{id}/students")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RemoveStudentsFromClass(string id, [FromBody] EnrollDto req)
     {
         if (req?.studentIds == null || !req.studentIds.Any())
@@ -217,7 +232,7 @@ public class LopHocPhanController : ControllerBase
             .ToListAsync();
 
         // Không cho phép xóa sinh viên đã có điểm tổng kết
-        if (records.Any(r => r.DiemTongKet != null || r.DiemThiLan1 != null))
+        if (records.Any(ScheduleRules.HasGrades))
         {
             return BadRequest(new { status = "error", message = "Không thể xóa sinh viên đã có điểm thi khỏi lớp học phần!" });
         }
@@ -229,6 +244,7 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] LopHocPhan model)
     {
         if (string.IsNullOrWhiteSpace(model.MaLHP) || string.IsNullOrWhiteSpace(model.TenLopHP))
@@ -247,6 +263,10 @@ public class LopHocPhanController : ControllerBase
             model.TrangThaiNhapDiem = "Vui lòng nhập điểm";
         }
 
+        var course = await _db.MonHocs.FindAsync(model.MaMon);
+        if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == model.MaHK)) return BadRequest(new { status = "error", message = "Môn học hoặc học kỳ không tồn tại." });
+        model.STC = course.SoTinChi;
+        model.STCHP = course.SoTinChi;
         _db.LopHocPhans.Add(model);
         await _db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Lớp học phần", $"Đã tạo lớp học phần {model.MaLHP} - {model.TenLopHP}");
@@ -254,6 +274,7 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<LopHocPhan> list)
     {
         if (list == null || !list.Any())
@@ -270,6 +291,9 @@ public class LopHocPhanController : ControllerBase
             item.CauHinhDiem ??= defaultCauHinh;
             item.TrangThaiNhapDiem ??= "Vui lòng nhập điểm";
             item.TrangThai ??= "MoDangKy";
+            var course = await _db.MonHocs.FindAsync(item.MaMon);
+            if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == item.MaHK)) continue;
+            item.STC = course.SoTinChi; item.STCHP = course.SoTinChi;
             _db.LopHocPhans.Add(item);
             count++;
         }
@@ -280,11 +304,23 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] LopHocPhan model)
     {
         var existing = await _db.LopHocPhans.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
+        if ((existing.MaHK != model.MaHK || existing.MaMon != model.MaMon) &&
+            (await _db.ClassSchedules.AnyAsync(x => x.MaLHP == id) || await _db.KetQuaHocTaps.AnyAsync(x => x.MaLHP == id)))
+            return BadRequest(new { status = "error", message = "Không thể đổi môn/học kỳ khi lớp đã có lịch hoặc sinh viên." });
+        if (model.SiSoToiDa < await _db.KetQuaHocTaps.CountAsync(x => x.MaLHP == id))
+            return BadRequest(new { status = "error", message = "Sĩ số tối đa nhỏ hơn số sinh viên đã đăng ký." });
+        if (existing.MaMon != model.MaMon)
+        {
+            var course = await _db.MonHocs.FindAsync(model.MaMon);
+            if (course == null) return BadRequest(new { status = "error", message = "Môn học không tồn tại." });
+            existing.STC = course.SoTinChi; existing.STCHP = course.SoTinChi;
+        }
         existing.TenLopHP = model.TenLopHP;
         existing.MaMon = model.MaMon;
         existing.MaGV = model.MaGV;
@@ -299,6 +335,7 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.LopHocPhans

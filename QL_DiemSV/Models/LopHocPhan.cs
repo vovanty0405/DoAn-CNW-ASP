@@ -28,6 +28,14 @@ public class LopHocPhan
 
     public int? SiSoToiDa { get; set; } = 40;
 
+    [MaxLength(10)] public string NMH { get; set; } = "01";
+    [MaxLength(10)] public string? TTH { get; set; }
+    [Range(0, 30)] public int STC { get; set; }
+    [Range(0, 100)] [Column(TypeName = "decimal(8,2)")] public decimal STCHP { get; set; }
+    [MaxLength(20)] public string? MaLop { get; set; }
+    [NotMapped] public int SoLuongDaDangKy => KetQuaHocTaps.Count;
+    [JsonIgnore] public ICollection<ClassSchedule> LichHocs { get; set; } = new List<ClassSchedule>();
+
     [MaxLength(50)]
     public string? TrangThai { get; set; } = "MoDangKy";
 

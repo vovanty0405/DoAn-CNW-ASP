@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class HocKyController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -28,6 +30,7 @@ public class HocKyController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] HocKy model)
     {
         if (string.IsNullOrWhiteSpace(model.MaHK) || string.IsNullOrWhiteSpace(model.TenHK))
@@ -43,6 +46,7 @@ public class HocKyController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] HocKy model)
     {
         var existing = await _db.HocKys.FindAsync(id);
@@ -58,6 +62,7 @@ public class HocKyController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.HocKys.FindAsync(id);

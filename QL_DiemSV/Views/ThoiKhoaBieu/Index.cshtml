@@ -1,0 +1,31 @@
+@model QL_DiemSV.ViewModels.TimetableViewModel
+@using QL_DiemSV.Services
+@{ViewData["Title"]="Thông tin thời khóa biểu"; var lessons=Model.Schedules.Where(x=>ScheduleRules.Weeks(x.ChuoiTuanHoc).Contains(Model.Week)).ToList();}
+<div class="academic">
+<div><p class="muted">Academic Ledger / Lịch học & Giảng dạy</p><h1>Thông Tin Thời Khóa Biểu</h1></div>
+<section class="panel">
+<form method="get" class="toolbar no-print">
+<label>Chọn học kỳ xem TKB<select name="maHK" onchange="this.form.submit()">@foreach(var hk in Model.HocKys){<option value="@hk.MaHK" selected="@(hk.MaHK==Model.HocKy?.MaHK)">@hk.TenHK · @hk.NamHocBatDau-@hk.NamHocKetThuc</option>}</select></label>
+<label>Chế độ xem<select name="mode" onchange="this.form.submit()"><option value="week" selected="@(Model.Mode=="week")">TKB theo tuần</option><option value="all" selected="@(Model.Mode=="all")">TKB toàn học kỳ</option></select></label>
+<label>Tuần<select name="week" onchange="this.form.submit()">@for(int w=1;w<=(Model.HocKy?.SoTuan??20);w++){var start=Model.HocKy?.NgayBatDauTuan1?.AddDays((w-1)*7);<option value="@w" selected="@(w==Model.Week)">Tuần @w @(start.HasValue ? $"[Từ {start:dd/MM/yyyy} -- Đến {start.Value.AddDays(6):dd/MM/yyyy}]" : "[Chưa cấu hình ngày]")</option>}</select></label>
+<button type="button" onclick="window.print()">In TKB / Lưu PDF</button>
+</form>
+<p class="notice muted">@Model.HocKy?.TenHK · Tuần 1 bắt đầu: @(Model.HocKy?.NgayBatDauTuan1?.ToString("dd/MM/yyyy") ?? "Chưa cấu hình") · @(Model.Mode=="all" ? "Toàn học kỳ" : $"Tuần {Model.Week}")</p>
+@if(Model.Mode=="all") {
+<div class="scroll"><table><thead><tr><th>Mã lớp</th><th>Môn học</th><th>TH</th><th>Thứ</th><th>Tiết</th><th>Phòng</th><th>Giảng viên</th><th>Tuần</th></tr></thead><tbody>
+@foreach(var l in Model.Schedules){<tr><td>@l.MaLHP</td><td>@l.LopHocPhan?.MonHoc?.TenMon</td><td>@(l.LoaiBuoiHoc?"*":"")</td><td>@ScheduleRules.DayName(l.Thu)</td><td>@l.TietBatDau–@(l.TietBatDau+l.SoTiet-1)</td><td>@l.PhongHoc</td><td>@l.GiangVien?.HoTen</td><td>@l.ChuoiTuanHoc</td></tr>}
+</tbody></table></div>
+} else {
+<div class="scroll"><table class="grid-table"><colgroup><col style="width:58px" />@for(int d=2;d<=8;d++){<col />}<col style="width:58px" /></colgroup><thead><tr><th>Tiết</th>@for(int d=2;d<=8;d++){<th>@ScheduleRules.DayName(d).ToUpper()</th>}<th>Tiết</th></tr></thead><tbody>
+@for(int tiet=1;tiet<=12;tiet++) {<tr><th>Tiết @tiet</th>
+@for(int thu=2;thu<=8;thu++) {
+    var mon=lessons.FirstOrDefault(x=>x.Thu==thu && x.TietBatDau==tiet);
+    var covered=lessons.Any(x=>x.Thu==thu && x.TietBatDau<tiet && tiet<x.TietBatDau+x.SoTiet);
+    if(mon!=null && !covered){<td rowspan="@mon.SoTiet" class="course"><strong>@mon.LopHocPhan?.MonHoc?.TenMon</strong><div>Phòng: @mon.PhongHoc</div><div>@mon.MaLHP · @mon.LopHocPhan?.NMH</div><div>@(mon.LoaiBuoiHoc?"Thực hành":"Lý thuyết")</div><div>@mon.GiangVien?.HoTen</div></td>}
+    else if(!covered){<td></td>}
+}
+<th>Tiết @tiet</th></tr>}
+</tbody><tfoot><tr><th>Tiết</th>@for(int d=2;d<=8;d++){<th>@ScheduleRules.DayName(d).ToUpper()</th>}<th>Tiết</th></tr></tfoot></table></div>
+@if(lessons.Count==0){<p class="notice muted">Không có lịch học trong tuần này.</p>}
+}
+</section></div>

@@ -16,6 +16,10 @@ public class KetQuaHocTap
     [MaxLength(20)]
     public string? MaLHP { get; set; }
 
+    [Column(TypeName = "decimal(18,2)")] public decimal? HocPhiDangKy { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal MienGiam { get; set; }
+    public DateTime? NgayDangKy { get; set; }
+
     public double? DiemCC { get; set; }
 
     public double? DiemGK { get; set; }

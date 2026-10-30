@@ -1,0 +1,16 @@
+@using System.Security.Claims
+@inject IConfiguration Configuration
+@{var logged=User.Identity?.IsAuthenticated==true;var canWrite=User.IsInRole("Admin")||User.IsInRole("GiangVien");}
+<!DOCTYPE html><html lang="vi" class="light"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>@ViewData["Title"] · Academic Ledger</title>
+<script>(()=>{const theme=localStorage.getItem('app-theme')||'light';document.documentElement.classList.toggle('dark',theme==='dark');document.documentElement.classList.toggle('light',theme!=='dark');})();</script>
+<link rel="stylesheet" href="~/css/academic.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />@await RenderSectionAsync("Styles",required:false)
+</head><body class="portal-body" id="top"><div class="portal-topline">ACADEMIC LEDGER <span>Kết nối tri thức · Đồng hành cùng người học</span></div>
+<header class="portal-header"><a href="/portal" class="portal-brand"><span class="brand-mark" aria-hidden="true">AL</span><span><strong>Academic Ledger</strong><small>CỔNG THÔNG TIN ĐÀO TẠO</small></span></a>
+<nav class="portal-nav" aria-label="Điều hướng chính"><a href="/portal#articles">Thông báo</a><a href="/portal#curriculum">Đào tạo</a><a href="/portal#regulations">Quy trình - Quy định</a><a href="/portal#documents">Văn bản - Hướng dẫn</a><a href="/quan-ly-lich-hoc/ma-tran">Lịch</a></nav>
+<div class="portal-account"><button type="button" class="theme-toggle" id="portal-theme" aria-label="Chuyển giao diện Sáng/Tối">◐</button>
+@if(logged){<details class="user-menu"><summary>@(User.FindFirst("HoTen")?.Value??User.Identity?.Name) ▾</summary><div><a href="/thoi-khoa-bieu">Thời khóa biểu cá nhân</a>@if(User.IsInRole("SinhVien")){<a href="/dang-ky-hoc-phan">Đăng ký học phần</a>}@if(canWrite){<a href="/bai-viet">Quản lý bài viết</a>}@if(User.IsInRole("Admin")){<a href="/">Khu vực quản trị</a>}<button id="portal-logout" type="button">Đăng xuất</button></div></details>}else{<a class="portal-button" href="/login">Đăng nhập →</a>}
+</div></header>
+<main class="portal-main">@RenderBody()</main>
+<footer class="portal-footer" id="contact"><div><a href="/portal" class="footer-brand">Academic Ledger</a><p>Cổng thông tin đào tạo dành cho sinh viên & giảng viên.</p>@foreach(var key in new[]{("DiaChi","Địa chỉ"),("Hotline","Hotline"),("Email","Email")}){var value=Configuration["Portal:"+key.Item1];if(!string.IsNullOrWhiteSpace(value)){<p>@key.Item2: @value</p>}}@if(string.IsNullOrWhiteSpace(Configuration["Portal:Email"])&&string.IsNullOrWhiteSpace(Configuration["Portal:Hotline"])){<p>Thông tin liên hệ các phòng ban đang được cập nhật.</p>}</div><div><h3>Liên kết nhanh</h3><a href="/portal/tra-cuu-tkb">Tra cứu thời khóa biểu</a><a href="/quan-ly-lich-hoc/ma-tran">Lịch phòng học</a><a href="/dang-ky-hoc-phan">Đăng ký học phần</a><a href="/portal#curriculum">Chương trình đào tạo</a></div><div><h3>Đồng hành cùng bạn</h3><p>Thông tin chính xác. Học tập chủ động.</p><p>© @QL_DiemSV.Services.RoomMatrixRules.Today.Year Academic Ledger</p><a href="#top" class="back-top">↑ Về đầu trang</a></div></footer>
+<script src="~/js/portal.js" asp-append-version="true"></script>@await RenderSectionAsync("Scripts",required:false)
+</body></html>

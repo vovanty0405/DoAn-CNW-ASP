@@ -16,6 +16,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Quản Lý Điểm Sinh Viên</title>
 
+    <link rel="stylesheet" href="~/css/academic.css" asp-append-version="true" />
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,6 +175,10 @@
 
             <!-- Navigation Menu -->
             <nav class="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+                <a href="/portal" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Cổng thông tin đào tạo</a>
+                @if(User.IsInRole("Admin")||User.IsInRole("GiangVien")){
+                    <a href="/bai-viet" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Bài viết & Thông báo</a>
+                }
                 <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Tổng quan</div>
                 <a href="/" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath == "/" ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
                     <i data-lucide="home" class="w-4 h-4"></i>
@@ -217,6 +222,15 @@
                     </a>
                 }
 
+                @if (roleName == "SinhVien") {
+                    <a href="/dang-ky-hoc-phan" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Đăng ký học phần</a>
+                }
+                @if (roleName == "SinhVien" || roleName == "GiangVien" || roleName == "Admin") {
+                    <a href="/thoi-khoa-bieu" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Thời khóa biểu</a>
+                }
+                @if (roleName == "Admin") {
+                    <a href="/quan-ly-lich-hoc" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Điều phối lịch & Phòng học</a>
+                }
                 <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Điểm số & Phúc khảo</div>
                 @if (roleName == "Admin" || roleName == "GiangVien" || roleName == "KhaoThi")
                 {

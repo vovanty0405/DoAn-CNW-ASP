@@ -1,0 +1,60 @@
+@model QL_DiemSV.ViewModels.PortalTimetableViewModel
+@using QL_DiemSV.Services
+@{
+    Layout="_PortalLayout";ViewData["Title"]="Tra cứu thời khóa biểu";
+    string WeekUrl(int week)=>Url.Action("Timetable","Portal",new{code=Model.Code,kind=Model.Kind,maHK=Model.HocKy?.MaHK,week,mode=Model.Mode})!;
+    var maxWeek=Model.HocKy?.SoTuan??1;
+    string Value(string? value)=>string.IsNullOrWhiteSpace(value)?"Chưa cập nhật":value;
+}
+@section Styles{<link rel="stylesheet" href="~/css/portal-timetable.css" asp-append-version="true" />}
+<div class="timetable-portal">
+<div class="portal-breadcrumb no-print"><a href="/portal">Cổng đào tạo</a> / Tra cứu thời khóa biểu</div>
+@if(!Model.HasResult){
+<section class="portal-panel lookup-start" id="lookup-start"><div class="lookup-start-icon" aria-hidden="true">◷</div><span class="eyebrow">LỊCH HỌC & GIẢNG DẠY</span><h1>Tra cứu thời khóa biểu</h1><p>Nhập mã để xem lịch học hoặc lịch giảng dạy của bạn.</p>
+<form method="get" class="portal-filter initial-lookup" id="lookup-form"><label>Đối tượng<select name="kind"><option value="student" selected="@(Model.Kind=="student")">Sinh viên</option><option value="lecturer" selected="@(Model.Kind=="lecturer")">Giảng viên</option></select></label><label>Mã SV / GV<input name="code" value="@Model.Code" required maxlength="20" placeholder="VD: SV002 hoặc DTH235811" autocomplete="off" /></label><button>Xem TKB →</button></form>
+@if(Model.Error!=null){<p class="portal-alert lookup-error" role="alert">@Model.Error</p>}
+</section>
+}else{
+<div class="lookup-page-heading"><div><span class="eyebrow">STUDENT & LECTURER SCHEDULE</span><h1>Thông tin thời khóa biểu</h1></div><a class="lookup-again no-print" href="@Url.Action("Timetable",new{kind=Model.Kind})">⌕ Tra cứu mã khác</a></div>
+<section class="portal-panel timetable-controls no-print" id="timetable-controls">
+<form method="get" id="timetable-filter"><input type="hidden" name="code" value="@Model.Code" /><input type="hidden" name="kind" value="@Model.Kind" />
+<div class="timetable-control-row"><label class="term-control">Chọn học kỳ xem TKB<select name="maHK" data-tkb="term" disabled="@(Model.HocKys.Count==0)">@foreach(var term in Model.HocKys){<option value="@term.MaHK" selected="@(term.MaHK==Model.HocKy?.MaHK)">@term.TenHK - Năm học @term.NamHocBatDau-@term.NamHocKetThuc</option>}</select></label></div>
+<div class="timetable-control-row"><label>Chế độ xem<select name="mode" data-tkb="mode"><option value="week" selected="@(Model.Mode=="week")">TKB theo tuần</option><option value="all" selected="@(Model.Mode=="all")">TKB toàn học kỳ</option></select></label>
+@if(Model.Mode=="week") {<label class="week-control">Chọn tuần<select name="week" data-tkb="week" disabled="@(Model.HocKy==null)">@if(Model.HocKy!=null){@for(int w=1;w<=maxWeek;w++){<option value="@w" selected="@(w==Model.Week)">@TimetablePresentation.WeekLabel(Model.HocKy,w)</option>}}</select></label>}else{<input type="hidden" name="week" value="@Model.Week" />}
+<button type="button" class="print-timetable" id="print-timetable">🖨️ In TKB</button><noscript><button>Xem TKB</button></noscript></div>
+<p class="timetable-note">(Lưu ý: tuần 1 tương ứng với tuần 1 của học kỳ, bắt đầu từ ngày @(Model.HocKy?.NgayBatDauTuan1?.ToString("dd/MM/yyyy")??"chưa được cấu hình").)</p>
+</form>
+@if(Model.NoCurrentTerm){<p class="portal-alert">Chưa có học kỳ được cấu hình bao phủ hôm nay. Đang hiển thị học kỳ gần nhất; bạn có thể đổi học kỳ để xem.</p>}
+@if(Model.HocKys.Count==0){<p class="portal-alert">Hệ thống chưa có học kỳ. Vui lòng liên hệ Phòng Đào tạo.</p>}
+</section>
+<section class="profile-banner" id="lookup-profile"><div class="profile-avatar" aria-hidden="true">@(Model.Kind=="student"?"SV":"GV")</div><div class="profile-main"><span class="profile-type">@(Model.Kind=="student"?"SINH VIÊN":"GIẢNG VIÊN")</span><h2>@(Model.Kind=="lecturer"?$"{Model.Degree} {Model.FullName}".Trim():Model.FullName)</h2><dl class="profile-fields"><div><dt>@(Model.Kind=="student"?"Mã Số:":"Mã GV:")</dt><dd class="code-badge">@Model.Code</dd></div><div><dt>Họ Tên:</dt><dd>@(Model.Kind=="lecturer"?$"{Model.Degree} {Model.FullName}".Trim():Model.FullName)</dd></div>
+@if(Model.Kind=="student"){<div><dt>Ngày sinh:</dt><dd>@(Model.DateOfBirth?.ToString("dd/MM/yyyy")??"Chưa cập nhật")</dd></div><div><dt>Lớp:</dt><dd>@Value(Model.ClassName)</dd></div><div><dt>Ngành:</dt><dd>@Value(Model.MajorName)</dd></div><div><dt>Khoa:</dt><dd>@Value(Model.FacultyName)</dd></div>}else{<div><dt>Bộ môn/Khoa:</dt><dd>@Value(Model.FacultyName)</dd></div><div><dt>Email:</dt><dd>@Value(Model.Email)</dd></div>}
+</dl></div></section>
+<section class="portal-panel timetable-results" id="timetable-results"><div class="timetable-caption"><h2>@Model.HocKy?.TenHK · @Model.HocKy?.NamHocBatDau-@Model.HocKy?.NamHocKetThuc</h2><p>@(Model.Mode=="all"?"Thời khóa biểu toàn học kỳ":Model.HocKy!=null?TimetablePresentation.WeekLabel(Model.HocKy,Model.Week):"Chưa có học kỳ")</p></div>
+@if(Model.Mode=="all"){
+<div class="portal-table-wrap"><table class="portal-table full-term-table"><caption class="sr-only">Thời khóa biểu toàn học kỳ của @Model.FullName</caption><thead><tr><th>Môn học / Mã LHP</th><th>Nhóm</th><th>Thứ</th><th>Tiết</th><th>Phòng</th><th>Giảng viên</th><th>Tuần học</th><th>Trạng thái</th></tr></thead><tbody>
+@foreach(var lesson in Model.Schedules){var state=Model.StatusClass(lesson);<tr class="lesson-state state-@state"><td><strong>@lesson.LopHocPhan?.MonHoc?.TenMon</strong><small>@lesson.MaLHP</small></td><td>@lesson.LopHocPhan?.NMH</td><td>@ScheduleRules.DayName(lesson.Thu)</td><td>@lesson.TietBatDau–@(lesson.TietBatDau+lesson.SoTiet-1)</td><td>@lesson.PhongHoc</td><td>@lesson.GiangVien?.HoTen</td><td>@lesson.ChuoiTuanHoc</td><td>@TimetablePresentation.StatusLabel(state)@if(!string.IsNullOrWhiteSpace(lesson.TuanBaoNghi)){<small>Báo nghỉ tuần: @lesson.TuanBaoNghi</small>}</td></tr>}
+@if(Model.Schedules.Count==0){<tr><td colspan="8" class="portal-empty">Không có lịch trong học kỳ đã chọn.</td></tr>}
+</tbody></table></div>
+}else{
+var byDay=Enumerable.Range(2,7).ToDictionary(d=>d,d=>RoomMatrixRules.Blocks(Model.Schedules.Where(x=>x.Thu==d)));
+<div class="portal-table-wrap"><table class="portal-table lookup-grid enhanced-grid"><caption class="sr-only">Thời khóa biểu tuần @Model.Week của @Model.FullName</caption><colgroup><col class="period-column" />@for(int d=2;d<=8;d++){<col />}<col class="period-column" /></colgroup><thead><tr><th scope="col">TIẾT</th>@for(int day=2;day<=8;day++){<th scope="col">@ScheduleRules.DayName(day).ToUpper()<small>@Model.HocKy?.NgayBatDauTuan1?.AddDays((Model.Week-1)*7+day-2).ToString("dd/MM")</small></th>}<th scope="col">TIẾT</th></tr></thead><tbody>
+@for(int period=1;period<=12;period++){<tr><th scope="row" class="period-label">Tiết @period<small>@RoomMatrixRules.PeriodTime(period)</small></th>
+@for(int day=2;day<=8;day++){
+    var blocks=byDay[day];var block=blocks.FirstOrDefault(x=>x.Start==period);
+    if(block!=null){var state=block.Lessons.Count==1?Model.StatusClass(block.Lessons[0]):"mixed";<td rowspan="@block.Span" class="lookup-booking lesson-state state-@state">
+    @foreach(var lesson in block.Lessons){var lessonState=Model.StatusClass(lesson);<div class="lesson-card state-@lessonState"><strong>@lesson.LopHocPhan?.MonHoc?.TenMon</strong><span class="lesson-room">Phòng: @lesson.PhongHoc</span><span>@lesson.MaLHP / Nhóm @lesson.LopHocPhan?.NMH</span><span>@lesson.GiangVien?.HoTen</span><span>@(lesson.LoaiBuoiHoc?"Thực hành":"Lý thuyết") · Tiết @lesson.TietBatDau–@(lesson.TietBatDau+lesson.SoTiet-1)</span>@if(lessonState!="normal"){<small class="lesson-status">@TimetablePresentation.StatusLabel(lessonState)</small>}</div>}
+    </td>}
+    else if(!blocks.Any(x=>x.Start<period&&period<x.Start+x.Span)){<td class="lookup-empty">—</td>}
+}
+<th class="period-label">Tiết @period<small>@RoomMatrixRules.PeriodTime(period)</small></th></tr>}
+</tbody><tfoot><tr><th>TIẾT</th>@for(int day=2;day<=8;day++){<th>@ScheduleRules.DayName(day).ToUpper()</th>}<th>TIẾT</th></tr></tfoot></table></div>
+@if(Model.Schedules.Count==0){<p class="portal-empty">Không có lịch học/giảng dạy trong tuần đã chọn.</p>}
+}
+@if(Model.Mode=="week"&&Model.HocKy!=null){<nav class="timetable-week-nav no-print" aria-label="Chuyển tuần">@foreach(var nav in new[]{("Tuần Đầu",1,Model.Week<=1),("Tuần Trước",Model.Week-1,Model.Week<=1),("Tuần Kế",Model.Week+1,Model.Week>=maxWeek),("Tuần Cuối",maxWeek,Model.Week>=maxWeek)}){if(nav.Item3){<span class="week-nav-disabled" aria-disabled="true">@nav.Item1</span>}else{<a href="@WeekUrl(nav.Item2)">@nav.Item1</a>}}</nav>}
+<div class="timetable-legend" aria-label="Chú thích"><strong>Chú thích:</strong>@foreach(var legend in new[]{("normal","Lịch học bình thường"),("partial-overlap","Môn học chỉ trùng một vài tiết"),("full-overlap","Môn học trùng tất cả các tiết"),("historical","Thời khóa biểu học kỳ cũ"),("cancelled","Giảng viên đã đăng ký nghỉ dạy / Báo nghỉ")}){<span><i class="legend-box state-@legend.Item1" aria-hidden="true"></i>@legend.Item2</span>}</div>
+<p class="timetable-updated" title="Thời điểm tải dữ liệu từ máy chủ">( Dữ liệu được cập nhật vào lúc: @Model.LoadedAt.ToString("HH:mm") Ngày: @Model.LoadedAt.ToString("dd/MM/yyyy") )</p>
+</section>
+}
+</div>
+@section Scripts{<script src="~/js/portal-timetable.js" asp-append-version="true"></script>}

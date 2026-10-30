@@ -19,6 +19,12 @@ public class HocKy
 
     public int NamHocKetThuc { get; set; }
 
+    public DateTime? NgayBatDauTuan1 { get; set; }
+    public DateTime? BatDauDangKy { get; set; }
+    public DateTime? KetThucDangKy { get; set; }
+    [Range(1, 52)] public int SoTuan { get; set; } = 20;
+    [Column(TypeName = "decimal(18,2)")] [Range(0, 100000000)] public decimal DonGiaTinChi { get; set; } = 635000;
+
     [JsonIgnore]
     public virtual ICollection<LopHocPhan> LopHocPhans { get; set; } = new List<LopHocPhan>();
 }

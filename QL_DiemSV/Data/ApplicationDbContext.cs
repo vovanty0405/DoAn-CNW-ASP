@@ -33,10 +33,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<ThongBao> ThongBaos { get; set; }
     public DbSet<NhatKyHoatDong> NhatKyHoatDongs { get; set; }
 
+    public DbSet<Article> Articles => Set<Article>();
+    public DbSet<PortalDocument> PortalDocuments => Set<PortalDocument>();
+    public DbSet<ClassSchedule> ClassSchedules => Set<ClassSchedule>();
+    public DbSet<PhongHoc> PhongHocs => Set<PhongHoc>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<ClassSchedule>().Property(x=>x.TuanBaoNghi).IsRequired();
+        modelBuilder.Entity<ClassSchedule>().HasOne(x => x.LopHocPhan).WithMany(x => x.LichHocs).HasForeignKey(x => x.MaLHP).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClassSchedule>().HasOne(x => x.GiangVien).WithMany().HasForeignKey(x => x.MaGV).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClassSchedule>().HasOne<PhongHoc>().WithMany().HasForeignKey(x => x.PhongHoc).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Article>().HasOne(x=>x.NguoiDang).WithMany().HasForeignKey(x=>x.NguoiDangId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Article>().HasIndex(x=>new { x.TrangThai,x.DanhMuc,x.NgayDang });
         // UserAccount unique username
         modelBuilder.Entity<UserAccount>()
             .HasIndex(u => u.Username)

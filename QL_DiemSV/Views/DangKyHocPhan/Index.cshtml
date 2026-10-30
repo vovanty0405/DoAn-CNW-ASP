@@ -1,0 +1,44 @@
+@model QL_DiemSV.ViewModels.RegistrationViewModel
+@using QL_DiemSV.Services
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Đăng ký học phần";
+    var all = Model.Sections.Concat(Model.Selected.Select(x => x.LopHocPhan!)).DistinctBy(x => x.MaLHP).ToList();
+    var payload = all.Select(x => new { id = x.MaLHP, code = x.MaMon, name = x.MonHoc?.TenMon ?? x.TenLopHP, group = x.NMH, practice = x.TTH, credits = x.STC, feeCredits = x.STCHP, fee = Model.Selected.FirstOrDefault(k => k.MaLHP == x.MaLHP)?.HocPhiDangKy ?? (x.STC == 0 ? 0 : x.STCHP * (Model.HocKy?.DonGiaTinChi ?? 0)), discount = Model.Selected.FirstOrDefault(k => k.MaLHP == x.MaLHP)?.MienGiam ?? 0, saved = Model.Selected.Any(k => k.MaLHP == x.MaLHP), schedules = x.LichHocs.Select(l => new { day = l.Thu, start = l.TietBatDau, count = l.SoTiet, weeks = ScheduleRules.Weeks(l.ChuoiTuanHoc) }) });
+}
+<div class="academic">
+<div><p class="muted">Đào tạo tín chỉ / Sinh viên</p><h1>Đăng ký học phần</h1></div>
+<section class="panel">
+<form method="get" class="toolbar">
+<label>Học kỳ<select name="maHK" onchange="this.form.submit()">@foreach(var hk in Model.HocKys){<option value="@hk.MaHK" selected="@(hk.MaHK == Model.HocKy?.MaHK)">@hk.TenHK · @hk.NamHocBatDau-@hk.NamHocKetThuc</option>}</select></label>
+<label>Lọc theo môn học<input name="search" value="@Model.Search" placeholder="Mã MH hoặc tên môn học" /></label><button>Lọc</button>
+<label>Lọc theo điều kiện<select name="condition" onchange="this.form.elements.value.value='';this.form.submit()"><option value="">Tất cả</option>@foreach(var c in new[]{("class","Lớp hành chính"),("faculty","Khoa"),("major","Ngành"),("curriculum","Môn trong khung đào tạo")}){<option value="@c.Item1" selected="@(Model.Condition == c.Item1)">@c.Item2</option>}</select></label>
+<label>Giá trị<select name="value"><option value="">Tất cả</option>@foreach(var o in Model.Options){<option value="@o.Id" selected="@(Model.Value == o.Id)">@o.Name</option>}</select></label><button>Lọc</button>
+</form>
+<p class="notice @(Model.IsOpen ? "success" : "error")">@(Model.IsOpen ? "Đang trong thời gian đăng ký" : "Ngoài thời gian đăng ký hoặc học kỳ chưa được cấu hình đợt đăng ký.")</p>
+<p class="muted">Đơn giá: @((Model.HocKy?.DonGiaTinChi ?? 0).ToString("N0",System.Globalization.CultureInfo.InvariantCulture)) đ/tín chỉ · Giờ Việt Nam</p>
+<div class="scroll"><table><thead><tr>@foreach(var h in new[]{"Chọn","Mã MH","Tên môn học","NMH","TTH","STC","STCHP","Mã lớp","Sĩ số","CL","TH","Thứ","Tiết BĐ","ST","Phòng","Giảng viên","Tuần"}){<th>@h</th>}</tr></thead><tbody>
+@foreach(var s in Model.Sections){
+    var lessons = s.LichHocs.OrderBy(x=>x.Thu).ThenBy(x=>x.TietBatDau).ToList();
+    var span = Math.Max(1,lessons.Count); var remaining = Math.Max(0,(s.SiSoToiDa ?? 40)-s.SoLuongDaDangKy);
+    for(int i=0;i<span;i++) {<tr>
+    @if(i==0){<td rowspan="@span"><input type="checkbox" class="section-choice" data-id="@s.MaLHP" aria-label="Chọn @s.MaMon nhóm @s.NMH" disabled="@(!Model.IsOpen || remaining == 0 || Model.Selected.Any(x=>x.MaLHP==s.MaLHP))" checked="@(Model.Selected.Any(x=>x.MaLHP==s.MaLHP))" /></td><td rowspan="@span">@s.MaMon</td><td rowspan="@span">@s.MonHoc?.TenMon</td><td rowspan="@span">@s.NMH</td><td rowspan="@span">@s.TTH</td><td rowspan="@span">@s.STC</td><td rowspan="@span">@s.STCHP</td><td rowspan="@span">@s.MaLop</td><td rowspan="@span">@s.SiSoToiDa</td><td rowspan="@span" class="@(remaining==0 ? "error" : "success")">@(remaining==0 ? "Hết" : remaining.ToString())</td>}
+    @if(lessons.Count>0){var l=lessons[i];<td>@(l.LoaiBuoiHoc ? "*" : "")</td><td>@ScheduleRules.DayName(l.Thu)</td><td>@l.TietBatDau</td><td>@l.SoTiet</td><td>@l.PhongHoc</td><td>@l.GiangVien?.HoTen</td><td>@l.ChuoiTuanHoc</td>}else{<td colspan="7" class="muted">Chưa có lịch học</td>}
+    </tr>}
+}
+@if(Model.Sections.Count==0){<tr><td colspan="17" class="muted">Không có lớp phù hợp bộ lọc.</td></tr>}
+</tbody></table></div>
+</section>
+<section class="panel">
+<div class="toolbar"><h2 style="margin-right:auto">DANH SÁCH MÔN HỌC ĐÃ CHỌN</h2><button id="save-registration" disabled="@(!Model.IsOpen)">Lưu Đăng Ký</button><button id="remove-registration" class="secondary" disabled="@(!Model.IsOpen)">Xóa</button></div>
+<p id="registration-message" role="status" aria-live="polite" class="notice"></p>
+<form id="token">@Html.AntiForgeryToken()</form>
+<div class="scroll"><table><thead><tr>@foreach(var h in new[]{"STT","Mã MH","Tên môn học","NMH","TTH","STC","STCHP","Học Phí","Miễn Giảm","Phải Đóng","Trạng Thái môn học","Xóa"}){<th>@h</th>}</tr></thead><tbody id="selected-courses"></tbody><tfoot id="selected-totals"></tfoot></table></div>
+<p class="notice muted">Sau khi xóa hoặc thay đổi lựa chọn, bấm Lưu Đăng Ký để cập nhật CSDL. Học phí đã lưu được giữ theo đơn giá lúc đăng ký.</p>
+</section>
+</div>
+@section Scripts {
+<script id="registration-data" type="application/json">@Html.Raw(JsonSerializer.Serialize(payload))</script>
+<script>window.registrationTerm = @Html.Raw(JsonSerializer.Serialize(Model.HocKy?.MaHK)); window.registrationOpen = @JsonSerializer.Serialize(Model.IsOpen);</script>
+<script src="~/js/registration.js" asp-append-version="true"></script>
+}

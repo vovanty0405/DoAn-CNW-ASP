@@ -8,6 +8,7 @@ public static class DbInitializer
     public static void Initialize(ApplicationDbContext context)
     {
         context.Database.EnsureCreated();
+        AcademicSchemaUpgrade.Apply(context);
 
         if (context.Roles.Any())
         {
@@ -339,6 +340,11 @@ public static class DbInitializer
             new LopHocPhan { MaLHP = "LHP005", TenLopHP = "Công nghệ Web ASP.NET - Nhóm 01", MaMon = "IT005", MaHK = "HK2_2425", MaGV = "GV001", PhongHoc = "PM-01", SiSoToiDa = 35, TrangThai = "MoDangKy", CauHinhDiem = defaultCauHinh, TrangThaiNhapDiem = "Đang nhập" },
             new LopHocPhan { MaLHP = "LHP006", TenLopHP = "Phát triển Ứng dụng Di động - Nhóm 01", MaMon = "IT006", MaHK = "HK2_2425", MaGV = "GV002", PhongHoc = "PM-02", SiSoToiDa = 35, TrangThai = "MoDangKy", CauHinhDiem = defaultCauHinh, TrangThaiNhapDiem = "Chờ mở khóa" }
         };
+        foreach (var section in lopHocPhans)
+        {
+            section.STC = context.MonHocs.Find(section.MaMon)?.SoTinChi ?? 0;
+            section.STCHP = section.STC;
+        }
         context.LopHocPhans.AddRange(lopHocPhans);
         context.SaveChanges();
 

@@ -9,7 +9,7 @@ public class HomeController : Controller
     [HttpGet("/")]
     public IActionResult Index()
     {
-        if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
+        if (User.Identity?.IsAuthenticated != true || User.IsInRole("SinhVien") || User.IsInRole("GiangVien")) return Redirect("/portal");
         ViewData["Title"] = "Trang chủ & Tổng quan";
         return View("Index");
     }

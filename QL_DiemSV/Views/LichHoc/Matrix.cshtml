@@ -1,0 +1,87 @@
+@model QL_DiemSV.ViewModels.RoomMatrixViewModel
+@using QL_DiemSV.Services
+@using QL_DiemSV.ViewModels
+@using System.Globalization
+@{
+    Layout=User.IsInRole("Admin")?"_Layout":"_PortalLayout";
+    ViewData["Title"]="Ma trận điều phối phòng học";
+    string MatrixUrl(string? mode=null,string? type=null,string? area=null,DateTime? date=null,bool current=false) => Url.Action("Matrix","LichHoc",new {
+        maHK=current?null:Model.HocKy?.MaHK, week=current?(int?)null:Model.Week, day=current?(int?)null:Model.Day,
+        viewMode=mode??Model.ViewMode,scheduleType=type??Model.ScheduleType,building=area??Model.Building,
+        date=(current?Model.Today:date??(Model.HocKy?.NgayBatDauTuan1.HasValue==true?Model.Date:null))?.ToString("yyyy-MM-dd")
+    })!;
+    var anchor=Model.Date??Model.Today;
+    var weekStart=Model.WeekStart??anchor.AddDays(2-RoomMatrixRules.AcademicDay(anchor));
+    var todayLabel=RoomMatrixRules.AcademicDay(Model.Today)==8?"CN":$"T{RoomMatrixRules.AcademicDay(Model.Today)}";
+    var periods=Model.VisiblePeriods;
+    var columnWidth=(87m/periods.Count).ToString("0.######",CultureInfo.InvariantCulture)+"%";
+}
+<div class="academic matrix-page @(Model.ViewMode=="compact"?"compact":"")" data-view-mode="@Model.ViewMode">
+<div class="section-heading"><div><p class="muted">Quản lý đào tạo / Sử dụng phòng học</p><h1>Ma trận điều phối phòng học</h1></div>@if(User.IsInRole("Admin")){<a class="button secondary" href="/quan-ly-lich-hoc">Điều phối lịch học</a>}else{<a class="button secondary" href="/portal">Về cổng đào tạo</a>}</div>
+<section class="panel matrix-controls">
+<div class="filter-row"><span class="filter-label">Xem theo</span><nav class="pill-group" aria-label="Chế độ xem">@foreach(var item in new[]{("week","Theo tuần"),("day","Theo ngày"),("compact","Rút gọn")}){<a class="pill matrix-tab @(Model.ViewMode==item.Item1?"selected":"")" aria-current="@(Model.ViewMode==item.Item1?"page":null)" data-mode="@item.Item1" href="@MatrixUrl(mode:item.Item1)">@item.Item2</a>}</nav></div>
+<div class="filter-row"><span class="filter-label">Loại lịch</span><nav class="pill-group" aria-label="Loại lịch"><a class="pill @(Model.ScheduleType=="all"?"selected":"")" href="@MatrixUrl(type:"all")">Tất cả</a>@foreach(var type in RoomMatrixRules.ScheduleTypes){<a class="pill @(Model.ScheduleType==type.Key?"selected":"")" href="@MatrixUrl(type:type.Key)">@type.Value</a>}</nav></div>
+<div class="filter-row"><span class="filter-label">Tòa nhà / Khu vực</span><nav class="pill-group" aria-label="Tòa nhà"><a class="pill @(Model.Building=="all"?"selected":"")" href="@MatrixUrl(area:"all")">Tất cả</a>@foreach(var area in RoomMatrixRules.Buildings){<a class="pill @(Model.Building==area.Key?"selected":"")" href="@MatrixUrl(area:area.Key)">@area.Value</a>}</nav></div>
+<form method="get" class="toolbar matrix-time" id="matrix-filter">
+<input type="hidden" name="viewMode" value="@Model.ViewMode" /><input type="hidden" name="scheduleType" value="@Model.ScheduleType" /><input type="hidden" name="building" value="@Model.Building" />
+<label>Học kỳ<select name="maHK" data-calendar="term">@foreach(var hk in Model.HocKys){<option value="@hk.MaHK" selected="@(hk.MaHK==Model.HocKy?.MaHK)">@hk.TenHK · @hk.NamHocBatDau-@hk.NamHocKetThuc</option>}</select></label>
+<label>Tuần<select name="week" data-calendar="week">@if(Model.OutsideTerm){<option value="@Model.Week" selected>Tuần @Model.Week (ngoài học kỳ)</option>}@for(int w=1;w<=(Model.HocKy?.SoTuan??20);w++){<option value="@w" selected="@(w==Model.Week)">Tuần @w</option>}</select></label>
+@if(Model.ViewMode=="week"){
+    <input type="hidden" name="day" value="2" />
+    <div class="week-range">Tuần: @weekStart.ToString("dd/MM") – @weekStart.AddDays(6).ToString("dd/MM/yyyy")</div>
+    <div class="date-navigation" aria-label="Điều hướng tuần"><a class="button secondary" href="@MatrixUrl(date:weekStart.AddDays(-7))">« Tuần trước</a><a class="button secondary" href="@MatrixUrl(current:true)">Tuần hiện tại</a><a class="button secondary" href="@MatrixUrl(date:weekStart.AddDays(7))">Tuần kế tiếp »</a></div>
+}else{
+    <label>Thứ<select name="day" data-calendar="day">@for(int d=2;d<=8;d++){<option value="@d" selected="@(d==Model.Day)">@ScheduleRules.DayName(d)</option>}</select></label>
+    <label>Chọn ngày<input type="date" id="matrix-date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></label>
+    <div class="date-navigation" aria-label="Điều hướng ngày"><a class="button secondary" href="@MatrixUrl(date:anchor.AddDays(-1))">« Hôm qua</a><a class="button secondary" href="@MatrixUrl(current:true)">Hôm nay (@todayLabel, @Model.Today.ToString("dd/MM/yyyy"))</a><a class="button secondary" href="@MatrixUrl(date:anchor.AddDays(1))">Ngày mai »</a></div>
+}
+<button>Xem ma trận</button>
+</form>
+<p class="muted matrix-summary">Tuần 1: @(Model.HocKy?.NgayBatDauTuan1?.ToString("dd/MM/yyyy")??"Chưa cấu hình") · @Model.Rooms.Count phòng · Mỗi tiết 50 phút</p>
+@if(!Model.HasCurrentTerm){<p class="notice pending" role="status">Chưa có học kỳ được cấu hình bao phủ ngày hôm nay (@Model.Today.ToString("dd/MM/yyyy")).</p>}
+@if(Model.OutsideTerm){<p class="notice pending" role="status">Ngày @Model.Date?.ToString("dd/MM/yyyy") nằm ngoài học kỳ đang chọn. Hãy chọn ngày hoặc học kỳ phù hợp.</p>}
+@if(Model.HocKy?.NgayBatDauTuan1==null){<p class="notice pending">Cần cấu hình ngày bắt đầu tuần 1 để tra lịch theo ngày. Bạn vẫn có thể chọn số tuần và thứ để xem lịch.</p>}
+</section>
+<section class="panel matrix-table-panel">
+<div class="section-heading"><div><p class="muted">@(Model.OutsideTerm?"Ngoài học kỳ":$"Tuần {Model.Week}")</p><h2>@(Model.ViewMode=="week"?$"{weekStart:dd/MM} – {weekStart.AddDays(6):dd/MM/yyyy}":$"{ScheduleRules.DayName(Model.Day)} · {Model.Date:dd/MM/yyyy}")</h2></div><span class="badge neutral">@Model.Schedules.Count buổi</span></div>
+<div class="matrix-table-wrap">
+@if(Model.ViewMode=="week"){
+<table class="room-matrix weekly-matrix"><caption class="sr-only">Ma trận tuần @Model.Week: phòng, tiết và bảy ngày</caption><colgroup><col style="width:12%" /><col style="width:8%" />@for(int d=2;d<=8;d++){<col style="width:11.428571%" />}</colgroup>
+<thead><tr><th scope="col">Phòng</th><th scope="col">Tiết</th>@for(int d=2;d<=8;d++){<th scope="col">@ScheduleRules.DayName(d)<small>@weekStart.AddDays(d-2).ToString("dd/MM")</small></th>}</tr></thead>
+<tbody>
+@foreach(var room in Model.Rooms){
+    var byDay=Enumerable.Range(2,7).ToDictionary(d=>d,d=>RoomMatrixRules.Blocks(Model.Schedules.Where(x=>x.PhongHoc==room.MaPhong&&x.Thu==d)));
+    for(int tiet=1;tiet<=12;tiet++){
+        <tr>
+        @if(tiet==1){<th rowspan="12" scope="rowgroup" class="room-label"><strong>@room.MaPhong</strong><small>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha,room.ToaNha)</small><small>@room.SucChua chỗ</small><span class="badge @(room.TrangThai=="HoatDong"?"active":room.TrangThai=="BaoTri"?"maintenance":"locked")">@RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai,room.TrangThai)</span></th>}
+        <th scope="row" class="period-label">Tiết @tiet<small>@RoomMatrixRules.PeriodTime(tiet)</small></th>
+        @for(int d=2;d<=8;d++){
+            var blocks=byDay[d];var block=blocks.FirstOrDefault(x=>x.Start==tiet);
+            if(block!=null){<td rowspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons)" /></td>}
+            else if(!blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){<td class="available-cell"><span aria-label="Trống">—</span></td>}
+        }
+        </tr>
+    }
+}
+@if(Model.Rooms.Count==0){<tr><td colspan="9" class="empty-state">Không có phòng phù hợp bộ lọc.</td></tr>}
+</tbody></table>
+}else{
+<table class="room-matrix daily-matrix"><caption class="sr-only">Ma trận phòng học @ScheduleRules.DayName(Model.Day), tuần @Model.Week</caption><colgroup><col style="width:13%" />@foreach(var t in periods){<col style="width:@columnWidth" />}</colgroup><thead><tr><th scope="col">Phòng / Sức chứa</th>@foreach(var t in periods){<th scope="col">Tiết @t<small>@RoomMatrixRules.PeriodTime(t)</small></th>}</tr></thead><tbody>
+@foreach(var room in Model.Rooms){
+    var blocks=RoomMatrixRules.Blocks(Model.Schedules.Where(x=>x.PhongHoc==room.MaPhong&&x.Thu==Model.Day));
+    <tr><th scope="row" class="room-label"><strong>@room.MaPhong</strong><small>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha,room.ToaNha) · @room.SucChua chỗ</small><span class="badge @(room.TrangThai=="HoatDong"?"active":room.TrangThai=="BaoTri"?"maintenance":"locked")">@RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai,room.TrangThai)</span></th>
+    @foreach(var tiet in periods){
+        var block=blocks.FirstOrDefault(x=>x.Start==tiet);
+        if(block!=null){<td colspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons)" /></td>}
+        else if(!blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){<td class="available-cell"><span aria-label="Trống">—</span></td>}
+    }
+    </tr>
+}
+@if(Model.Rooms.Count==0){<tr><td colspan="@(periods.Count+1)" class="empty-state">@(Model.ViewMode=="compact"?"Không có phòng có lịch trong ngày đã chọn.":"Không có phòng thuộc khu vực đã chọn.")</td></tr>}
+</tbody></table>
+}
+</div>
+</section>
+<div class="matrix-legend" aria-label="Chú thích"><strong>Chú thích:</strong><span><i class="legend-swatch reserved" aria-hidden="true"></i> Đã đặt phòng</span><span><i class="legend-empty" aria-hidden="true">—</i> Trống</span><span><i class="legend-swatch overload" aria-hidden="true"></i> Quá sức chứa</span><span><i class="legend-swatch conflict" aria-hidden="true"></i> Xung đột</span></div>
+</div>
+@section Scripts{<script src="~/js/room-matrix.js" asp-append-version="true"></script>}

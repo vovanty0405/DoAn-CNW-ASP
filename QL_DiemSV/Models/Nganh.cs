@@ -15,6 +15,8 @@ public class Nganh
     [MaxLength(255)]
     public string TenNganh { get; set; } = string.Empty;
 
+    [Required,MaxLength(50)] public string HeDaoTao { get; set; } = "Chính quy";
+
     [MaxLength(20)]
     public string? MaKhoa { get; set; }
 
