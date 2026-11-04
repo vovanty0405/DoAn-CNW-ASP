@@ -36,7 +36,7 @@
         </div>
         <div>
             <label class="block text-xs text-text-muted mb-1">Học kỳ</label>
-            <select id="f-hk" onchange="loadDashboard()" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+            <select id="f-hk" onchange="reloadSectionOptions()" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
                 <option value="">Tất cả Học kỳ</option>
             </select>
         </div>
@@ -176,7 +176,7 @@
                 apiFetch('/api/lophanhchinh'),
                 apiFetch('/api/hocky'),
                 apiFetch('/api/monhoc'),
-                apiFetch('/api/lophocphan')
+                apiFetch('/api/lophocphan/options')
             ]);
 
             allNganhs = nganhs.data || [];
@@ -190,10 +190,18 @@
             const selHk = document.getElementById('f-hk');
             (hks.data || []).forEach(h => selHk.insertAdjacentHTML('beforeend', `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`));
 
+            document.getElementById("f-hk").value = lhps.maHK || "";
             populateDependentSelects();
             await loadDashboard();
         }
 
+        async function reloadSectionOptions() {
+            const response = await apiFetch('/api/lophocphan/options?' + new URLSearchParams({ maHK: document.getElementById('f-hk').value }));
+            allLhps = response.data || [];
+            document.getElementById('f-hk').value = response.maHK || '';
+            populateDependentSelects();
+            await loadDashboard();
+        }
         function populateDependentSelects() {
             const maKhoa = document.getElementById('f-khoa').value;
             const maNganh = document.getElementById('f-nganh').value;
@@ -230,8 +238,7 @@
 
         function resetFilters() {
             ['f-khoa', 'f-nganh', 'f-lop', 'f-hk', 'f-mon', 'f-lhp'].forEach(id => document.getElementById(id).value = '');
-            populateDependentSelects();
-            loadDashboard();
+            reloadSectionOptions();
         }
 
         async function loadDashboard() {

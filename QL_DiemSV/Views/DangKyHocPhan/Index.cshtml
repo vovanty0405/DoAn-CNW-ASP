@@ -20,7 +20,7 @@
 <div class="scroll"><table><thead><tr>@foreach(var h in new[]{"Chọn","Mã MH","Tên môn học","NMH","TTH","STC","STCHP","Mã lớp","Sĩ số","CL","TH","Thứ","Tiết BĐ","ST","Phòng","Giảng viên","Tuần"}){<th>@h</th>}</tr></thead><tbody>
 @foreach(var s in Model.Sections){
     var lessons = s.LichHocs.OrderBy(x=>x.Thu).ThenBy(x=>x.TietBatDau).ToList();
-    var span = Math.Max(1,lessons.Count); var remaining = Math.Max(0,(s.SiSoToiDa ?? 40)-s.SoLuongDaDangKy);
+    var span = Math.Max(1,lessons.Count); var remaining = Math.Max(0,(s.SiSoToiDa ?? 40)-Model.SectionSizes.GetValueOrDefault(s.MaLHP));
     for(int i=0;i<span;i++) {<tr>
     @if(i==0){<td rowspan="@span"><input type="checkbox" class="section-choice" data-id="@s.MaLHP" aria-label="Chọn @s.MaMon nhóm @s.NMH" disabled="@(!Model.IsOpen || remaining == 0 || Model.Selected.Any(x=>x.MaLHP==s.MaLHP))" checked="@(Model.Selected.Any(x=>x.MaLHP==s.MaLHP))" /></td><td rowspan="@span">@s.MaMon</td><td rowspan="@span">@s.MonHoc?.TenMon</td><td rowspan="@span">@s.NMH</td><td rowspan="@span">@s.TTH</td><td rowspan="@span">@s.STC</td><td rowspan="@span">@s.STCHP</td><td rowspan="@span">@s.MaLop</td><td rowspan="@span">@s.SiSoToiDa</td><td rowspan="@span" class="@(remaining==0 ? "error" : "success")">@(remaining==0 ? "Hết" : remaining.ToString())</td>}
     @if(lessons.Count>0){var l=lessons[i];<td>@(l.LoaiBuoiHoc ? "*" : "")</td><td>@ScheduleRules.DayName(l.Thu)</td><td>@l.TietBatDau</td><td>@l.SoTiet</td><td>@l.PhongHoc</td><td>@l.GiangVien?.HoTen</td><td>@l.ChuoiTuanHoc</td>}else{<td colspan="7" class="muted">Chưa có lịch học</td>}

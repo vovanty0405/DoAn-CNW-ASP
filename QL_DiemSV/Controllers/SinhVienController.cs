@@ -18,21 +18,31 @@ public class SinhVienController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maLop)
+    public async Task<IActionResult> GetAll([FromQuery] string? maLop, int page = 1, int pageSize = 20,
+        string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null)
     {
-        var query = _db.SinhViens
-            .Include(s => s.LopHanhChinh)
-                .ThenInclude(l => l!.Nganh)
-                    .ThenInclude(n => n!.Khoa)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(maLop))
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = _db.SinhViens.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(maLop)) query = query.Where(s => s.MaLop == maLop);
+        if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(s => s.LopHanhChinh!.MaNganh == maNganh);
+        if (!string.IsNullOrWhiteSpace(maKhoa)) query = query.Where(s => s.LopHanhChinh!.Nganh!.MaKhoa == maKhoa);
+        if (!string.IsNullOrWhiteSpace(cohort)) query = query.Where(s => s.LopHanhChinh!.NienKhoa == cohort);
+        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(s => s.TrangThai == status);
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(s => s.MaLop == maLop);
+            search = search.Trim();
+            query = query.Where(s => s.MaSV.Contains(search) || s.HoTen.Contains(search) || (s.Email != null && s.Email.Contains(search)));
         }
-
-        var data = await query.OrderBy(s => s.MaSV).ToListAsync();
-        return Ok(new { status = "success", data });
+        var total = await query.CountAsync();
+        var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+        var data = await query.OrderBy(s => s.MaSV).Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(s => new
+            {
+                s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.Email, s.SDT, s.CCCD, s.DiaChi, s.TrangThai,
+                LopHanhChinh = s.LopHanhChinh == null ? null : new { s.LopHanhChinh.MaLop, s.LopHanhChinh.TenLop, s.LopHanhChinh.MaNganh, s.LopHanhChinh.NienKhoa }
+            }).ToListAsync();
+        return Ok(new { status = "success", data, total, page, pageSize, totalPages });
     }
 
     [HttpGet("{id}")]

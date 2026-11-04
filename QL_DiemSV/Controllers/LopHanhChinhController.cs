@@ -20,30 +20,16 @@ public class LopHanhChinhController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maNganh)
     {
-        var query = _db.LopHanhChinhs
-            .Include(l => l.Nganh)
-                .ThenInclude(n => n!.Khoa)
-            .Include(l => l.GiangVien)
-            .Include(l => l.SinhViens)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(maNganh))
+        var query = _db.LopHanhChinhs.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(l => l.MaNganh == maNganh);
+        var data = await query.OrderBy(l => l.MaLop).Select(l => new
         {
-            query = query.Where(l => l.MaNganh == maNganh);
-        }
-
-        var list = await query.OrderBy(l => l.MaLop).ToListAsync();
-        var data = list.Select(l => new
-        {
-            l.MaLop,
-            l.TenLop,
-            l.NienKhoa,
-            l.MaNganh,
-            l.MaGVCN,
-            l.Nganh,
-            l.GiangVien,
-            SiSo = l.SinhViens.Count
-        });
+            l.MaLop, l.TenLop, l.NienKhoa, l.MaNganh, l.MaGVCN,
+            Nganh = l.Nganh == null ? null : new { l.Nganh.MaNganh, l.Nganh.TenNganh, l.Nganh.MaKhoa,
+                Khoa = l.Nganh.Khoa == null ? null : new { l.Nganh.Khoa.MaKhoa, l.Nganh.Khoa.TenKhoa } },
+            GiangVien = l.GiangVien == null ? null : new { l.GiangVien.MaGV, l.GiangVien.HoTen },
+            SiSo = l.SinhViens.Count()
+        }).ToListAsync();
 
         return Ok(new { status = "success", data });
     }
@@ -51,7 +37,7 @@ public class LopHanhChinhController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var item = await _db.LopHanhChinhs
+        var item = await _db.LopHanhChinhs.AsNoTracking().AsSplitQuery()
             .Include(l => l.Nganh)
                 .ThenInclude(n => n!.Khoa)
             .Include(l => l.GiangVien)

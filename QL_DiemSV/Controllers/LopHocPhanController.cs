@@ -20,51 +20,79 @@ public class LopHocPhanController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maHK, [FromQuery] string? maGV, [FromQuery] string? maMon)
+    public async Task<IActionResult> GetAll([FromQuery] string? maHK, [FromQuery] string? maGV,
+        [FromQuery] string? maMon, int page = 1, int pageSize = 20, string? search = null,
+        string? maKhoa = null, string? gradeStatus = null)
     {
-        var query = _db.LopHocPhans
-            .Include(l => l.MonHoc)
-                .ThenInclude(m => m!.Khoa)
-            .Include(l => l.HocKy)
-            .Include(l => l.GiangVien)
-            .Include(l => l.KetQuaHocTaps)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(maHK)) query = query.Where(l => l.MaHK == maHK);
+        maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = _db.LopHocPhans.AsNoTracking().Where(l => maHK != null && l.MaHK == maHK);
         if (!string.IsNullOrWhiteSpace(maGV)) query = query.Where(l => l.MaGV == maGV);
         if (!string.IsNullOrWhiteSpace(maMon)) query = query.Where(l => l.MaMon == maMon);
-
-        var list = await query.OrderByDescending(l => l.MaHK).ThenBy(l => l.MaLHP).ToListAsync();
-        var data = list.Select(l => new
+        if (!string.IsNullOrWhiteSpace(maKhoa)) query = query.Where(l => l.MonHoc!.MaKhoa == maKhoa);
+        if (gradeStatus == "OPEN") query = query.Where(l => l.TrangThaiNhapDiem == null || l.TrangThaiNhapDiem == "" || l.TrangThaiNhapDiem == "Đang nhập" || l.TrangThaiNhapDiem == "Vui lòng nhập điểm");
+        if (gradeStatus == "LOCKED") query = query.Where(l => l.TrangThaiNhapDiem == "Đã khóa");
+        if (gradeStatus == "PENDING_UNLOCK") query = query.Where(l => l.TrangThaiNhapDiem == "Chờ mở khóa");
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            l.MaLHP,
-            l.TenLopHP,
-            l.MaMon,
-            l.MaHK,
-            l.MaGV,
-            l.PhongHoc,
-            l.SiSoToiDa,
-            NMH = string.IsNullOrWhiteSpace(l.NMH) ? "01" : l.NMH,
-            STC = l.STC > 0 ? l.STC : (l.MonHoc != null ? l.MonHoc.SoTinChi : 3),
-            SiSoHienTai = l.KetQuaHocTaps.Count,
-            SoSVDaNhapDiem = l.KetQuaHocTaps.Count(k => k.DiemTongKet != null),
-            l.TrangThai,
-            l.CauHinhDiem,
-            l.TrangThaiNhapDiem,
-            TyLeQuaTrinh = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeQuaTrinh : 40,
-            TyLeThiKetThuc = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeThiKetThuc : 60,
-            l.MonHoc,
-            l.HocKy,
-            l.GiangVien
+            search = search.Trim();
+            query = query.Where(l => l.MaLHP.Contains(search) || (l.TenLopHP != null && l.TenLopHP.Contains(search))
+                || l.MonHoc!.TenMon.Contains(search) || (l.PhongHoc != null && l.PhongHoc.Contains(search)) || l.GiangVien!.HoTen.Contains(search));
+        }
+        var summary = await query.GroupBy(l => 1).Select(g => new
+        {
+            Total = g.Count(),
+            Open = g.Count(l => l.TrangThaiNhapDiem == null || l.TrangThaiNhapDiem == "" || l.TrangThaiNhapDiem == "Đang nhập" || l.TrangThaiNhapDiem == "Vui lòng nhập điểm"),
+            Locked = g.Count(l => l.TrangThaiNhapDiem == "Đã khóa")
+        }).FirstOrDefaultAsync();
+        var total = summary?.Total ?? 0;
+        var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+        var sections = await query.OrderBy(l => l.MaLHP).Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(l => new
+            {
+                l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK, l.MaGV, l.PhongHoc, l.SiSoToiDa,
+                NMH = l.NMH == "" ? "01" : l.NMH,
+                STC = l.STC > 0 ? l.STC : (l.MonHoc != null ? l.MonHoc.SoTinChi : 3),
+                l.TrangThai, l.TrangThaiNhapDiem,
+                TyLeQuaTrinh = l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100 ? l.TyLeQuaTrinh : 40,
+                TyLeThiKetThuc = l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100 ? l.TyLeThiKetThuc : 60,
+                MonHoc = l.MonHoc == null ? null : new { l.MonHoc.MaMon, l.MonHoc.TenMon, l.MonHoc.SoTinChi, l.MonHoc.MaKhoa },
+                HocKy = l.HocKy == null ? null : new { l.HocKy.TenHK, l.HocKy.NamHocBatDau, l.HocKy.NamHocKetThuc },
+                GiangVien = l.GiangVien == null ? null : new { l.GiangVien.MaGV, l.GiangVien.HoTen, l.GiangVien.MaKhoa }
+            }).ToListAsync();
+        var ids = sections.Select(l => l.MaLHP).ToArray();
+        var counts = await _db.KetQuaHocTaps.AsNoTracking().Where(k => ids.Contains(k.MaLHP!))
+            .GroupBy(k => k.MaLHP!).Select(g => new { Id = g.Key, Total = g.Count(), Graded = g.Count(k => k.DiemTongKet != null) })
+            .ToDictionaryAsync(x => x.Id);
+        var data = sections.Select(l => new
+        {
+            l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK, l.MaGV, l.PhongHoc, l.SiSoToiDa, l.NMH, l.STC,
+            SiSoHienTai = counts.GetValueOrDefault(l.MaLHP)?.Total ?? 0,
+            SoSVDaNhapDiem = counts.GetValueOrDefault(l.MaLHP)?.Graded ?? 0,
+            l.TrangThai, l.TrangThaiNhapDiem, l.TyLeQuaTrinh, l.TyLeThiKetThuc, l.MonHoc, l.HocKy, l.GiangVien
         });
-
-        return Ok(new { status = "success", data });
+        return Ok(new { status = "success", data, total, page, pageSize, totalPages, maHK, open = summary?.Open ?? 0, locked = summary?.Locked ?? 0 });
     }
+
+    // Lightweight dropdown data, scoped to exactly one semester. Not used for table rows.
+    [HttpGet("options")]
+    public async Task<IActionResult> Options(string? maHK = null)
+    {
+        maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
+        var data = await _db.LopHocPhans.AsNoTracking().Where(l => maHK != null && l.MaHK == maHK)
+            .OrderBy(l => l.MaLHP).Select(l => new { l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK }).ToListAsync();
+        return Ok(new { status = "success", data, maHK });
+    }
+
+    [HttpGet("count")]
+    public async Task<IActionResult> Count()
+        => Ok(new { status = "success", total = await _db.LopHocPhans.AsNoTracking().CountAsync() });
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var l = await _db.LopHocPhans
+        var l = await _db.LopHocPhans.AsNoTracking().AsSplitQuery()
             .Include(x => x.MonHoc)
                 .ThenInclude(m => m!.Khoa)
             .Include(x => x.HocKy)
@@ -114,68 +142,27 @@ public class LopHocPhanController : ControllerBase
     [HttpGet("{id}/available-students")]
     public async Task<IActionResult> GetAvailableStudents(string id)
     {
-        var lhp = await _db.LopHocPhans
-            .Include(l => l.LichHocs)
-            .Include(l => l.KetQuaHocTaps)
-            .FirstOrDefaultAsync(l => l.MaLHP == id);
-
+        var lhp = await _db.LopHocPhans.AsNoTracking().Where(l => l.MaLHP == id)
+            .Select(l => new { l.MaMon, l.MaHK }).FirstOrDefaultAsync();
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
-
-        var enrolledIds = lhp.KetQuaHocTaps
-            .Where(k => !string.IsNullOrEmpty(k.MaSV))
-            .Select(k => k.MaSV!)
-            .ToHashSet();
-
-        // Lấy danh sách môn tiên quyết của môn học này
-        var prereqCourses = await _db.DieuKienMonHocs
-            .Where(d => d.MaMon == lhp.MaMon && !string.IsNullOrEmpty(d.MaMonTienQuyet))
-            .Select(d => d.MaMonTienQuyet!)
-            .ToListAsync();
-
-        var allStudents = await _db.SinhViens
-            .Include(s => s.LopHanhChinh)
-            .Include(s => s.KetQuaHocTaps)
-                .ThenInclude(k => k.LopHocPhan)
-            .Where(s => !enrolledIds.Contains(s.MaSV) && s.TrangThai != "Thôi học")
-            .OrderBy(s => s.MaSV)
-            .ToListAsync();
-
-        var available = new List<SinhVien>();
-        foreach (var sv in allStudents)
+        var prerequisites = await _db.DieuKienMonHocs.AsNoTracking()
+            .Where(d => d.MaMon == lhp.MaMon && d.MaMonTienQuyet != null && d.MaMonTienQuyet != "")
+            .Select(d => d.MaMonTienQuyet!).Distinct().ToListAsync();
+        var query = _db.SinhViens.AsNoTracking().Where(s => s.TrangThai != "Thôi học"
+            && !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == lhp.MaMon && k.LopHocPhan.MaHK == lhp.MaHK));
+        // Preserve existing eligibility semantics, but evaluate using SQL EXISTS instead of loading grades.
+        foreach (var prerequisite in prerequisites)
         {
-            // Kiểm tra đã đang học một lớp học phần khác của cùng môn trong cùng học kỳ chưa
-            bool alreadyInSameCourseTerm = sv.KetQuaHocTaps.Any(k =>
-                k.LopHocPhan != null &&
-                k.LopHocPhan.MaMon == lhp.MaMon &&
-                k.LopHocPhan.MaHK == lhp.MaHK);
-
-            if (alreadyInSameCourseTerm) continue;
-
-            // Kiểm tra điều kiện tiên quyết (nếu có): sinh viên phải từng học môn tiên quyết và có điểm tổng kết >= 4.0 (hoặc chưa rớt)
-            bool passedPrereq = true;
-            foreach (var preMon in prereqCourses)
-            {
-                bool hasPassed = sv.KetQuaHocTaps.Any(k =>
-                    k.LopHocPhan != null &&
-                    k.LopHocPhan.MaMon == preMon &&
-                    (k.DiemTongKet == null || k.DiemTongKet >= 4.0));
-
-                // Nếu trong hệ thống sinh viên có học môn tiên quyết mà rớt (< 4.0) và chưa đậu lần nào thì chặn
-                bool hasFailedOnly = sv.KetQuaHocTaps.Any(k => k.LopHocPhan != null && k.LopHocPhan.MaMon == preMon) && !hasPassed;
-                if (hasFailedOnly)
-                {
-                    passedPrereq = false;
-                    break;
-                }
-            }
-
-            if (passedPrereq)
-            {
-                available.Add(sv);
-            }
+            var code = prerequisite;
+            query = query.Where(s => !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code)
+                || s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code && (k.DiemTongKet == null || k.DiemTongKet >= 4.0)));
         }
-
-        return Ok(new { status = "success", data = available });
+        var data = await query.OrderBy(s => s.MaSV).Select(s => new
+        {
+            s.MaSV, s.HoTen, s.MaLop,
+            LopHanhChinh = s.LopHanhChinh == null ? null : new { s.LopHanhChinh.MaLop, s.LopHanhChinh.TenLop }
+        }).ToListAsync();
+        return Ok(new { status = "success", data });
     }
 
     public class EnrollDto

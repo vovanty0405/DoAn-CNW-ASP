@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
+using QL_DiemSV.Models;
 using QL_DiemSV.Services;
 using QL_DiemSV.ViewModels;
 
@@ -28,23 +29,8 @@ public class ThoiKhoaBieuController(ApplicationDbContext db) : Controller
                 .FirstOrDefaultAsync();
         }
 
-        // Nếu chưa chọn maHK, ưu tiên học kỳ đã có lịch học được xếp (để thấy ngay các lớp như LHP002)
-        if (string.IsNullOrWhiteSpace(maHK))
-        {
-            var scheduledTermIds = await db.ClassSchedules.AsNoTracking()
-                .Where(x => x.LopHocPhan != null && x.LopHocPhan.MaHK != null)
-                .Select(x => x.LopHocPhan!.MaHK!)
-                .Distinct()
-                .ToListAsync();
-
-            var termWithSchedules = terms.FirstOrDefault(t => scheduledTermIds.Contains(t.MaHK));
-            if (termWithSchedules != null)
-            {
-                maHK = termWithSchedules.MaHK;
-            }
-        }
-
-        var term = terms.FirstOrDefault(x => x.MaHK == maHK) ?? terms.FirstOrDefault();
+        maHK = await AcademicQueries.ResolveTermAsync(db, maHK);
+        var term = terms.FirstOrDefault(x => x.MaHK == maHK);
 
         var vm = new TimetableViewModel
         {
@@ -62,18 +48,15 @@ public class ThoiKhoaBieuController(ApplicationDbContext db) : Controller
         if (User.IsInRole("Admin"))
         {
             vm.Sections = await db.LopHocPhans.AsNoTracking()
-                .Include(x => x.MonHoc)
                 .Where(x => x.MaHK == term.MaHK)
                 .OrderBy(x => x.MaLHP)
-                .ToListAsync();
+                .Select(x => new LopHocPhan { MaLHP = x.MaLHP, TenLopHP = x.TenLopHP, MaMon = x.MaMon,
+                    MonHoc = x.MonHoc == null ? null : new MonHoc { TenMon = x.MonHoc.TenMon } }).ToListAsync();
             vm.Teachers = await db.GiangViens.AsNoTracking().OrderBy(x => x.HoTen).ToListAsync();
             vm.Rooms = await db.PhongHocs.AsNoTracking().OrderBy(x => x.MaPhong).ToListAsync();
         }
 
         var q = db.ClassSchedules.AsNoTracking()
-            .Include(x => x.LopHocPhan)
-                .ThenInclude(x => x!.MonHoc)
-            .Include(x => x.GiangVien)
             .Where(x => x.LopHocPhan!.MaHK == term.MaHK);
 
         if (User.IsInRole("SinhVien"))
@@ -93,7 +76,7 @@ public class ThoiKhoaBieuController(ApplicationDbContext db) : Controller
             if (!string.IsNullOrWhiteSpace(phong)) q = q.Where(x => x.PhongHoc == phong);
         }
 
-        vm.Schedules = await q.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau).ToListAsync();
+        vm.Schedules = await q.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau).Select(AcademicQueries.ScheduleList).ToListAsync();
         return View(vm);
     }
 }

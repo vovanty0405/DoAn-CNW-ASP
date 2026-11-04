@@ -130,54 +130,53 @@
         </div>
 
         <!-- Thanh công cụ lọc: Học kỳ, Khoa, Khóa, Trạng thái buổi học, Tìm kiếm nhanh -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+        <form id="schedule-filters" method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
             <div>
                 <label class="block text-xs text-text-muted mb-1">Lọc theo Học kỳ</label>
-                <select id="grid-filter-hk" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
-                    <option value="">Tất cả Học kỳ (@Model.Sections.Count)</option>
+                <select id="grid-filter-hk" name="maHK" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
                     @foreach (var term in Model.Terms)
                     {
                         var cnt = Model.Sections.Count(x => x.MaHK == term.MaHK);
-                        <option value="@term.MaHK">@term.TenHK (@term.NamHocBatDau-@term.NamHocKetThuc) [@cnt]</option>
+                        <option value="@term.MaHK" selected="@(term.MaHK==Model.SelectedTermId)">@term.TenHK (@term.NamHocBatDau-@term.NamHocKetThuc)</option>
                     }
                 </select>
             </div>
 
             <div>
                 <label class="block text-xs text-text-muted mb-1">Lọc theo Khoa</label>
-                <select id="grid-filter-khoa" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                <select id="grid-filter-khoa" name="faculty" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
                     <option value="">Tất cả Khoa</option>
                     @foreach (var fac in Model.Faculties)
                     {
-                        <option value="@fac.MaKhoa">@fac.TenKhoa</option>
+                        <option value="@fac.MaKhoa" selected="@(fac.MaKhoa==Model.Faculty)">@fac.TenKhoa</option>
                     }
                 </select>
             </div>
 
             <div>
                 <label class="block text-xs text-text-muted mb-1">Lọc theo Khóa</label>
-                <select id="grid-filter-khoahoc" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                <select id="grid-filter-khoahoc" name="cohort" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
                     <option value="">Tất cả Khóa</option>
                     @foreach (var cohort in Model.Cohorts)
                     {
-                        <option value="@cohort">@FormatCohortLabel(cohort)</option>
+                        <option value="@cohort" selected="@(cohort==Model.Cohort)">@FormatCohortLabel(cohort)</option>
                     }
                 </select>
             </div>
 
             <div>
                 <label class="block text-xs text-text-muted mb-1">Trạng thái buổi học</label>
-                <select id="grid-filter-status" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
-                    <option value="ALL">Tất cả (@Model.Sections.Count lớp)</option>
-                    <option value="SCHEDULED">Đã xếp lịch (@scheduledSections.Count lớp)</option>
-                    <option value="UNSCHEDULED">Chưa xếp lịch (@unscheduledSections.Count lớp)</option>
+                <select id="grid-filter-status" name="scheduleStatus" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                    <option value="ALL" selected="@(Model.ScheduleStatus=="ALL")">Tất cả (@Model.Sections.Count lớp)</option>
+                    <option value="SCHEDULED" selected="@(Model.ScheduleStatus=="SCHEDULED")">Đã xếp lịch (@scheduledSections.Count lớp)</option>
+                    <option value="UNSCHEDULED" selected="@(Model.ScheduleStatus=="UNSCHEDULED")">Chưa xếp lịch (@unscheduledSections.Count lớp)</option>
                 </select>
             </div>
 
             <div class="sm:col-span-2">
                 <label class="block text-xs text-text-muted mb-1">Tìm kiếm nhanh (Mã LHP, Môn học, Phòng, Giảng viên)</label>
                 <div class="flex items-center gap-2">
-                    <input type="text" id="grid-filter-search" oninput="filterScheduleTable()"
+                    <input type="text" id="grid-filter-search" name="search" value="@Model.Search" oninput="queueScheduleSearch()"
                            placeholder="Nhập Mã LHP (VD: LHP002), tên môn, phòng, giảng viên..."
                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full" />
                     <button type="button" onclick="resetScheduleFilter()" class="secondary px-3 py-2 rounded-xl text-xs whitespace-nowrap">
@@ -185,7 +184,13 @@
                     </button>
                 </div>
             </div>
-        </div>
+            <input type="hidden" name="pageSize" value="@Model.PageSize" />
+        </form>
+        <nav class="toolbar" aria-label="Phân trang lớp học phần">
+            <span class="muted">@Model.Total lớp · Trang @Model.Page / @Model.TotalPages</span>
+            @if(Model.Page > 1){<a class="button secondary" href="@Url.Action("Index",new{maHK=Model.SelectedTermId,page=Model.Page-1,pageSize=Model.PageSize,faculty=Model.Faculty,cohort=Model.Cohort,scheduleStatus=Model.ScheduleStatus,search=Model.Search})">« Trước</a>}
+            @if(Model.Page < Model.TotalPages){<a class="button secondary" href="@Url.Action("Index",new{maHK=Model.SelectedTermId,page=Model.Page+1,pageSize=Model.PageSize,faculty=Model.Faculty,cohort=Model.Cohort,scheduleStatus=Model.ScheduleStatus,search=Model.Search})">Sau »</a>}
+        </nav>
 
         <!-- Bảng Danh sách Lớp học phần -->
         <div class="scroll pt-1">
@@ -211,7 +216,7 @@
                         var nmhVal = string.IsNullOrWhiteSpace(item.NMH) ? "01" : item.NMH;
 
                         var adminClass = Model.AdministrativeClasses.FirstOrDefault(c => c.MaLop == item.MaLop)
-                                         ?? item.KetQuaHocTaps.Select(k => k.SinhVien?.LopHanhChinh).FirstOrDefault(c => c != null);
+                                         ?? Model.FallbackClasses.GetValueOrDefault(item.MaLHP);
                         var maLopHC = !string.IsNullOrWhiteSpace(item.MaLop) ? item.MaLop : (adminClass?.MaLop ?? "");
                         var maKhoa = item.MonHoc?.MaKhoa ?? adminClass?.Nganh?.MaKhoa ?? "";
                         var tenKhoa = item.MonHoc?.Khoa?.TenKhoa ?? Model.Faculties.FirstOrDefault(f => f.MaKhoa == maKhoa)?.TenKhoa ?? "";
@@ -278,7 +283,7 @@
                             <!-- Cột 4: Sĩ số -->
                             <td class="text-center whitespace-nowrap align-middle">
                                 <span class="px-2.5 py-1 rounded-lg bg-canvas border border-surface-hover text-xs font-semibold text-text-primary">
-                                    @item.KetQuaHocTaps.Count/@(item.SiSoToiDa ?? 40)
+                                    @Model.SectionSizes.GetValueOrDefault(item.MaLHP)/@(item.SiSoToiDa ?? 40)
                                 </span>
                             </td>
 
@@ -356,7 +361,7 @@
             </table>
         </div>
 
-        <div id="schedule-table-empty" class="hidden py-10 text-center text-sm text-text-muted">
+        <div id="schedule-table-empty" class="py-10 text-center text-sm text-text-muted @(Model.Sections.Count > 0 ? "hidden" : "")">
             Không tìm thấy lớp học phần nào khớp với điều kiện lọc hiện tại. Nhấn <strong>"Đặt lại"</strong> để hiển thị toàn bộ danh sách.
         </div>
     </section>
@@ -596,49 +601,10 @@
     <script>
         const SECTIONS_DATA = @Html.Raw(JsonSerializer.Serialize(sectionsClientData));
 
-        function filterScheduleTable() {
-            const hk = document.getElementById('grid-filter-hk')?.value || '';
-            const khoa = document.getElementById('grid-filter-khoa')?.value || '';
-            const khoahoc = document.getElementById('grid-filter-khoahoc')?.value || '';
-            const status = document.getElementById('grid-filter-status')?.value || 'ALL';
-            const q = (document.getElementById('grid-filter-search')?.value || '').trim().toLowerCase();
-
-            const rows = document.querySelectorAll('.schedule-section-row');
-            let visible = 0;
-
-            rows.forEach(row => {
-                const rowHk = row.getAttribute('data-hk') || '';
-                const rowKhoa = row.getAttribute('data-khoa') || '';
-                const rowKhoahoc = row.getAttribute('data-khoahoc') || '';
-                const isScheduled = row.getAttribute('data-scheduled') === 'true';
-                const search = row.getAttribute('data-search') || '';
-
-                let match = true;
-                if (hk && rowHk !== hk) match = false;
-                if (khoa && rowKhoa !== khoa) match = false;
-                if (khoahoc && rowKhoahoc !== khoahoc) match = false;
-                if (status === 'SCHEDULED' && !isScheduled) match = false;
-                if (status === 'UNSCHEDULED' && isScheduled) match = false;
-                if (q && !search.includes(q)) match = false;
-
-                row.classList.toggle('hidden', !match);
-                if (match) visible++;
-            });
-
-            const emptyEl = document.getElementById('schedule-table-empty');
-            if (emptyEl) {
-                emptyEl.classList.toggle('hidden', visible > 0);
-            }
-        }
-
-        function resetScheduleFilter() {
-            document.getElementById('grid-filter-hk').value = '';
-            document.getElementById('grid-filter-khoa').value = '';
-            document.getElementById('grid-filter-khoahoc').value = '';
-            document.getElementById('grid-filter-status').value = 'ALL';
-            document.getElementById('grid-filter-search').value = '';
-            filterScheduleTable();
-        }
+        let scheduleSearchTimer;
+        function filterScheduleTable() { document.getElementById('schedule-filters').requestSubmit(); }
+        function queueScheduleSearch() { clearTimeout(scheduleSearchTimer); scheduleSearchTimer = setTimeout(filterScheduleTable, 350); }
+        function resetScheduleFilter() { window.location.href = '/quan-ly-lich-hoc'; }
 
         function createScheduleRowElement(maLHP, rowData, defaultWeeks, defaultMaGV) {
             const tpl = document.getElementById('schedule-template');
@@ -725,7 +691,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            filterScheduleTable();
             if (window.lucide) lucide.createIcons();
 
             const modal = document.getElementById('schedule-editor-modal');

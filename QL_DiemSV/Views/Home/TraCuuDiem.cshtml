@@ -274,13 +274,12 @@
 
             // Với Admin / Giảng viên / Khảo thí: tải danh mục để phục vụ bộ lọc
             try {
-                const [resSv, resKhoa, resLop] = await Promise.all([
-                    apiFetch('/api/sinhvien'),
+                const [resKhoa, resLop] = await Promise.all([
                     apiFetch('/api/khoa'),
                     apiFetch('/api/lophanhchinh')
                 ]);
 
-                allStudents = resSv.data || [];
+                allStudents = [];
                 allKhoas = resKhoa.data || [];
                 allLops = resLop.data || [];
                 currentFilteredSv = allStudents;
@@ -339,22 +338,6 @@
 
         // Áp dụng bộ lọc và từ khóa
         function applyFilters() {
-            const selectedNienKhoa = document.getElementById('tc-filter-nienkhoa').value;
-            const selectedKhoa = document.getElementById('tc-filter-khoa').value;
-            const selectedLop = document.getElementById('tc-filter-lop').value;
-            const keyword = document.getElementById('tc-filter-keyword').value.toLowerCase().trim();
-
-            currentFilteredSv = allStudents.filter(s => {
-                const matchNienKhoa = !selectedNienKhoa || s.LopHanhChinh?.NienKhoa === selectedNienKhoa;
-                const matchKhoa = !selectedKhoa || s.LopHanhChinh?.Nganh?.MaKhoa === selectedKhoa;
-                const matchLop = !selectedLop || s.MaLop === selectedLop;
-                const matchKeyword = !keyword ||
-                    s.MaSV.toLowerCase().includes(keyword) ||
-                    s.HoTen.toLowerCase().includes(keyword);
-
-                return matchNienKhoa && matchKhoa && matchLop && matchKeyword;
-            });
-
             svCurrentPage = 1;
             renderStudentResultsTable();
         }
@@ -371,19 +354,25 @@
         }
 
         // Hiển thị danh sách sinh viên kết quả vào table với phân trang
-        function renderStudentResultsTable() {
-            const totalItems = currentFilteredSv.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / svPageSize));
-
-            if (svCurrentPage > totalPages) svCurrentPage = totalPages;
-            if (svCurrentPage < 1) svCurrentPage = 1;
-
-            const countEl = document.getElementById('sv-results-count');
-            if (countEl) countEl.textContent = `Tìm thấy ${totalItems} sinh viên`;
-
+        let studentLookupRequest = 0;
+        async function renderStudentResultsTable() {
+            const request = ++studentLookupRequest;
+            const params = new URLSearchParams({ page: svCurrentPage, pageSize: svPageSize,
+                maLop: document.getElementById('tc-filter-lop').value,
+                maKhoa: document.getElementById('tc-filter-khoa').value,
+                cohort: document.getElementById('tc-filter-nienkhoa').value,
+                search: document.getElementById('tc-filter-keyword').value.trim()
+            });
+            let response;
+            try { response = await apiFetch('/api/sinhvien?' + params); }
+            catch (error) { if (request === studentLookupRequest) showToast(error.message, 'error'); return; }
+            if (request !== studentLookupRequest) return;
+            svCurrentPage = response.page;
+            const totalItems = response.total, totalPages = response.totalPages;
             const startIndex = (svCurrentPage - 1) * svPageSize;
-            const endIndex = Math.min(startIndex + svPageSize, totalItems);
-            const paged = currentFilteredSv.slice(startIndex, endIndex);
+            const paged = (response.data || []).map(s => ({ ...s, LopHanhChinh: allLops.find(l => l.MaLop === s.MaLop) || s.LopHanhChinh }));
+            const endIndex = Math.min(startIndex + paged.length, totalItems);
+            currentFilteredSv = paged;
 
             const tbody = document.getElementById('sv-results-tbody');
             if (paged.length === 0) {

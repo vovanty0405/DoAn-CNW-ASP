@@ -43,6 +43,13 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<LopHocPhan>().HasIndex(x => x.MaHK);
+        modelBuilder.Entity<ClassSchedule>().HasIndex(x => new { x.MaLHP, x.Thu });
+        modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaSV, x.MaLHP });
+        modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaLHP, x.DiemTongKet });
+        modelBuilder.Entity<KhungChuongTrinh>().HasIndex(x => x.MaNganh);
+        modelBuilder.Entity<Article>().HasIndex(x => new { x.TrangThai, x.GhimDauTrang, x.NgayDang, x.Id })
+            .IsDescending(false, true, true, true);
         modelBuilder.Entity<Curriculum>().HasOne(x=>x.NganhHoc).WithMany().HasForeignKey(x=>x.NganhHocId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Curriculum>().HasIndex(x=>new{x.HeDaoTao,x.KhoaHoc,x.NganhHocId,x.TenChuongTrinh}).IsUnique();
         modelBuilder.Entity<CurriculumSection>().HasIndex(x=>new{x.CurriculumId,x.ThuTu}).IsUnique();

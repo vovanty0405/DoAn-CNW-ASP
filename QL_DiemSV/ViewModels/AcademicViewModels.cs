@@ -2,6 +2,7 @@ using QL_DiemSV.Models;
 namespace QL_DiemSV.ViewModels;
 public class RegistrationViewModel
 {
+    public Dictionary<string, int> SectionSizes { get; set; } = new();
     public List<HocKy> HocKys { get; set; } = new();
     public HocKy? HocKy { get; set; }
     public List<LopHocPhan> Sections { get; set; } = new();
@@ -30,6 +31,17 @@ public class TimetableViewModel
 }
 public class ScheduleEditorViewModel
 {
+    public string? SelectedTermId { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public int Total { get; set; }
+    public int TotalPages => Math.Max(1, (Total + PageSize - 1) / PageSize);
+    public string? Faculty { get; set; }
+    public string? Cohort { get; set; }
+    public string? ScheduleStatus { get; set; }
+    public string? Search { get; set; }
+    public Dictionary<string,int> SectionSizes {get;set;}=new();
+    public Dictionary<string,LopHanhChinh> FallbackClasses {get;set;}=new();
     public List<LopHanhChinh> AdministrativeClasses { get; set; } = new();
     public List<Khoa> Faculties { get; set; } = new();
     public List<string> Cohorts { get; set; } = new();
@@ -48,6 +60,7 @@ public class RegistrationRequest
 
 public class RoomMatrixViewModel : TimetableViewModel
 {
+    public Dictionary<string, int> SectionSizes { get; set; } = new();
     public string ViewMode { get; set; } = "week";
     public string ScheduleType { get; set; } = "all";
     public string Building { get; set; } = "all";
@@ -63,4 +76,4 @@ public class RoomMatrixViewModel : TimetableViewModel
     public List<int> Days => ViewMode == "week" ? Enumerable.Range(2,7).ToList() : new() { Day };
 }
 
-public record MatrixBookingViewModel(PhongHoc Room, List<ClassSchedule> Lessons);
+public record MatrixBookingViewModel(PhongHoc Room, List<ClassSchedule> Lessons, IReadOnlyDictionary<string, int>? SectionSizes = null);

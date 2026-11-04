@@ -14,7 +14,6 @@
             code = $"BV{a.Id:D3}",
             tieuDe = a.TieuDe,
             tomTat = a.TomTat,
-            noiDung = a.NoiDung,
             danhMuc = PortalRules.Categories.GetValueOrDefault(a.DanhMuc, a.DanhMuc),
             heDaoTao = string.IsNullOrWhiteSpace(a.HeDaoTao) ? "Đại học chính quy" : a.HeDaoTao,
             donViDang = a.DonViDang,
@@ -605,8 +604,20 @@
             form.submit();
         }
 
-        function openPreviewArticleModal(id) {
+        async function loadArticleContent(id) {
             const a = ADMIN_ARTICLES_MAP[id];
+            if (!a) return null;
+            if (a.noiDung === undefined) {
+                try {
+                    const response = await fetch(`/AdminArticle/${id}/json`);
+                    if (!response.ok) throw new Error('Không tải được nội dung bài viết');
+                    a.noiDung = (await response.json()).noiDung;
+                } catch (error) { alert(error.message); return null; }
+            }
+            return a;
+        }
+        async function openPreviewArticleModal(id) {
+            const a = await loadArticleContent(id);
             if (!a) return;
             document.getElementById('preview-modal-badges').textContent = `${a.danhMuc} • ${a.heDaoTao} • ${a.trangThai}`;
             document.getElementById('preview-modal-title').textContent = a.tieuDe;
@@ -626,8 +637,8 @@
             modal.classList.remove('flex');
         }
 
-        function exportSingleArticlePdf(id) {
-            const a = ADMIN_ARTICLES_MAP[id];
+        async function exportSingleArticlePdf(id) {
+            const a = await loadArticleContent(id);
             if (!a || typeof html2pdf === 'undefined') return;
 
             document.getElementById('pdf-stage-unit').textContent = a.donViDang;

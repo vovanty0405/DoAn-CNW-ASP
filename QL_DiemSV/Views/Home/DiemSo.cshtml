@@ -113,7 +113,7 @@
                         </label>
                         <div class="relative">
                             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-                            <input type="text" id="filter-search" oninput="applyCardFilters()"
+                            <input type="text" id="filter-search" oninput="queueGradeSearch()"
                                    placeholder="Mã LHP, tên lớp, môn..."
                                    class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl py-2 pl-9 pr-3 text-sm w-full focus:outline-none focus:border-primary" />
                         </div>
@@ -459,6 +459,8 @@
 
     // State cho Bước 1 (Danh sách Card Lớp học phần)
     let allLHP = [];
+    let gradeRequest = 0, gradeTimer;
+    function queueGradeSearch() { clearTimeout(gradeTimer); gradeTimer = setTimeout(() => applyCardFilters(), 250); }
     let filteredLHP = [];
     let allHocKy = [];
     let allKhoa = [];
@@ -602,13 +604,14 @@
             allLHP = (lhpRes.data || []).map(normLHP).filter(l => l && l.maLHP);
 
             detectCurrentSemester();
+            currentActiveMaHK = lhpRes.maHK || currentActiveMaHK;
             populateFilterDropdowns();
-            applyCardFilters();
+            await applyCardFilters();
 
             // Nếu trên URL có truyền sẵn ?maLHP=... thì mở thẳng sổ điểm của lớp đó
             const params = new URLSearchParams(window.location.search);
             const urlMaLHP = params.get('maLHP');
-            if (urlMaLHP && allLHP.some(l => l.maLHP === urlMaLHP)) {
+            if (urlMaLHP) {
                 await openGradebookDetail(urlMaLHP);
             }
         } catch (err) {
@@ -636,15 +639,15 @@
     function populateFilterDropdowns() {
         // 1. Học kỳ
         const hkSelect = document.getElementById('filter-hk');
-        hkSelect.innerHTML = `<option value="">-- Tất cả Học kỳ (${allLHP.length} lớp) --</option>` +
+        hkSelect.innerHTML = `<option value="">-- Học kỳ hiện tại --</option>` +
             allHocKy.map(h => {
                 const isCurrent = h.maHK === currentActiveMaHK;
                 const countInHK = allLHP.filter(l => l.maHK === h.maHK).length;
-                const label = `${h.tenHK || h.maHK} (${h.namHocBatDau}-${h.namHocKetThuc}) [${countInHK} lớp]${isCurrent ? ' ★' : ''}`;
+                const label = `${h.tenHK || h.maHK} (${h.namHocBatDau}-${h.namHocKetThuc})${isCurrent ? ' ★' : ''}`;
                 return `<option value="${h.maHK}">${label}</option>`;
             }).join('');
 
-        hkSelect.value = '';
+        hkSelect.value = currentActiveMaHK;
 
         // 2. Khoa
         const khoaSelect = document.getElementById('filter-khoa');
@@ -703,47 +706,36 @@
         applyCardFilters();
     }
 
-    function applyCardFilters() {
-        const maHK = document.getElementById('filter-hk').value;
-        const maKhoa = document.getElementById('filter-khoa').value;
-        const maMon = document.getElementById('filter-mon').value;
-        const maGV = document.getElementById('filter-gv').value;
-        const statusFilter = document.getElementById('filter-status').value;
-        const keyword = (document.getElementById('filter-search').value || '').trim().toLowerCase();
-
-        filteredLHP = allLHP.filter(l => {
-            if (maHK && l.maHK !== maHK) return false;
-            if (maKhoa && l.monHoc?.maKhoa !== maKhoa) return false;
-            if (maMon && l.maMon !== maMon) return false;
-            if (maGV && l.maGV !== maGV) return false;
-
-            if (statusFilter === 'OPEN' && !isStatusOpen(l.trangThaiNhapDiem)) return false;
-            if (statusFilter === 'LOCKED' && l.trangThaiNhapDiem !== 'Đã khóa') return false;
-            if (statusFilter === 'PENDING_UNLOCK' && l.trangThaiNhapDiem !== 'Chờ mở khóa') return false;
-
-            if (keyword) {
-                const searchStr = `${l.maLHP} ${l.tenLopHP || ''} ${l.maMon || ''} ${l.monHoc?.tenMon || ''} ${l.giangVien?.hoTen || ''} ${l.phongHoc || ''}`.toLowerCase();
-                if (!searchStr.includes(keyword)) return false;
+    async function applyCardFilters(page = 1) {
+        const request = ++gradeRequest;
+        const params = new URLSearchParams({ page, pageSize: 20,
+            maHK: document.getElementById('filter-hk').value,
+            maKhoa: document.getElementById('filter-khoa').value,
+            maMon: document.getElementById('filter-mon').value,
+            maGV: USER_ROLE === 'GiangVien' && USER_MAGV ? USER_MAGV : document.getElementById('filter-gv').value,
+            gradeStatus: document.getElementById('filter-status').value,
+            search: document.getElementById('filter-search').value.trim()
+        });
+        try {
+            const response = await fetch('/api/lophocphan?' + params);
+            if (!response.ok) throw new Error('Không tải được danh sách lớp học phần');
+            const result = await response.json();
+            if (request !== gradeRequest) return;
+            document.getElementById('filter-hk').value = result.maHK || '';
+            allLHP = (result.data || []).map(normLHP).filter(Boolean);
+            filteredLHP = allLHP;
+            renderCardsGrid();
+            document.getElementById('stat-total-lhp').textContent = result.total;
+            document.getElementById('stat-open-lhp').textContent = result.open;
+            document.getElementById('stat-locked-lhp').textContent = result.locked;
+            let nav = document.getElementById('grade-pages');
+            if (!nav) {
+                nav = document.createElement('nav'); nav.id = 'grade-pages';
+                nav.className = 'flex items-center justify-center gap-3 p-4 text-sm text-text-primary';
+                document.getElementById('lhp-cards-grid').after(nav);
             }
-            return true;
-        });
-
-        // Sắp xếp ưu tiên: Lớp thuộc Học kỳ hiện tại + Đang mở nhập điểm lên đầu
-        filteredLHP.sort((a, b) => {
-            const aIsCurrentHK = a.maHK === currentActiveMaHK ? 1 : 0;
-            const bIsCurrentHK = b.maHK === currentActiveMaHK ? 1 : 0;
-            if (aIsCurrentHK !== bIsCurrentHK) return bIsCurrentHK - aIsCurrentHK;
-
-            const aIsOpen = isStatusOpen(a.trangThaiNhapDiem) ? 1 : 0;
-            const bIsOpen = isStatusOpen(b.trangThaiNhapDiem) ? 1 : 0;
-            if (aIsOpen !== bIsOpen) return bIsOpen - aIsOpen;
-
-            if ((b.maHK || '') !== (a.maHK || '')) return (b.maHK || '').localeCompare(a.maHK || '');
-            return (a.maLHP || '').localeCompare(b.maLHP || '');
-        });
-
-        updateOverviewStats();
-        renderCardsGrid();
+            nav.innerHTML = `<button class="btn" ${result.page <= 1 ? 'disabled' : ''} onclick="applyCardFilters(${result.page - 1})">Trước</button><span>Trang ${result.page}/${result.totalPages} · ${result.total} lớp</span><button class="btn" ${result.page >= result.totalPages ? 'disabled' : ''} onclick="applyCardFilters(${result.page + 1})">Sau</button>`;
+        } catch (error) { if (request === gradeRequest) showToast(error.message, 'error'); }
     }
 
     function updateOverviewStats() {
@@ -761,9 +753,9 @@
                         <i data-lucide="folder-search" class="w-7 h-7"></i>
                     </div>
                     <h3 class="text-base font-bold text-text-primary">Không tìm thấy Lớp học phần phù hợp</h3>
-                    <p class="text-xs text-text-muted mt-1">Hãy thử chọn "Tất cả Học kỳ" hoặc đặt lại bộ lọc tìm kiếm.</p>
+                    <p class="text-xs text-text-muted mt-1">Hãy thử chọn học kỳ khác hoặc đặt lại bộ lọc tìm kiếm.</p>
                     <button type="button" onclick="resetCardFilters()" class="btn bg-primary/15 hover:bg-primary/25 text-primary text-xs mt-4 px-4 py-2">
-                        Hiển thị tất cả Lớp học phần
+                        Đặt lại bộ lọc
                     </button>
                 </div>`;
             if (window.lucide) lucide.createIcons();

@@ -14,11 +14,12 @@ public class DangKyHocPhanController(ApplicationDbContext db) : Controller
     [HttpGet("")]
     public async Task<IActionResult> Index(string? maHK, string? search, string? condition, string? value)
     {
-        var terms = await db.HocKys.OrderByDescending(x => x.NamHocBatDau).ThenByDescending(x => x.MaHK).ToListAsync();
-        var term = terms.FirstOrDefault(x => x.MaHK == maHK) ?? terms.FirstOrDefault();
+        var terms = await db.HocKys.AsNoTracking().OrderByDescending(x => x.NamHocBatDau).ThenByDescending(x => x.MaHK).ToListAsync();
+        maHK = await AcademicQueries.ResolveTermAsync(db, maHK);
+        var term = terms.FirstOrDefault(x => x.MaHK == maHK);
         var vm = new RegistrationViewModel { HocKys = terms, HocKy = term, Search = search, Condition = condition, Value = value, IsOpen = term != null && ScheduleRules.IsOpen(term) };
         if (term == null) return View(vm);
-        var q = db.LopHocPhans.Include(x => x.MonHoc).Include(x => x.LichHocs).ThenInclude(x => x.GiangVien).Include(x => x.KetQuaHocTaps).Where(x => x.MaHK == term.MaHK && x.TrangThai == "MoDangKy");
+        var q = db.LopHocPhans.AsNoTracking().AsSplitQuery().Include(x => x.MonHoc).Include(x => x.LichHocs).ThenInclude(x => x.GiangVien).Where(x => x.MaHK == term.MaHK && x.TrangThai == "MoDangKy");
         if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.MaMon!.Contains(search) || x.MonHoc!.TenMon.Contains(search));
         vm.Options = condition switch {
             "class" => await db.LopHanhChinhs.Select(x => new FilterOption(x.MaLop, x.TenLop)).ToListAsync(),
@@ -34,8 +35,11 @@ public class DangKyHocPhanController(ApplicationDbContext db) : Controller
             _ => q
         };
         vm.Sections = await q.OrderBy(x => x.MaMon).ThenBy(x => x.NMH).ToListAsync();
+        var sectionIds = vm.Sections.Select(x => x.MaLHP).ToArray();
+        vm.SectionSizes = await db.KetQuaHocTaps.AsNoTracking().Where(x => sectionIds.Contains(x.MaLHP!))
+            .GroupBy(x => x.MaLHP!).Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Id, x => x.Count);
         string sv = User.FindFirst("MaSV")?.Value ?? "";
-        vm.Selected = await db.KetQuaHocTaps.Include(x => x.LopHocPhan).ThenInclude(x => x!.MonHoc).Include(x => x.LopHocPhan).ThenInclude(x => x!.LichHocs).Where(x => x.MaSV == sv && x.LopHocPhan!.MaHK == term.MaHK).ToListAsync();
+        vm.Selected = await db.KetQuaHocTaps.AsNoTracking().AsSplitQuery().Include(x => x.LopHocPhan).ThenInclude(x => x!.MonHoc).Include(x => x.LopHocPhan).ThenInclude(x => x!.LichHocs).Where(x => x.MaSV == sv && x.LopHocPhan!.MaHK == term.MaHK).ToListAsync();
         return View(vm);
     }
     [HttpPost("luu"), ValidateAntiForgeryToken]

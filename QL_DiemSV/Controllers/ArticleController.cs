@@ -86,9 +86,10 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
 
         var articles = await q
             .OrderByDescending(x => x.GhimDauTrang)
-            .ThenByDescending(x => x.NgayDang)
+            .ThenByDescending(x => x.NgayDang).ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(AcademicQueries.ArticleList)
             .ToListAsync();
 
         return View("~/Views/Article/Index.cshtml", new ArticleListViewModel

@@ -11,10 +11,12 @@ namespace QL_DiemSV.Controllers;
 public class MonHocController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly CourseCatalogCache _catalog;
 
-    public MonHocController(ApplicationDbContext db)
+    public MonHocController(ApplicationDbContext db, CourseCatalogCache catalog)
     {
         _db = db;
+        _catalog = catalog;
     }
 
     public class MonHocDto
@@ -31,30 +33,15 @@ public class MonHocController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maKhoa)
     {
-        var query = _db.MonHocs
-            .Include(m => m.Khoa)
-            .Include(m => m.DieuKienTienQuyets)
-                .ThenInclude(d => d.MonHocTienQuyet)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(maKhoa))
-        {
-            query = query.Where(m => m.MaKhoa == maKhoa);
-        }
-
-        var data = await query.OrderBy(m => m.MaMon).ToListAsync();
+        var subjects = await _catalog.GetAsync();
+        var data = subjects.Where(m => string.IsNullOrWhiteSpace(maKhoa) || m.MaKhoa == maKhoa);
         return Ok(new { status = "success", data });
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var item = await _db.MonHocs
-            .Include(m => m.Khoa)
-            .Include(m => m.DieuKienTienQuyets)
-                .ThenInclude(d => d.MonHocTienQuyet)
-            .FirstOrDefaultAsync(m => m.MaMon == id);
-
+        var item = (await _catalog.GetAsync()).FirstOrDefault(m => m.MaMon == id);
         if (item == null) return NotFound(new { status = "error", message = "Không tìm thấy Môn học" });
         return Ok(new { status = "success", data = item });
     }
@@ -110,6 +97,7 @@ public class MonHocController : ControllerBase
 
         _db.MonHocs.Add(mh);
         await _db.SaveChangesAsync();
+        _catalog.Invalidate();
 
         if (req.MonTienQuyet != null && req.MonTienQuyet.Any())
         {
@@ -123,6 +111,7 @@ public class MonHocController : ControllerBase
                 _db.DieuKienMonHocs.Add(new DieuKienMonHoc { MaMon = mh.MaMon, MaMonTienQuyet = p });
             }
             await _db.SaveChangesAsync();
+        _catalog.Invalidate();
         }
 
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Môn học", $"Đã thêm môn học {mh.MaMon} - {mh.TenMon}");
@@ -153,6 +142,7 @@ public class MonHocController : ControllerBase
             count++;
         }
         await _db.SaveChangesAsync();
+        _catalog.Invalidate();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Môn học", $"Đã import {count} môn học từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} môn học" });
     }
@@ -188,6 +178,7 @@ public class MonHocController : ControllerBase
         existing.MaKhoa = string.IsNullOrWhiteSpace(req.MaKhoa) ? null : req.MaKhoa;
 
         await _db.SaveChangesAsync();
+        _catalog.Invalidate();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật Môn học", $"Đã cập nhật môn học {id}");
         return Ok(new { status = "success", message = "Cập nhật môn học thành công", data = existing });
     }
@@ -206,6 +197,7 @@ public class MonHocController : ControllerBase
 
         _db.MonHocs.Remove(existing);
         await _db.SaveChangesAsync();
+        _catalog.Invalidate();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa Môn học", $"Đã xóa môn học {id}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa môn học thành công" });
     }

@@ -11,10 +11,12 @@ namespace QL_DiemSV.Controllers;
 public class KhungChuongTrinhController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly CourseCatalogCache _catalog;
 
-    public KhungChuongTrinhController(ApplicationDbContext db)
+    public KhungChuongTrinhController(ApplicationDbContext db, CourseCatalogCache catalog)
     {
         _db = db;
+        _catalog = catalog;
     }
 
     [HttpGet("{maNganh}")]
@@ -33,16 +35,12 @@ public class KhungChuongTrinhController : ControllerBase
             };
         }
 
-        var danhSachMon = await _db.KhungChuongTrinhs
-            .Include(k => k.MonHoc)
-                .ThenInclude(m => m!.Khoa)
-            .Include(k => k.MonHoc)
-                .ThenInclude(m => m!.DieuKienTienQuyets)
-                    .ThenInclude(d => d.MonHocTienQuyet)
-            .Where(k => k.MaNganh == maNganh)
-            .OrderBy(k => k.HocKyDuKien)
-            .ThenBy(k => k.MaMon)
+        var subjects = (await _catalog.GetAsync()).ToDictionary(m => m.MaMon);
+        var danhSachMon = await _db.KhungChuongTrinhs.AsNoTracking()
+            .Where(k => k.MaNganh == maNganh).OrderBy(k => k.HocKyDuKien).ThenBy(k => k.MaMon)
+            .Select(k => new KhungChuongTrinh { ID = k.ID, MaNganh = k.MaNganh, MaMon = k.MaMon, HocKyDuKien = k.HocKyDuKien, LoaiMon = k.LoaiMon })
             .ToListAsync();
+        foreach (var row in danhSachMon) row.MonHoc = subjects.GetValueOrDefault(row.MaMon);
 
         return Ok(new
         {

@@ -27,7 +27,7 @@
     <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="sv-search" oninput="renderSvTable()" type="text" placeholder="Tìm Mã SV, Họ tên, Email..."
+            <input id="sv-search" oninput="queueSvSearch()" type="text" placeholder="Tìm Mã SV, Họ tên, Email..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
         </div>
         <select id="sv-khoa" onchange="onFilterKhoaChange()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
@@ -36,10 +36,10 @@
         <select id="sv-nganh" onchange="onFilterNganhChange()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
             <option value="">Tất cả Ngành</option>
         </select>
-        <select id="sv-lop" onchange="renderSvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+        <select id="sv-lop" onchange="renderSvTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
             <option value="">Tất cả Lớp hành chính</option>
         </select>
-        <select id="sv-status" onchange="renderSvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+        <select id="sv-status" onchange="renderSvTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
             <option value="">Tất cả Trạng thái</option>
             <option value="Đang học">Đang học</option>
             <option value="Bảo lưu">Bảo lưu</option>
@@ -158,15 +158,15 @@
         let svList = [], khoas = [], nganhs = [], lops = [];
         let editingMaSV = null;
         let svCurrentPage = 1, svPageSize = 10;
+        let svRequest = 0, svSearchTimer;
+        function queueSvSearch() { clearTimeout(svSearchTimer); svSearchTimer = setTimeout(() => renderSvTable(true), 250); }
 
         async function loadData() {
-            const [resSv, resKhoa, resNganh, resLop] = await Promise.all([
-                apiFetch('/api/sinhvien'),
+            const [resKhoa, resNganh, resLop] = await Promise.all([
                 apiFetch('/api/khoa'),
                 apiFetch('/api/nganh'),
                 apiFetch('/api/lophanhchinh')
             ]);
-            svList = resSv.data || [];
             khoas = resKhoa.data || [];
             nganhs = resNganh.data || [];
             lops = resLop.data || [];
@@ -196,35 +196,28 @@
             renderSvTable(true);
         }
 
-        function getFilteredSv() {
-            const q = document.getElementById('sv-search').value.toLowerCase().trim();
-            const maKhoa = document.getElementById('sv-khoa').value;
-            const maNganh = document.getElementById('sv-nganh').value;
-            const maLop = document.getElementById('sv-lop').value;
-            const status = document.getElementById('sv-status').value;
-
-            return svList.filter(s => {
-                const matchQ = !q || s.MaSV.toLowerCase().includes(q) || s.HoTen.toLowerCase().includes(q) || (s.Email || '').toLowerCase().includes(q);
-                const matchLop = !maLop || s.MaLop === maLop;
-                const matchNganh = !maNganh || s.LopHanhChinh?.MaNganh === maNganh;
-                const matchKhoa = !maKhoa || s.LopHanhChinh?.Nganh?.MaKhoa === maKhoa;
-                const matchStatus = !status || s.TrangThai === status;
-                return matchQ && matchLop && matchNganh && matchKhoa && matchStatus;
+        function studentParams(page = svCurrentPage, pageSize = svPageSize) {
+            return new URLSearchParams({ page, pageSize,
+                search: document.getElementById('sv-search').value.trim(),
+                maKhoa: document.getElementById('sv-khoa').value,
+                maNganh: document.getElementById('sv-nganh').value,
+                maLop: document.getElementById('sv-lop').value,
+                status: document.getElementById('sv-status').value
             });
         }
-
-        function renderSvTable(resetPage = false) {
+        async function renderSvTable(resetPage = false) {
             if (resetPage) svCurrentPage = 1;
-            const filtered = getFilteredSv();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / svPageSize));
-
-            if (svCurrentPage > totalPages) svCurrentPage = totalPages;
-            if (svCurrentPage < 1) svCurrentPage = 1;
-
+            const request = ++svRequest;
+            let response;
+            try { response = await apiFetch('/api/sinhvien?' + studentParams()); }
+            catch (error) { if (request === svRequest) showToast(error.message, 'error'); return; }
+            if (request !== svRequest) return;
+            svList = (response.data || []).map(s => ({ ...s, LopHanhChinh: lops.find(l => l.MaLop === s.MaLop) || s.LopHanhChinh }));
+            svCurrentPage = response.page;
+            const totalItems = response.total, totalPages = response.totalPages;
             const startIndex = (svCurrentPage - 1) * svPageSize;
-            const endIndex = Math.min(startIndex + svPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + svList.length, totalItems);
+            const paged = svList;
 
             const tbody = document.getElementById('sv-tbody');
 
@@ -386,8 +379,20 @@
             }
         }
 
-        function exportSinhVienExcel() {
-            const rows = getFilteredSv().map((s, idx) => ({
+        async function exportSinhVienExcel() {
+            const selectedParams = studentParams(1, 100);
+            const students = [];
+            try {
+                let page = 1, totalPages = 1;
+                do {
+                    selectedParams.set('page', page);
+                    const response = await apiFetch('/api/sinhvien?' + selectedParams);
+                    students.push(...response.data);
+                    totalPages = response.totalPages;
+                    page++;
+                } while (page <= totalPages);
+            } catch (error) { showToast(error.message, 'error'); return; }
+            const rows = students.map((s, idx) => ({
                 'STT': idx + 1,
                 'MaSV': s.MaSV,
                 'HoTen': s.HoTen,

@@ -24,16 +24,16 @@
     <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="lhp-search" oninput="renderLhpTable()" type="text" placeholder="Tìm Mã LHP, Tên lớp, Phòng..."
+            <input id="lhp-search" oninput="queueLhpSearch()" type="text" placeholder="Tìm Mã LHP, Tên lớp, Phòng..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
         </div>
-        <select id="lhp-hk" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="lhp-hk" onchange="renderLhpTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Học kỳ</option>
         </select>
-        <select id="lhp-mon" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="lhp-mon" onchange="renderLhpTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Môn học</option>
         </select>
-        <select id="lhp-gv" onchange="renderLhpTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="lhp-gv" onchange="renderLhpTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Giảng viên</option>
         </select>
     </div>
@@ -281,20 +281,21 @@
         let lhpList = [], hks = [], mons = [], gvs = [], editingMaLHP = null, activeEnrollLHP = null, editingMaHK = null;
         let lhpCurrentPage = 1, lhpPageSize = 10;
         let pendingDeleteAction = null;
+        let lhpRequest = 0, lhpSearchTimer;
+        function queueLhpSearch() { clearTimeout(lhpSearchTimer); lhpSearchTimer = setTimeout(() => renderLhpTable(true), 250); }
 
         async function loadData() {
-            const [resLhp, resHk, resMon, resGv] = await Promise.all([
-                apiFetch('/api/lophocphan'),
+            const selectedTerm = document.getElementById("lhp-hk").value;
+            const [resHk, resMon, resGv] = await Promise.all([
                 apiFetch('/api/hocky'),
                 apiFetch('/api/monhoc'),
                 apiFetch('/api/giangvien')
             ]);
-            lhpList = resLhp.data || [];
             hks = resHk.data || [];
             mons = resMon.data || [];
             gvs = resGv.data || [];
 
-            document.getElementById('lhp-hk').innerHTML = '<option value="">Tất cả Học kỳ</option>' + hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
+            document.getElementById('lhp-hk').innerHTML = hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
             document.getElementById('lhp-mon').innerHTML = '<option value="">Tất cả Môn học</option>' + mons.map(m => `<option value="${m.MaMon}">${m.TenMon}</option>`).join('');
             document.getElementById('lhp-gv').innerHTML = '<option value="">Tất cả Giảng viên</option>' + gvs.map(g => `<option value="${g.MaGV}">${g.HoTen}</option>`).join('');
 
@@ -302,37 +303,33 @@
             document.getElementById('p-mahk').innerHTML = hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
             document.getElementById('p-magv').innerHTML = gvs.map(g => `<option value="${g.MaGV}">${g.MaGV} - ${g.HoTen}</option>`).join('');
 
-            renderLhpTable();
+            document.getElementById("lhp-hk").value = selectedTerm;
+            await renderLhpTable();
             renderHkTable();
         }
 
-        function getFilteredLhp() {
-            const q = document.getElementById('lhp-search').value.toLowerCase().trim();
-            const maHK = document.getElementById('lhp-hk').value;
-            const maMon = document.getElementById('lhp-mon').value;
-            const maGV = document.getElementById('lhp-gv').value;
-
-            return lhpList.filter(l => {
-                const mQ = !q || l.MaLHP.toLowerCase().includes(q) || (l.TenLopHP || '').toLowerCase().includes(q) || (l.PhongHoc || '').toLowerCase().includes(q);
-                const mH = !maHK || l.MaHK === maHK;
-                const mM = !maMon || l.MaMon === maMon;
-                const mG = !maGV || l.MaGV === maGV;
-                return mQ && mH && mM && mG;
-            });
-        }
-
-        function renderLhpTable(resetPage = false) {
+        async function renderLhpTable(resetPage = false) {
             if (resetPage) lhpCurrentPage = 1;
-            const filtered = getFilteredLhp();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / lhpPageSize));
-
-            if (lhpCurrentPage > totalPages) lhpCurrentPage = totalPages;
-            if (lhpCurrentPage < 1) lhpCurrentPage = 1;
-
+            const request = ++lhpRequest;
+            const params = new URLSearchParams({
+                page: lhpCurrentPage, pageSize: lhpPageSize,
+                maHK: document.getElementById('lhp-hk').value,
+                maMon: document.getElementById('lhp-mon').value,
+                maGV: document.getElementById('lhp-gv').value,
+                search: document.getElementById('lhp-search').value.trim()
+            });
+            let response;
+            try { response = await apiFetch('/api/lophocphan?' + params); }
+            catch (error) { if (request === lhpRequest) showToast(error.message, 'error'); return; }
+            if (request !== lhpRequest) return;
+            document.getElementById('lhp-hk').value = response.maHK || '';
+            lhpList = response.data || [];
+            lhpCurrentPage = response.page;
+            const totalItems = response.total;
+            const totalPages = response.totalPages;
             const startIndex = (lhpCurrentPage - 1) * lhpPageSize;
-            const endIndex = Math.min(startIndex + lhpPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + lhpList.length, totalItems);
+            const paged = lhpList;
 
             const tbody = document.getElementById('lhp-tbody');
             if (paged.length === 0) {

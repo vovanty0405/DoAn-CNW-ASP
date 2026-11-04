@@ -14,53 +14,76 @@ namespace QL_DiemSV.Controllers;
 public class LichHocController(ApplicationDbContext db) : Controller
 {
     [HttpGet("")]
-    public async Task<IActionResult> Index(string? id, string? configHK)
+    public async Task<IActionResult> Index(string? id, string? configHK, string? maHK = null,
+        int page = 1, int pageSize = 20, string? faculty = null, string? cohort = null, string? scheduleStatus = null, string? search = null)
     {
-        var sections = await db.LopHocPhans
-            .AsNoTracking()
-            .Include(x => x.MonHoc)
-                .ThenInclude(m => m!.Khoa)
-            .Include(x => x.HocKy)
-            .Include(x => x.GiangVien)
-            .Include(x => x.KetQuaHocTaps)
-                .ThenInclude(k => k.SinhVien)
-                    .ThenInclude(s => s!.LopHanhChinh)
-            .Include(x => x.LichHocs)
-                .ThenInclude(l => l.GiangVien)
-            .OrderByDescending(x => x.LichHocs.Count > 0)
-            .ThenByDescending(x => x.MaHK)
-            .ThenBy(x => x.MaLHP)
-            .ToListAsync();
-
-        var sectionId = sections.FirstOrDefault(x => x.MaLHP == id)?.MaLHP ?? sections.FirstOrDefault()?.MaLHP;
-        var section = sections.FirstOrDefault(x => x.MaLHP == sectionId) ?? new LopHocPhan();
+        if (string.IsNullOrWhiteSpace(maHK) && !string.IsNullOrWhiteSpace(id))
+            maHK = await db.LopHocPhans.AsNoTracking().Where(x => x.MaLHP == id).Select(x => x.MaHK).FirstOrDefaultAsync();
+        maHK = await AcademicQueries.ResolveTermAsync(db, maHK);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        var query = db.LopHocPhans.AsNoTracking().Where(x => maHK != null && x.MaHK == maHK);
+        if (!string.IsNullOrWhiteSpace(faculty)) query = query.Where(x => x.MonHoc!.MaKhoa == faculty);
+        if (!string.IsNullOrWhiteSpace(cohort)) query = query.Where(x => db.LopHanhChinhs.Any(c => c.MaLop == x.MaLop && c.NienKhoa == cohort)
+            || (x.MaLop == null && x.KetQuaHocTaps.Any(k => k.SinhVien!.LopHanhChinh!.NienKhoa == cohort)));
+        if (scheduleStatus == "SCHEDULED") query = query.Where(x => x.LichHocs.Any());
+        if (scheduleStatus == "UNSCHEDULED") query = query.Where(x => !x.LichHocs.Any());
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            query = query.Where(x => x.MaLHP.Contains(search) || x.TenLopHP!.Contains(search) || x.MonHoc!.TenMon.Contains(search)
+                || x.MaLop!.Contains(search) || x.LichHocs.Any(l => l.PhongHoc.Contains(search) || l.GiangVien!.HoTen.Contains(search)));
+        }
+        var total = await query.CountAsync();
+        var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+        if (!string.IsNullOrWhiteSpace(id) && await query.AnyAsync(x => x.MaLHP == id))
+            page = await query.CountAsync(x => string.Compare(x.MaLHP, id) < 0) / pageSize + 1;
+        var sections = await query.OrderBy(x => x.MaLHP).Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new LopHocPhan
+            {
+                MaLHP = x.MaLHP, MaHK = x.MaHK, MaMon = x.MaMon, MaGV = x.MaGV, MaLop = x.MaLop,
+                TenLopHP = x.TenLopHP, PhongHoc = x.PhongHoc, NMH = x.NMH, TTH = x.TTH,
+                STC = x.STC, STCHP = x.STCHP, SiSoToiDa = x.SiSoToiDa, TrangThai = x.TrangThai,
+                MonHoc = x.MonHoc == null ? null : new MonHoc { MaMon = x.MonHoc.MaMon, TenMon = x.MonHoc.TenMon, SoTinChi = x.MonHoc.SoTinChi, MaKhoa = x.MonHoc.MaKhoa }
+            }).ToListAsync();
+        var ids = sections.Select(x => x.MaLHP).ToArray();
+        var lessons = await db.ClassSchedules.AsNoTracking().Where(x => ids.Contains(x.MaLHP))
+            .Select(x => new ClassSchedule { Id = x.Id, MaLHP = x.MaLHP, LoaiBuoiHoc = x.LoaiBuoiHoc, LoaiLich = x.LoaiLich,
+                Thu = x.Thu, TietBatDau = x.TietBatDau, SoTiet = x.SoTiet, PhongHoc = x.PhongHoc,
+                MaGV = x.MaGV, ChuoiTuanHoc = x.ChuoiTuanHoc, TuanBaoNghi = x.TuanBaoNghi }).ToListAsync();
         var terms = await db.HocKys.AsNoTracking().OrderByDescending(x => x.NamHocBatDau).ThenByDescending(x => x.MaHK).ToListAsync();
-        var adminClasses = await db.LopHanhChinhs.AsNoTracking()
-            .Include(x => x.Nganh)
-                .ThenInclude(n => n!.Khoa)
-            .OrderBy(x => x.MaLop)
-            .ToListAsync();
-        var faculties = await db.Khoas.AsNoTracking().OrderBy(x => x.MaKhoa).ToListAsync();
-        var cohorts = adminClasses
-            .Where(x => !string.IsNullOrWhiteSpace(x.NienKhoa))
-            .Select(x => x.NienKhoa!.Trim())
-            .Distinct()
-            .OrderByDescending(x => x)
-            .ToList();
-
+        var teachers = await db.GiangViens.AsNoTracking().OrderBy(x => x.HoTen)
+            .Select(x => new GiangVien { MaGV = x.MaGV, HoTen = x.HoTen }).ToListAsync();
+        var teacherMap = teachers.ToDictionary(x => x.MaGV);
+        foreach (var lesson in lessons) lesson.GiangVien = teacherMap.GetValueOrDefault(lesson.MaGV);
+        var lessonsBySection = lessons.ToLookup(x => x.MaLHP);
+        foreach (var item in sections)
+        {
+            item.HocKy = terms.FirstOrDefault(t => t.MaHK == item.MaHK);
+            item.GiangVien = teacherMap.GetValueOrDefault(item.MaGV ?? "");
+            item.LichHocs = lessonsBySection[item.MaLHP].ToList();
+        }
+        var adminClasses = await db.LopHanhChinhs.AsNoTracking().OrderBy(x => x.MaLop)
+            .Select(x => new LopHanhChinh { MaLop = x.MaLop, TenLop = x.TenLop, MaNganh = x.MaNganh, NienKhoa = x.NienKhoa,
+                Nganh = x.Nganh == null ? null : new Nganh { MaNganh = x.Nganh.MaNganh, MaKhoa = x.Nganh.MaKhoa } }).ToListAsync();
+        var summary = await db.KetQuaHocTaps.AsNoTracking().Where(x => ids.Contains(x.MaLHP!))
+            .GroupBy(x => x.MaLHP!).Select(g => new { Id = g.Key, Count = g.Count(), Class = g.Min(x => x.SinhVien!.MaLop) }).ToListAsync();
+        var classesByCode = adminClasses.ToDictionary(x => x.MaLop);
+        var section = sections.FirstOrDefault(x => x.MaLHP == id) ?? sections.FirstOrDefault() ?? new LopHocPhan();
         return View(new ScheduleEditorViewModel
         {
-            Section = section,
-            Sections = sections,
-            Terms = terms,
-            Faculties = faculties,
-            Cohorts = cohorts,
-            ConfigurationTerm = terms.FirstOrDefault(x => x.MaHK == configHK)
-                ?? terms.FirstOrDefault(x => x.MaHK == section?.MaHK)
-                ?? terms.FirstOrDefault(),
+            SelectedTermId = maHK, Page = page, PageSize = pageSize, Total = total,
+            Faculty = faculty, Cohort = cohort, ScheduleStatus = scheduleStatus, Search = search,
+            Section = section, Sections = sections, Terms = terms, Teachers = teachers,
+            SectionSizes = summary.ToDictionary(x => x.Id, x => x.Count),
+            FallbackClasses = summary.Where(x => x.Class != null && classesByCode.ContainsKey(x.Class))
+                .ToDictionary(x => x.Id, x => classesByCode[x.Class!]),
+            Faculties = await db.Khoas.AsNoTracking().OrderBy(x => x.MaKhoa)
+                .Select(x => new Khoa { MaKhoa = x.MaKhoa, TenKhoa = x.TenKhoa }).ToListAsync(),
+            Cohorts = adminClasses.Where(x => !string.IsNullOrWhiteSpace(x.NienKhoa)).Select(x => x.NienKhoa!).Distinct().OrderByDescending(x => x).ToList(),
+            ConfigurationTerm = terms.FirstOrDefault(x => x.MaHK == configHK) ?? terms.FirstOrDefault(x => x.MaHK == maHK),
             AdministrativeClasses = adminClasses,
-            Rooms = await db.PhongHocs.AsNoTracking().OrderBy(x => x.MaPhong).ToListAsync(),
-            Teachers = await db.GiangViens.AsNoTracking().OrderBy(x => x.HoTen).ToListAsync()
+            Rooms = await db.PhongHocs.AsNoTracking().OrderBy(x => x.MaPhong).ToListAsync()
         });
     }
 
@@ -346,24 +369,6 @@ public class LichHocController(ApplicationDbContext db) : Controller
         var terms = await db.HocKys.AsNoTracking().OrderByDescending(x => x.NamHocBatDau).ThenByDescending(x => x.MaHK).ToListAsync();
         var today = RoomMatrixRules.Today;
 
-        if (string.IsNullOrWhiteSpace(maHK) && !date.HasValue)
-        {
-            var termIdsWithSchedules = await db.ClassSchedules
-                .AsNoTracking()
-                .Where(x => x.LopHocPhan != null && x.LopHocPhan.MaHK != null)
-                .Select(x => x.LopHocPhan!.MaHK!)
-                .Distinct()
-                .ToListAsync();
-
-            var activeTermWithSchedule = terms.FirstOrDefault(t => termIdsWithSchedules.Contains(t.MaHK) && RoomMatrixRules.ContainsDate(t, today))
-                ?? terms.FirstOrDefault(t => termIdsWithSchedules.Contains(t.MaHK));
-
-            if (activeTermWithSchedule != null)
-            {
-                maHK = activeTermWithSchedule.MaHK;
-            }
-        }
-
         var calendar = RoomMatrixRules.ResolveCalendar(terms, maHK, week, day, date, today);
         var term = calendar.Term;
 
@@ -398,19 +403,31 @@ public class LichHocController(ApplicationDbContext db) : Controller
 
         if (term != null && !vm.OutsideTerm)
         {
+            var roomIds = vm.Rooms.Select(r => r.MaPhong).ToArray();
             var query = db.ClassSchedules.AsNoTracking()
-                .Include(x => x.LopHocPhan).ThenInclude(x => x!.MonHoc)
-                .Include(x => x.LopHocPhan).ThenInclude(x => x!.KetQuaHocTaps)
-                .Include(x => x.GiangVien)
-                .Where(x => x.LopHocPhan!.MaHK == term.MaHK);
-
+                .Where(x => x.LopHocPhan!.MaHK == term.MaHK && roomIds.Contains(x.PhongHoc));
             if (vm.ViewMode != "week") query = query.Where(x => x.Thu == vm.Day);
             if (vm.ScheduleType != "all") query = query.Where(x => x.LoaiLich == vm.ScheduleType);
 
-            var allTermLessons = await query.ToListAsync();
+            var allTermLessons = await query.Select(x => new ClassSchedule
+            {
+                Id = x.Id, MaLHP = x.MaLHP, MaGV = x.MaGV, PhongHoc = x.PhongHoc, Thu = x.Thu,
+                TietBatDau = x.TietBatDau, SoTiet = x.SoTiet, LoaiLich = x.LoaiLich, LoaiBuoiHoc = x.LoaiBuoiHoc,
+                ChuoiTuanHoc = x.ChuoiTuanHoc, TuanBaoNghi = x.TuanBaoNghi,
+                GiangVien = x.GiangVien == null ? null : new GiangVien { HoTen = x.GiangVien.HoTen },
+                LopHocPhan = x.LopHocPhan == null ? null : new LopHocPhan
+                {
+                    MaLHP = x.LopHocPhan.MaLHP, SiSoToiDa = x.LopHocPhan.SiSoToiDa,
+                    MonHoc = x.LopHocPhan.MonHoc == null ? null : new MonHoc { TenMon = x.LopHocPhan.MonHoc.TenMon }
+                }
+            }).ToListAsync();
             vm.Schedules = allTermLessons
                 .Where(x => ScheduleRules.Weeks(x.ChuoiTuanHoc).Contains(vm.Week) && vm.Rooms.Any(r => r.MaPhong == x.PhongHoc))
                 .ToList();
+            var sectionIds = vm.Schedules.Select(x => x.MaLHP).Distinct().ToArray();
+            vm.SectionSizes = await db.KetQuaHocTaps.AsNoTracking().Where(x => sectionIds.Contains(x.MaLHP!))
+                .GroupBy(x => x.MaLHP!).Select(g => new { Id = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Id, x => x.Count);
         }
 
         if (vm.ViewMode == "compact")

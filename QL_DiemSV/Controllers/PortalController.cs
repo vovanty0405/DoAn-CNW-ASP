@@ -73,8 +73,9 @@ public class PortalController(ApplicationDbContext db) : Controller
 
         var allPublished = await published
             .OrderByDescending(x => x.GhimDauTrang)
-            .ThenByDescending(x => x.NgayDang)
+            .ThenByDescending(x => x.NgayDang).ThenByDescending(x => x.Id)
             .Take(80)
+            .Select(AcademicQueries.ArticleList)
             .ToListAsync();
 
         return View(new PortalViewModel
@@ -86,16 +87,18 @@ public class PortalController(ApplicationDbContext db) : Controller
             Counts = counts,
             Articles = await q
                 .OrderByDescending(x => x.GhimDauTrang)
-                .ThenByDescending(x => x.NgayDang)
+                .ThenByDescending(x => x.NgayDang).ThenByDescending(x => x.Id)
                 .Skip((page - 1) * 8)
                 .Take(8)
-                .ToListAsync(),
+                .Select(AcademicQueries.ArticleList)
+            .ToListAsync(),
             AllPublishedArticles = allPublished,
             News = await published
                 .Where(x => x.DanhMuc == "TinTuc")
                 .OrderByDescending(x => x.NgayDang)
                 .Take(3)
-                .ToListAsync(),
+                .Select(AcademicQueries.ArticleList)
+            .ToListAsync(),
             Curriculums = await db.Curriculums.AsNoTracking().Include(x=>x.NganhHoc).Where(x=>x.TrangThai).OrderByDescending(x=>x.KhoaHoc).ToListAsync(),
             Majors = await db.Nganhs.AsNoTracking()
                 .Include(x => x.KhungChuongTrinhs)
@@ -154,9 +157,10 @@ public class PortalController(ApplicationDbContext db) : Controller
 
         var articles = await q
             .OrderByDescending(x => x.GhimDauTrang)
-            .ThenByDescending(x => x.NgayDang)
+            .ThenByDescending(x => x.NgayDang).ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(AcademicQueries.ArticleList)
             .ToListAsync();
 
         return View("Articles", new PortalArticlesViewModel
@@ -185,6 +189,7 @@ public class PortalController(ApplicationDbContext db) : Controller
             .Where(x => x.TrangThai == "DaXuatBan" && x.Id != id && x.DanhMuc == article.DanhMuc)
             .OrderByDescending(x => x.NgayDang)
             .Take(6)
+            .Select(AcademicQueries.ArticleList)
             .ToListAsync();
 
         if (sameCategory.Count < 6)
@@ -194,7 +199,8 @@ public class PortalController(ApplicationDbContext db) : Controller
                 .Where(x => x.TrangThai == "DaXuatBan" && !excludeIds.Contains(x.Id))
                 .OrderByDescending(x => x.NgayDang)
                 .Take(6 - sameCategory.Count)
-                .ToListAsync();
+                .Select(AcademicQueries.ArticleList)
+            .ToListAsync();
             sameCategory.AddRange(more);
         }
 
@@ -280,15 +286,12 @@ public class PortalController(ApplicationDbContext db) : Controller
             vm.IsHistoricalTerm = TimetablePresentation.IsHistorical(vm.HocKy, today);
             var termId = vm.HocKy.MaHK;
             var q = db.ClassSchedules.AsNoTracking()
-                .Include(x => x.LopHocPhan)
-                .ThenInclude(x => x!.MonHoc)
-                .Include(x => x.GiangVien)
                 .Where(x => x.LopHocPhan!.MaHK == termId);
             if (vm.Kind == "student")
                 q = q.Where(x => db.KetQuaHocTaps.Any(k => k.MaSV == vm.Code && k.MaLHP == x.MaLHP));
             else
                 q = q.Where(x => x.MaGV == vm.Code);
-            vm.TermSchedules = await q.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau).ToListAsync();
+            vm.TermSchedules = await q.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau).Select(AcademicQueries.ScheduleList).ToListAsync();
             vm.Schedules = vm.Mode == "all"
                 ? vm.TermSchedules
                 : vm.TermSchedules.Where(x => ScheduleRules.Weeks(x.ChuoiTuanHoc).Contains(vm.Week)).ToList();
