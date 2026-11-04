@@ -1,0 +1,141 @@
+@model QL_DiemSV.ViewModels.PortalArticleDetailViewModel
+@using QL_DiemSV.Services
+@{
+    Layout = "_PortalLayout";
+    var a = Model.Article;
+    ViewData["Title"] = a.TieuDe;
+    var catLabel = PortalRules.Categories.GetValueOrDefault(a.DanhMuc, a.DanhMuc);
+    var programLabel = string.IsNullOrWhiteSpace(a.HeDaoTao) ? "Đại học chính quy" : a.HeDaoTao;
+    var formattedDate = PortalRules.FormatVietnameseDateWithDay(a.NgayDang);
+    var isPdfAttachment = !string.IsNullOrEmpty(a.FileDinhKemUrl) &&
+                          (a.TenFileDinhKem?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) == true ||
+                           a.FileDinhKemUrl.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="article-detail-layout">
+    <!-- =================================================================== -->
+    <!-- CỘT TRÁI (70%): NỘI DUNG CHI TIẾT BÀI VIẾT                          -->
+    <!-- =================================================================== -->
+    <article class="portal-panel article-detail-main">
+        @if (a.TrangThai != "DaXuatBan")
+        {
+            <div class="portal-alert">
+                ⚠️ <strong>BẢN NHÁP (CHẾ ĐỘ XEM THỬ)</strong> — Bài viết này chưa được xuất bản công khai trên Portal.
+            </div>
+        }
+
+        <!-- Nút điều hướng trên cùng (Chỉ giữ lại nút Quay lại danh sách bài viết) -->
+        <div class="detail-top-nav">
+            <a href="/Portal/Articles" class="back-list-link">← Quay lại danh sách bài viết</a>
+        </div>
+
+        <!-- Hàng Badges: Pill Danh mục & Hệ đào tạo -->
+        <div class="portal-card-badges detail-badges">
+            <span class="pill-outline-blue">@catLabel</span>
+            <span class="pill-outline-blue">@programLabel</span>
+        </div>
+
+        <!-- Tiêu đề bài viết cỡ lớn (H1, in đậm) -->
+        <h1 class="detail-h1">@a.TieuDe</h1>
+
+        <!-- Dòng thông tin Meta (Tác giả / Khoa và Ngày đăng nổi bật, tương phản cao) -->
+        <div class="detail-meta-bar">
+            <span class="detail-meta-item">📅 <strong>@formattedDate</strong></span>
+            <span class="meta-dot">•</span>
+            <span class="detail-meta-item">👥 <strong>@a.DonViDang</strong></span>
+        </div>
+
+        @if (PortalRules.SafeUrl(a.ThumbnailUrl, true) && a.ThumbnailUrl != "/images/portal-news.svg")
+        {
+            <img class="article-thumbnail" src="@a.ThumbnailUrl" alt="@a.TieuDe" />
+        }
+
+        <!-- Nội dung chi tiết bài viết (Rich Text kế thừa chuẩn màu Light/Dark mode) -->
+        <div class="article-content article-rich-text">
+            @Html.Raw(PortalRules.SanitizeHtml(a.NoiDung))
+        </div>
+
+        <!-- Khung File PDF / Tài liệu đính kèm (nếu có) -->
+        @if (!string.IsNullOrEmpty(a.FileDinhKemUrl))
+        {
+            <div class="detail-attachment-box">
+                <div class="attachment-info">
+                    <span class="pdf-badge-icon">📄</span>
+                    <div>
+                        <strong>@(a.TenFileDinhKem ?? "Tài liệu đính kèm")</strong>
+                        <small>Dung lượng: @PortalRules.Size(a.DungLuongFile ?? 0)</small>
+                    </div>
+                </div>
+                <div class="attachment-actions">
+                    <a href="@a.FileDinhKemUrl" target="_blank" rel="noopener" class="btn-att-download" title="Tải xuống hoặc xem file PDF">
+                        📥 Tải xuống / Xem file PDF
+                    </a>
+                </div>
+            </div>
+        }
+
+        <!-- Chân khung: Đường kẻ ngang và link ← Xem tất cả bài viết -->
+        <div class="detail-footer-nav">
+            <a href="/Portal/Articles">← Xem tất cả bài viết</a>
+            @if (User.IsInRole("Admin") || User.IsInRole("GiangVien"))
+            {
+                <a href="/bai-viet/@a.Id/sua" class="edit-article-shortcut">✏️ Chỉnh sửa bài viết này</a>
+            }
+        </div>
+    </article>
+
+    <!-- =================================================================== -->
+    <!-- CỘT PHẢI (30%): KHUNG "BÀI VIẾT LIÊN QUAN"                          -->
+    <!-- =================================================================== -->
+    <aside class="portal-panel article-related-sidebar">
+        <h2 class="related-heading">Bài viết liên quan</h2>
+
+        <div class="related-list">
+            @foreach (var rel in Model.RelatedArticles)
+            {
+                var relDate = PortalRules.Local(rel.NgayDang);
+                var hasRelThumb = PortalRules.SafeUrl(rel.ThumbnailUrl, true) && rel.DanhMuc != "NghiBu";
+
+                <a href="/Portal/ArticleDetail/@rel.Id" class="related-item">
+                    <!-- Ảnh thumbnail nhỏ bên trái -->
+                    <div class="related-thumb">
+                        @if (hasRelThumb)
+                        {
+                            <img src="@rel.ThumbnailUrl" alt="" loading="lazy" />
+                        }
+                        else if (rel.DanhMuc == "NghiBu")
+                        {
+                            <div class="mini-banner mini-nghibu">
+                                <span>🗓️</span>
+                                <small>Nghỉ lớp</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mini-banner mini-default">
+                                <span>📢</span>
+                                <small>Thông báo</small>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Tiêu đề rút gọn màu xanh + Ngày đăng (dd/MM/yyyy) -->
+                    <div class="related-info">
+                        <h3 class="related-title" title="@rel.TieuDe">@rel.TieuDe</h3>
+                        <span class="related-date">(@relDate.ToString("dd/MM/yyyy"))</span>
+                    </div>
+                </a>
+            }
+
+            @if (Model.RelatedArticles.Count == 0)
+            {
+                <p class="portal-empty">Chưa có bài viết liên quan khác.</p>
+            }
+        </div>
+
+        <!-- Nút Xem thêm → rộng toàn khung ở dưới cùng -->
+        <a href="/Portal/Articles?category=@a.DanhMuc" class="btn-related-more">
+            Xem thêm →
+        </a>
+    </aside>
+</div>

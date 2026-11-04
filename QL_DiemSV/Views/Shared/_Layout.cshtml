@@ -37,6 +37,7 @@
                         primary: 'var(--color-primary)',
                         'primary-hover': 'var(--color-primary-hover)',
                         'text-primary': 'var(--color-text-primary)',
+                        'text-main': 'var(--color-text-primary)',
                         'text-muted': 'var(--color-text-muted)',
                         'semantic-success': 'var(--color-semantic-success)',
                         'semantic-error': 'var(--color-semantic-error)',
@@ -87,6 +88,81 @@
             color: var(--color-text-primary);
             font-family: var(--font-sans);
             -webkit-font-smoothing: antialiased;
+        }
+
+        .input-field {
+            background-color: var(--color-canvas);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-surface-hover);
+            border-radius: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-field:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(77, 142, 255, 0.2);
+        }
+        .input-field option {
+            background-color: var(--color-surface);
+            color: var(--color-text-primary);
+        }
+        .input-field::placeholder {
+            color: var(--color-text-muted);
+            opacity: 0.75;
+        }
+
+        .card {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-surface-hover);
+            border-radius: 1rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            filter: brightness(1.08);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .badge-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .badge-danger {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .badge-info {
+            background-color: rgba(77, 142, 255, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(77, 142, 255, 0.3);
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -147,6 +223,7 @@
             return json;
         };
     </script>
+<link rel="stylesheet" href="~/css/sidebar.css" asp-append-version="true" />
 </head>
 <body class="min-h-screen flex bg-canvas text-text-primary selection:bg-primary selection:text-white">
     <!-- Toast Container -->
@@ -174,96 +251,7 @@
             </div>
 
             <!-- Navigation Menu -->
-            <nav class="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-                <a href="/portal" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Cổng thông tin đào tạo</a>
-                @if(User.IsInRole("Admin")||User.IsInRole("GiangVien")){
-                    <a href="/bai-viet" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Bài viết & Thông báo</a>
-                }
-                <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Tổng quan</div>
-                <a href="/" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath == "/" ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                    <i data-lucide="home" class="w-4 h-4"></i>
-                    <span>Trang chủ</span>
-                </a>
-
-                @if (roleName == "Admin" || roleName == "GiangVien")
-                {
-                    <a href="/thong-ke" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/thong-ke") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                        <span>Thống kê & Báo cáo</span>
-                    </a>
-                }
-
-                @if (roleName == "Admin")
-                {
-                    <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Quản lý Đào tạo</div>
-                    <a href="/sinh-vien" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/sinh-vien") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="users" class="w-4 h-4"></i>
-                        <span>Sinh viên</span>
-                    </a>
-                    <a href="/giang-vien" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/giang-vien") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="user-check" class="w-4 h-4"></i>
-                        <span>Giảng viên & Khoa</span>
-                    </a>
-                    <a href="/mon-hoc" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/mon-hoc") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="book-open" class="w-4 h-4"></i>
-                        <span>Môn học</span>
-                    </a>
-                    <a href="/khung-dao-tao" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/khung-dao-tao") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="layers" class="w-4 h-4"></i>
-                        <span>Khung đào tạo</span>
-                    </a>
-                    <a href="/lop-hanh-chinh" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/lop-hanh-chinh") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="building-2" class="w-4 h-4"></i>
-                        <span>Lớp hành chính & Ngành</span>
-                    </a>
-                    <a href="/lop-hoc-phan" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/lop-hoc-phan") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
-                        <span>Lớp học phần & Học kỳ</span>
-                    </a>
-                }
-
-                @if (roleName == "SinhVien") {
-                    <a href="/dang-ky-hoc-phan" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Đăng ký học phần</a>
-                }
-                @if (roleName == "SinhVien" || roleName == "GiangVien" || roleName == "Admin") {
-                    <a href="/thoi-khoa-bieu" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Thời khóa biểu</a>
-                }
-                @if (roleName == "Admin") {
-                    <a href="/quan-ly-lich-hoc" class="block px-3.5 py-2.5 rounded-xl text-sm text-primary hover:bg-surface-hover">Điều phối lịch & Phòng học</a>
-                }
-                <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Điểm số & Phúc khảo</div>
-                @if (roleName == "Admin" || roleName == "GiangVien" || roleName == "KhaoThi")
-                {
-                    <a href="/diem-so" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/diem-so") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                        <span>Quản lý Điểm số</span>
-                    </a>
-                }
-                <a href="/tra-cuu-diem" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/tra-cuu-diem") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                    <i data-lucide="award" class="w-4 h-4"></i>
-                    <span>Tra cứu điểm & Tốt nghiệp</span>
-                </a>
-                @if (roleName == "Admin" || roleName == "GiangVien")
-                {
-                    <a href="/khieu-nai" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/khieu-nai") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="message-square-warning" class="w-4 h-4"></i>
-                        <span>Khiếu nại & Phúc khảo</span>
-                    </a>
-                }
-
-                @if (roleName == "Admin")
-                {
-                    <div class="px-3 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">Quản trị Hệ thống</div>
-                    <a href="/tai-khoan" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/tai-khoan") || currentPath.StartsWith("/phan-quyen") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="shield-check" class="w-4 h-4"></i>
-                        <span>Tài khoản & Phân quyền</span>
-                    </a>
-                    <a href="/nhat-ky-he-thong" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all @(currentPath.StartsWith("/nhat-ky-he-thong") ? "bg-primary text-white shadow-lg shadow-primary/25" : "text-text-muted hover:bg-surface-hover hover:text-text-primary")">
-                        <i data-lucide="history" class="w-4 h-4"></i>
-                        <span>Nhật ký hệ thống</span>
-                    </a>
-                }
-            </nav>
+            <partial name="_SidebarNavigation" />
 
             <!-- User Footer -->
             <div class="p-4 border-t border-surface-hover bg-surface-header space-y-3">
@@ -480,5 +468,6 @@
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)
+<script src="~/js/sidebar.js" asp-append-version="true"></script>
 </body>
 </html>

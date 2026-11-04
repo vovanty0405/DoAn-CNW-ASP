@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
 using QL_DiemSV.Models;
@@ -187,7 +187,11 @@ public class KhieuNaiController : ControllerBase
                 else if (don.LoaiDiem == "thiLan1" || don.LoaiDiem == "cuoiky") kq.DiemThiLan1 = req.newGrade;
                 else if (don.LoaiDiem == "thiLan2") kq.DiemThiLan2 = req.newGrade;
 
-                var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2);
+                int tyLeQT = (don.LopHocPhan != null && don.LopHocPhan.TyLeQuaTrinh + don.LopHocPhan.TyLeThiKetThuc == 100)
+                    ? don.LopHocPhan.TyLeQuaTrinh : 40;
+                int tyLeThi = 100 - tyLeQT;
+
+                var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, tyLeQT, tyLeThi);
                 kq.DiemTongKet = tk;
                 kq.DiemChu = dc;
                 kq.GhiChu = gc;
@@ -217,4 +221,3 @@ public class KhieuNaiController : ControllerBase
         return Ok(new { status = "success", message = "Đã xử lý đơn khiếu nại thành công!", data = don });
     }
 }
-

@@ -107,17 +107,112 @@ public class KhungChuongTrinhController : ControllerBase
         return Ok(new { status = "success", message = "Đã thêm môn học vào khung chương trình", data = item });
     }
 
+    [HttpPost("batch")]
+    public async Task<IActionResult> AddSubjectsBatch([FromBody] BatchAddKhungDto req)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.MaNganh))
+            return BadRequest(new { status = "error", message = "Vui lòng chọn Ngành đào tạo!" });
+
+        var subjectCodes = new List<string>();
+        var customLoaiMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (req.Items != null && req.Items.Any())
+        {
+            foreach (var item in req.Items)
+            {
+                if (!string.IsNullOrWhiteSpace(item.MaMon))
+                {
+                    var code = item.MaMon.Trim();
+                    subjectCodes.Add(code);
+                    if (!string.IsNullOrWhiteSpace(item.LoaiMon))
+                    {
+                        customLoaiMap[code] = item.LoaiMon.Trim();
+                    }
+                }
+            }
+        }
+
+        if (req.MaMonList != null && req.MaMonList.Any())
+        {
+            foreach (var code in req.MaMonList)
+            {
+                if (!string.IsNullOrWhiteSpace(code))
+                {
+                    subjectCodes.Add(code.Trim());
+                }
+            }
+        }
+
+        subjectCodes = subjectCodes.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (!subjectCodes.Any())
+            return BadRequest(new { status = "error", message = "Vui lòng chọn ít nhất 1 môn học để thêm vào khung đào tạo!" });
+
+        int hocKy = req.HocKy > 0 ? req.HocKy : 1;
+        string defaultLoai = string.IsNullOrWhiteSpace(req.LoaiHocPhan) ? "Bắt buộc" : req.LoaiHocPhan.Trim();
+
+        // Lấy danh sách mã môn đã tồn tại trong khung đào tạo của ngành này
+        var existingCodes = await _db.KhungChuongTrinhs
+            .Where(k => k.MaNganh == req.MaNganh)
+            .Select(k => k.MaMon)
+            .ToListAsync();
+        var existingSet = new HashSet<string>(existingCodes, StringComparer.OrdinalIgnoreCase);
+
+        var toAdd = new List<KhungChuongTrinh>();
+        foreach (var maMon in subjectCodes)
+        {
+            if (existingSet.Contains(maMon))
+                continue;
+
+            var loai = customLoaiMap.TryGetValue(maMon, out var customLoai) ? customLoai : defaultLoai;
+            toAdd.Add(new KhungChuongTrinh
+            {
+                MaNganh = req.MaNganh.Trim(),
+                MaMon = maMon,
+                HocKyDuKien = hocKy,
+                LoaiMon = loai
+            });
+            existingSet.Add(maMon);
+        }
+
+        if (!toAdd.Any())
+        {
+            return BadRequest(new { status = "error", message = "Tất cả các môn học được chọn đều đã tồn tại trong khung đào tạo của ngành này!" });
+        }
+
+        _db.KhungChuongTrinhs.AddRange(toAdd);
+        await _db.SaveChangesAsync();
+
+        GradeHelper.GhiNhatKy(
+            _db,
+            User.Identity?.Name,
+            "Thêm hàng loạt môn vào Khung đào tạo",
+            $"Đã thêm {toAdd.Count} môn học vào Học kỳ {hocKy} của ngành {req.MaNganh}: {string.Join(", ", toAdd.Select(x => x.MaMon))}"
+        );
+
+        return Ok(new
+        {
+            status = "success",
+            message = $"Đã thêm thành công {toAdd.Count} môn học vào Học kỳ {hocKy}",
+            addedCount = toAdd.Count,
+            data = toAdd
+        });
+    }
+
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateSubject(int id, [FromBody] KhungChuongTrinh req)
+    public async Task<IActionResult> UpdateSubject(int id, [FromBody] UpdateKhungSubjectDto req)
     {
         var existing = await _db.KhungChuongTrinhs.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy bản ghi trong khung chương trình" });
 
-        existing.HocKyDuKien = req.HocKyDuKien;
-        existing.LoaiMon = req.LoaiMon;
+        if (req.HocKyDuKien.HasValue && req.HocKyDuKien.Value > 0)
+            existing.HocKyDuKien = req.HocKyDuKien.Value;
+
+        if (!string.IsNullOrWhiteSpace(req.LoaiMon))
+            existing.LoaiMon = req.LoaiMon.Trim();
 
         await _db.SaveChangesAsync();
-        return Ok(new { status = "success", message = "Cập nhật thành công", data = existing });
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật môn trong Khung đào tạo", $"Đã cập nhật môn {existing.MaMon} (Ngành {existing.MaNganh}): {existing.LoaiMon} - HK {existing.HocKyDuKien}");
+        return Ok(new { status = "success", message = $"Đã cập nhật môn {existing.MaMon} thành {existing.LoaiMon}", data = existing });
     }
 
     [HttpDelete("{id}")]
@@ -131,4 +226,25 @@ public class KhungChuongTrinhController : ControllerBase
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa môn khỏi Khung đào tạo", $"Đã xóa môn {existing.MaMon} khỏi ngành {existing.MaNganh}");
         return Ok(new { status = "success", message = "Đã xóa môn khỏi khung chương trình" });
     }
+}
+
+public class BatchAddKhungDto
+{
+    public string MaNganh { get; set; } = string.Empty;
+    public int HocKy { get; set; } = 1;
+    public string LoaiHocPhan { get; set; } = "Bắt buộc";
+    public List<string> MaMonList { get; set; } = new();
+    public List<BatchSubjectItemDto>? Items { get; set; }
+}
+
+public class BatchSubjectItemDto
+{
+    public string MaMon { get; set; } = string.Empty;
+    public string? LoaiMon { get; set; }
+}
+
+public class UpdateKhungSubjectDto
+{
+    public int? HocKyDuKien { get; set; }
+    public string? LoaiMon { get; set; }
 }

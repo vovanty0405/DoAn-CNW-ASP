@@ -1,10 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using QL_DiemSV.Models;
+
 namespace QL_DiemSV.ViewModels;
+
 public class PortalViewModel
 {
+    public List<Curriculum> Curriculums { get; set; } = new();
     public List<Article> Articles { get; set; } = new();
-    public Dictionary<string,int> Counts { get; set; } = new();
+    public List<Article> AllPublishedArticles { get; set; } = new();
+    public Dictionary<string, int> Counts { get; set; } = new();
     public List<Article> News { get; set; } = new();
     public List<Nganh> Majors { get; set; } = new();
     public List<PortalDocument> Documents { get; set; } = new();
@@ -14,7 +18,28 @@ public class PortalViewModel
     public int Total { get; set; }
     public string? Search { get; set; }
 }
-public record RoomTodayRow(string Room,string Periods,string Status);
+
+public class PortalArticlesViewModel
+{
+    public List<Article> Articles { get; set; } = new();
+    public Dictionary<string, int> Counts { get; set; } = new();
+    public string Category { get; set; } = "all";
+    public string? Search { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 9;
+    public int Total { get; set; }
+    public int TotalAll { get; set; }
+    public int TotalPages => Math.Max(1, (Total + PageSize - 1) / PageSize);
+}
+
+public class PortalArticleDetailViewModel
+{
+    public Article Article { get; set; } = new();
+    public List<Article> RelatedArticles { get; set; } = new();
+}
+
+public record RoomTodayRow(string Room, string Periods, string Status);
+
 public class PortalTimetableViewModel : TimetableViewModel
 {
     public string? Code { get; set; }
@@ -32,30 +57,55 @@ public class PortalTimetableViewModel : TimetableViewModel
     public bool IsHistoricalTerm { get; set; }
     public DateTime LoadedAt { get; set; }
     public List<ClassSchedule> TermSchedules { get; set; } = new();
-    public string StatusClass(ClassSchedule lesson) => QL_DiemSV.Services.TimetablePresentation.Status(lesson,TermSchedules,IsHistoricalTerm,Mode=="all"?null:Week);
-
+    public string StatusClass(ClassSchedule lesson) =>
+        QL_DiemSV.Services.TimetablePresentation.Status(lesson, TermSchedules, IsHistoricalTerm, Mode == "all" ? null : Week);
 }
+
 public class ArticleListViewModel
 {
     public List<Article> Articles { get; set; } = new();
+    public List<string> Departments { get; set; } = new();
     public string? Search { get; set; }
     public string? Category { get; set; }
+    public string? Department { get; set; }
+    public string? Program { get; set; }
     public string? Status { get; set; }
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
     public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
     public int Total { get; set; }
+    public int TotalPublished { get; set; }
+    public int TotalDraft { get; set; }
+    public int TotalPinned { get; set; }
+    public int TotalPages => Math.Max(1, (Total + PageSize - 1) / PageSize);
 }
+
 public class ArticleEditViewModel
 {
     public int Id { get; set; }
-    [Required(ErrorMessage="Nhập tiêu đề."),MaxLength(250)] public string TieuDe { get; set; } = "";
-    [MaxLength(1000)] public string? TomTat { get; set; }
-    [Required(ErrorMessage="Nhập nội dung."),MaxLength(100000)] public string NoiDung { get; set; } = "";
-    [Required,MaxLength(40)] public string DanhMuc { get; set; } = "ThongBaoChung";
-    [Required(ErrorMessage="Nhập đơn vị đăng."),MaxLength(200)] public string DonViDang { get; set; } = "";
+    [Required(ErrorMessage = "Nhập tiêu đề bài viết."), MaxLength(250)]
+    public string TieuDe { get; set; } = "";
+    [MaxLength(1000)]
+    public string? TomTat { get; set; }
+    [Required(ErrorMessage = "Nhập nội dung bài viết.")]
+    public string NoiDung { get; set; } = "";
+    [Required, MaxLength(40)]
+    public string DanhMuc { get; set; } = "ThongBaoChung";
+    [MaxLength(100)]
+    public string HeDaoTao { get; set; } = "Đại học chính quy";
+    [Required(ErrorMessage = "Nhập đơn vị / khoa đăng bài."), MaxLength(200)]
+    public string DonViDang { get; set; } = "";
     public bool GhimDauTrang { get; set; }
-    [MaxLength(500)] public string? ThumbnailUrl { get; set; }
-    [Required] public string TrangThai { get; set; } = "BanNhap";
+    [MaxLength(500)]
+    public string? ThumbnailUrl { get; set; }
+    [Required]
+    public string TrangThai { get; set; } = "DaXuatBan";
+    public DateTime? NgayDang { get; set; }
     public IFormFile? File { get; set; }
     public bool RemoveAttachment { get; set; }
     public string? CurrentAttachment { get; set; }
+    public string? CurrentAttachmentUrl { get; set; }
+    public long? CurrentAttachmentSize { get; set; }
+    public List<string> Departments { get; set; } = new();
 }

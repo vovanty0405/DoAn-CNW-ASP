@@ -1,31 +1,262 @@
 @model QL_DiemSV.ViewModels.TimetableViewModel
 @using QL_DiemSV.Services
-@{ViewData["Title"]="Thông tin thời khóa biểu"; var lessons=Model.Schedules.Where(x=>ScheduleRules.Weeks(x.ChuoiTuanHoc).Contains(Model.Week)).ToList();}
+@{
+    ViewData["Title"] = "Thông tin thời khóa biểu";
+    var lessons = Model.Schedules.Where(x => ScheduleRules.Weeks(x.ChuoiTuanHoc).Contains(Model.Week)).ToList();
+    var isAdmin = User.IsInRole("Admin");
+
+    string CompactWeeks(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "---";
+        try
+        {
+            var sorted = ScheduleRules.Weeks(raw).OrderBy(x => x).ToList();
+            if (sorted.Count == 0) return raw;
+            var ranges = new List<string>();
+            int start = sorted[0], prev = sorted[0];
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                if (sorted[i] == prev + 1)
+                {
+                    prev = sorted[i];
+                }
+                else
+                {
+                    ranges.Add(start == prev ? $"{start}" : $"{start}–{prev}");
+                    start = prev = sorted[i];
+                }
+            }
+            ranges.Add(start == prev ? $"{start}" : $"{start}–{prev}");
+            return string.Join(", ", ranges);
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+}
 <div class="academic">
-<div><p class="muted">Academic Ledger / Lịch học & Giảng dạy</p><h1>Thông Tin Thời Khóa Biểu</h1></div>
-<section class="panel">
-<form method="get" class="toolbar no-print">
-<label>Chọn học kỳ xem TKB<select name="maHK" onchange="this.form.submit()">@foreach(var hk in Model.HocKys){<option value="@hk.MaHK" selected="@(hk.MaHK==Model.HocKy?.MaHK)">@hk.TenHK · @hk.NamHocBatDau-@hk.NamHocKetThuc</option>}</select></label>
-<label>Chế độ xem<select name="mode" onchange="this.form.submit()"><option value="week" selected="@(Model.Mode=="week")">TKB theo tuần</option><option value="all" selected="@(Model.Mode=="all")">TKB toàn học kỳ</option></select></label>
-<label>Tuần<select name="week" onchange="this.form.submit()">@for(int w=1;w<=(Model.HocKy?.SoTuan??20);w++){var start=Model.HocKy?.NgayBatDauTuan1?.AddDays((w-1)*7);<option value="@w" selected="@(w==Model.Week)">Tuần @w @(start.HasValue ? $"[Từ {start:dd/MM/yyyy} -- Đến {start.Value.AddDays(6):dd/MM/yyyy}]" : "[Chưa cấu hình ngày]")</option>}</select></label>
-<button type="button" onclick="window.print()">In TKB / Lưu PDF</button>
-</form>
-<p class="notice muted">@Model.HocKy?.TenHK · Tuần 1 bắt đầu: @(Model.HocKy?.NgayBatDauTuan1?.ToString("dd/MM/yyyy") ?? "Chưa cấu hình") · @(Model.Mode=="all" ? "Toàn học kỳ" : $"Tuần {Model.Week}")</p>
-@if(Model.Mode=="all") {
-<div class="scroll"><table><thead><tr><th>Mã lớp</th><th>Môn học</th><th>TH</th><th>Thứ</th><th>Tiết</th><th>Phòng</th><th>Giảng viên</th><th>Tuần</th></tr></thead><tbody>
-@foreach(var l in Model.Schedules){<tr><td>@l.MaLHP</td><td>@l.LopHocPhan?.MonHoc?.TenMon</td><td>@(l.LoaiBuoiHoc?"*":"")</td><td>@ScheduleRules.DayName(l.Thu)</td><td>@l.TietBatDau–@(l.TietBatDau+l.SoTiet-1)</td><td>@l.PhongHoc</td><td>@l.GiangVien?.HoTen</td><td>@l.ChuoiTuanHoc</td></tr>}
-</tbody></table></div>
-} else {
-<div class="scroll"><table class="grid-table"><colgroup><col style="width:58px" />@for(int d=2;d<=8;d++){<col />}<col style="width:58px" /></colgroup><thead><tr><th>Tiết</th>@for(int d=2;d<=8;d++){<th>@ScheduleRules.DayName(d).ToUpper()</th>}<th>Tiết</th></tr></thead><tbody>
-@for(int tiet=1;tiet<=12;tiet++) {<tr><th>Tiết @tiet</th>
-@for(int thu=2;thu<=8;thu++) {
-    var mon=lessons.FirstOrDefault(x=>x.Thu==thu && x.TietBatDau==tiet);
-    var covered=lessons.Any(x=>x.Thu==thu && x.TietBatDau<tiet && tiet<x.TietBatDau+x.SoTiet);
-    if(mon!=null && !covered){<td rowspan="@mon.SoTiet" class="course"><strong>@mon.LopHocPhan?.MonHoc?.TenMon</strong><div>Phòng: @mon.PhongHoc</div><div>@mon.MaLHP · @mon.LopHocPhan?.NMH</div><div>@(mon.LoaiBuoiHoc?"Thực hành":"Lý thuyết")</div><div>@mon.GiangVien?.HoTen</div></td>}
-    else if(!covered){<td></td>}
-}
-<th>Tiết @tiet</th></tr>}
-</tbody><tfoot><tr><th>Tiết</th>@for(int d=2;d<=8;d++){<th>@ScheduleRules.DayName(d).ToUpper()</th>}<th>Tiết</th></tr></tfoot></table></div>
-@if(lessons.Count==0){<p class="notice muted">Không có lịch học trong tuần này.</p>}
-}
-</section></div>
+    <div class="section-heading">
+        <div>
+            <p class="muted">Academic Ledger / Lịch học & Giảng dạy</p>
+            <h1>Thông Tin Thời Khóa Biểu</h1>
+        </div>
+        @if (isAdmin)
+        {
+            <div class="row-actions no-print">
+                <a class="button secondary" href="/quan-ly-lich-hoc?configHK=@Model.HocKy?.MaHK">⚙️ Điều phối lịch học</a>
+                <a class="button secondary" href="/quan-ly-lich-hoc/ma-tran?maHK=@Model.HocKy?.MaHK&week=@Model.Week&viewMode=week">🏢 Ma trận phòng học</a>
+            </div>
+        }
+    </div>
+
+    <section class="panel">
+        <form method="get" class="toolbar no-print">
+            <label>
+                Chọn học kỳ xem TKB
+                <select name="maHK" onchange="this.form.submit()">
+                    @foreach (var hk in Model.HocKys)
+                    {
+                        <option value="@hk.MaHK" selected="@(hk.MaHK == Model.HocKy?.MaHK)">@hk.TenHK · @hk.NamHocBatDau-@hk.NamHocKetThuc</option>
+                    }
+                </select>
+            </label>
+
+            @if (isAdmin)
+            {
+                <label>
+                    Lớp học phần
+                    <select name="maLHP" onchange="this.form.submit()">
+                        <option value="">-- Tất cả Lớp học phần --</option>
+                        @foreach (var sec in Model.Sections)
+                        {
+                            <option value="@sec.MaLHP" selected="@(sec.MaLHP == Model.SelectedMaLHP)">@sec.MaLHP · @(sec.TenLopHP ?? sec.MonHoc?.TenMon)</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Giảng viên
+                    <select name="maGV" onchange="this.form.submit()">
+                        <option value="">-- Tất cả Giảng viên --</option>
+                        @foreach (var gv in Model.Teachers)
+                        {
+                            <option value="@gv.MaGV" selected="@(gv.MaGV == Model.SelectedMaGV)">@gv.HoTen (@gv.MaGV)</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Phòng học
+                    <select name="phong" onchange="this.form.submit()">
+                        <option value="">-- Tất cả Phòng --</option>
+                        @foreach (var r in Model.Rooms)
+                        {
+                            <option value="@r.MaPhong" selected="@(r.MaPhong == Model.SelectedPhong)">@r.MaPhong (@r.SucChua chỗ)</option>
+                        }
+                    </select>
+                </label>
+            }
+
+            <label>
+                Chế độ xem
+                <select name="mode" onchange="this.form.submit()">
+                    <option value="week" selected="@(Model.Mode == "week")">TKB theo tuần</option>
+                    <option value="all" selected="@(Model.Mode == "all")">TKB toàn học kỳ</option>
+                </select>
+            </label>
+
+            @if (Model.Mode == "week")
+            {
+                <label>
+                    Tuần học
+                    <select name="week" onchange="this.form.submit()">
+                        @for (int w = 1; w <= (Model.HocKy?.SoTuan ?? 20); w++)
+                        {
+                            var start = Model.HocKy?.NgayBatDauTuan1?.AddDays((w - 1) * 7);
+                            <option value="@w" selected="@(w == Model.Week)">
+                                Tuần @w @(start.HasValue ? $"[Từ {start:dd/MM/yyyy} -- Đến {start.Value.AddDays(6):dd/MM/yyyy}]" : "")
+                            </option>
+                        }
+                    </select>
+                </label>
+            }
+
+            <button type="button" onclick="window.print()">🖨️ In TKB / Lưu PDF</button>
+        </form>
+
+        <div class="section-heading" style="margin-bottom: 12px;">
+            <p class="notice muted" style="padding: 0;">
+                @Model.HocKy?.TenHK (@Model.HocKy?.NamHocBatDau-@Model.HocKy?.NamHocKetThuc) ·
+                Tuần 1 bắt đầu: @(Model.HocKy?.NgayBatDauTuan1?.ToString("dd/MM/yyyy") ?? "Chưa cấu hình") ·
+                @(Model.Mode == "all" ? $"Toàn học kỳ ({Model.Schedules.Count} buổi)" : $"Tuần {Model.Week} ({lessons.Count} buổi)")
+            </p>
+        </div>
+
+        @if (Model.Mode == "all")
+        {
+            <div class="scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mã LHP</th>
+                            <th>Tên lớp / Môn học</th>
+                            <th>Nhóm</th>
+                            <th>Loại buổi</th>
+                            <th>Thứ</th>
+                            <th>Tiết</th>
+                            <th>Phòng</th>
+                            <th>Giảng viên</th>
+                            <th>Tuần học</th>
+                            @if (isAdmin)
+                            {
+                                <th class="no-print">Thao tác</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in Model.Schedules)
+                        {
+                            <tr>
+                                <td><strong style="color: var(--color-primary);">@l.MaLHP</strong></td>
+                                <td>@(l.LopHocPhan?.MonHoc?.TenMon ?? l.LopHocPhan?.TenLopHP)</td>
+                                <td>@(l.LopHocPhan?.NMH ?? "01")</td>
+                                <td><span class="badge @(l.LoaiBuoiHoc ? "maintenance" : "active")">@(l.LoaiBuoiHoc ? "Thực hành" : "Lý thuyết")</span></td>
+                                <td>@ScheduleRules.DayName(l.Thu)</td>
+                                <td>Tiết @l.TietBatDau–@(l.TietBatDau + l.SoTiet - 1)</td>
+                                <td><strong>@l.PhongHoc</strong></td>
+                                <td>@l.GiangVien?.HoTen</td>
+                                <td>Tuần @CompactWeeks(l.ChuoiTuanHoc)</td>
+                                @if (isAdmin)
+                                {
+                                    <td class="no-print">
+                                        <a class="button secondary" style="padding: 5px 10px; font-size: 12px;" href="/quan-ly-lich-hoc?id=@l.MaLHP&openModal=true">✏️ Sửa buổi học</a>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                        @if (Model.Schedules.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="@(isAdmin ? 10 : 9)" class="empty-state">Không có lịch học trong học kỳ này.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            var byDay = Enumerable.Range(2, 7).ToDictionary(d => d, d => RoomMatrixRules.Blocks(lessons.Where(x => x.Thu == d)));
+            <div class="scroll">
+                <table class="grid-table">
+                    <colgroup>
+                        <col style="width:68px" />
+                        @for (int d = 2; d <= 8; d++)
+                        {
+                            <col />
+                        }
+                        <col style="width:68px" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>TIẾT</th>
+                            @for (int d = 2; d <= 8; d++)
+                            {
+                                <th>@ScheduleRules.DayName(d).ToUpper()</th>
+                            }
+                            <th>TIẾT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int tiet = 1; tiet <= 12; tiet++)
+                        {
+                            <tr>
+                                <th>Tiết @tiet</th>
+                                @for (int thu = 2; thu <= 8; thu++)
+                                {
+                                    var blocks = byDay[thu];
+                                    var block = blocks.FirstOrDefault(x => x.Start == tiet);
+                                    var covered = blocks.Any(x => x.Start < tiet && tiet < x.Start + x.Span);
+                                    if (block != null && !covered)
+                                    {
+                                        <td rowspan="@block.Span" class="course" style="padding: 10px; vertical-align: top; text-align: left;">
+                                            @foreach (var mon in block.Lessons)
+                                            {
+                                                <div style="@(block.Lessons.Count > 1 ? "padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px dashed var(--color-surface-hover);" : "")">
+                                                    <strong style="font-size: 13px; color: var(--color-primary); margin-bottom: 2px;">
+                                                        @(mon.LopHocPhan?.MonHoc?.TenMon ?? mon.LopHocPhan?.TenLopHP)
+                                                    </strong>
+                                                    <div><b>@mon.MaLHP</b> • Nhóm @(mon.LopHocPhan?.NMH ?? "01")</div>
+                                                    <div>Phòng: <b>@mon.PhongHoc</b> • Tiết @mon.TietBatDau–@(mon.TietBatDau + mon.SoTiet - 1)</div>
+                                                    <div>@(mon.LoaiBuoiHoc ? "Thực hành" : "Lý thuyết") • @(mon.GiangVien?.HoTen ?? mon.MaGV)</div>
+                                                </div>
+                                            }
+                                        </td>
+                                    }
+                                    else if (!covered)
+                                    {
+                                        <td></td>
+                                    }
+                                }
+                                <th>Tiết @tiet</th>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th>TIẾT</th>
+                            @for (int d = 2; d <= 8; d++)
+                            {
+                                <th>@ScheduleRules.DayName(d).ToUpper()</th>
+                            }
+                            <th>TIẾT</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            @if (lessons.Count == 0)
+            {
+                <p class="notice muted">Không có lịch học trong Tuần @Model.Week. Hãy chọn tuần khác hoặc chuyển sang chế độ "TKB toàn học kỳ".</p>
+            }
+        }
+    </section>
+</div>

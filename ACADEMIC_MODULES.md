@@ -62,3 +62,27 @@ Ngày tường minh có ưu tiên hơn week/day có thể còn cũ trong URL. Kh
 Mã nguồn chính: Controllers/LichHocController.cs (Matrix), Services/RoomMatrixRules.cs (ResolveCalendar), ViewModels/AcademicViewModels.cs (RoomMatrixViewModel), Views/LichHoc/Matrix.cshtml và _MatrixBooking.cshtml, wwwroot/css/academic.css, wwwroot/js/room-matrix.js.
 
 Nếu ứng dụng đang chạy khóa DLL, dừng phiên chạy rồi build lại. Có thể build kiểm tra sang một OutputPath riêng (.verification) mà không dừng ứng dụng hiện tại.
+
+## Cấu hình học kỳ — form và bảng đồng bộ danh mục phòng
+
+Khối `Views/LichHoc/_TermConfiguration.cshtml` dùng cùng panel, section-heading, badge, toolbar, scroll/table và row-actions với phòng học. Bảng liệt kê mọi phần tử `ScheduleEditorViewModel.Terms`, gồm tên/năm học, ngày tuần 1 và số tuần, khoảng đăng ký, đơn giá, trạng thái, Sửa/Xóa.
+
+Dropdown Chọn học kỳ và nút Sửa dùng dữ liệu JSON được Razor mã hóa trong trang, điền đủ trường ngay lập tức, không reload. Hủy chọn bỏ mã đang chọn, xóa các ngày giờ và highlight, khôi phục mặc định 20 tuần / 635000 đ; nút Lưu bị khóa đến khi chọn học kỳ. Không tự sinh một mã học kỳ rỗng. Form này tạo cấu hình lần đầu hoặc cập nhật cấu hình cho học kỳ đã có; để tạo học kỳ có mã/tên/năm học mới, dùng quản lý học kỳ tại màn hình Lớp học phần.
+
+POST `/quan-ly-lich-hoc/hoc-ky` kiểm tra đầy đủ ngày giờ, Thứ Hai, khoảng đăng ký, giới hạn số tuần/đơn giá và các tuần đã có lịch; lưu trong transaction Serializable rồi redirect GET để bảng được làm mới. GET Index hiện có luôn truyền đầy đủ Terms và ConfigurationTerm, giữ mã lớp đang điều phối.
+
+POST `/quan-ly-lich-hoc/hoc-ky/xoa` có chống CSRF, yêu cầu Admin; chặn xóa khi còn bất kỳ lớp học phần nào tham chiếu, kể cả lớp đã đóng, để giữ dữ liệu điểm/lịch. Chỉ xóa học kỳ chưa được sử dụng, không cascade xóa lớp. Có xác nhận phía trình duyệt; kiểm tra máy chủ vẫn là quyết định cuối cùng.
+
+Trạng thái dựa vào ngày học, không phải thời hạn đăng ký: trước tuần 1 = Sắp tới; trong SoTuan × 7 ngày = Hiện tại; sau ngày cuối = Đã kết thúc. Chưa có ngày tuần 1 = Chưa cấu hình, không suy đoán trạng thái từ tên hoặc năm học. Đơn giá hiển thị theo nhóm hàng nghìn `635,000 đ`, ngày hiển thị dd/MM/yyyy, giờ đăng ký là giờ Việt Nam.
+
+JavaScript: `wwwroot/js/term-configuration.js`. CSS bổ sung có scope term-toolbar/term-table trong academic.css, không đổi danh mục phòng hoặc bảng điều phối lớp.
+
+Kiểm tra riêng phân hệ (không phụ thuộc các test Portal cũ):
+
+```
+dotnet run --project tests/SemesterConfiguration.Checks/SemesterConfiguration.Checks.csproj
+node tests/SemesterConfiguration.Checks/term-form.checks.cjs
+python tests/SemesterConfiguration.Checks/http.checks.py
+```
+
+Kiểm thử SQL tạo/xóa CSDL tạm riêng; kiểm tra HTTP dùng build `.verification/QL_DiemSV.dll`, tự chạy server localhost:5284 và luôn dừng đúng process trong finally. Không dừng dotnet watch đang chạy của người dùng.

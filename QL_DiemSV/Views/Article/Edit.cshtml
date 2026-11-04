@@ -1,17 +1,331 @@
 @model QL_DiemSV.ViewModels.ArticleEditViewModel
 @using QL_DiemSV.Services
-@{ViewData["Title"]=Model.Id==0?"Thêm bài viết":"Sửa bài viết";}
-<div class="academic"><div class="section-heading"><div><p class="muted">Biên tập nội dung / @(Model.Id==0?"Bài mới":"Chỉnh sửa")</p><h1>@ViewData["Title"]</h1></div><a href="/bai-viet" class="button secondary">← Danh sách bài viết</a></div>
-<form method="post" action="/bai-viet/luu" enctype="multipart/form-data" class="panel" id="article-form">@Html.AntiForgeryToken()<input asp-for="Id" type="hidden" /><div asp-validation-summary="All" class="error notice" role="alert"></div>
-<label>Tiêu đề<input asp-for="TieuDe" maxlength="250" required /></label>
-<div class="toolbar" style="margin-top:16px"><label>Danh mục<select asp-for="DanhMuc">@foreach(var c in PortalRules.Categories){<option value="@c.Key">@c.Value</option>}</select></label><label>Đơn vị / Khoa / Người đăng<input asp-for="DonViDang" required maxlength="200" /></label><label>Trạng thái<select asp-for="TrangThai"><option value="BanNhap">Bản nháp</option><option value="DaXuatBan">Đã xuất bản</option></select></label><label><span>Ưu tiên</span><span><input asp-for="GhimDauTrang" /> Ghim đầu trang</span></label></div>
-<label>Tóm tắt<textarea asp-for="TomTat" maxlength="1000" rows="3" class="article-textarea"></textarea></label>
-<label style="margin-top:16px">Nội dung bài viết (Rich Text)</label><div class="rich-toolbar" role="toolbar" aria-label="Định dạng nội dung"><button type="button" data-command="bold" class="secondary"><b>B</b></button><button type="button" data-command="italic" class="secondary"><i>I</i></button><button type="button" data-command="underline" class="secondary"><u>U</u></button><button type="button" data-command="insertUnorderedList" class="secondary">• Danh sách</button><button type="button" data-command="insertOrderedList" class="secondary">1. Danh sách</button><button type="button" id="editor-link" class="secondary">Liên kết</button></div>
-<div id="rich-editor" class="rich-editor" contenteditable="true" role="textbox" aria-label="Nội dung bài viết" aria-multiline="true">@Html.Raw(PortalRules.SanitizeHtml(Model.NoiDung))</div>
-<textarea asp-for="NoiDung" id="article-html" rows="10" class="article-textarea" aria-label="Nội dung HTML dự phòng"></textarea>
-<noscript><p class="notice muted">Nhập HTML vào ô Nội dung HTML bên dưới khi JavaScript bị tắt.</p></noscript>
-<div class="toolbar" style="margin-top:16px"><label>URL ảnh thumbnail (HTTPS hoặc /images/)<input asp-for="ThumbnailUrl" maxlength="500" placeholder="/images/portal-news.svg" /></label><label>File đính kèm (tối đa 5 MB)<input asp-for="File" type="file" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg" /></label></div>
-@if(Model.CurrentAttachment!=null){<p class="notice">Tệp hiện tại: @Model.CurrentAttachment <label><span><input asp-for="RemoveAttachment" /> Gỡ tệp hiện tại</span></label></p>}
-<p class="notice muted">Bản nháp chỉ hiển thị cho tác giả và Admin. Chọn Đã xuất bản để bài viết xuất hiện trên Portal.</p><button>Lưu bài viết</button> <a class="button secondary" href="/bai-viet">Hủy</a>
-</form></div>
-@section Scripts{<script src="~/js/article-editor.js" asp-append-version="true"></script>}
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Thêm bài viết & thông báo mới" : $"Chỉnh sửa bài viết #BV{Model.Id:D3}";
+}
+
+<div class="academic space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <p class="muted text-xs uppercase tracking-wider font-semibold">
+                Quản lý Bài viết & Thông báo / @(Model.Id == 0 ? "Soạn bài viết mới" : $"Chỉnh sửa #BV{Model.Id:D3}")
+            </p>
+            <h1 class="text-2xl font-extrabold text-text-primary flex items-center gap-2.5 mt-1">
+                <span class="p-2 rounded-xl bg-primary/15 text-primary border border-primary/30">
+                    <i data-lucide="file-pen-line" class="w-6 h-6"></i>
+                </span>
+                @ViewData["Title"]
+            </h1>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            @if (Model.Id > 0)
+            {
+                <a href="/Portal/ArticleDetail/@Model.Id" target="_blank"
+                   class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
+                    <span>👁️ Xem trên Portal</span>
+                </a>
+            }
+            <button type="button" onclick="exportEditorContentToPdf()"
+                    class="btn bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
+                <span>📄 Xuất PDF bài viết</span>
+            </button>
+            <a href="/bai-viet"
+               class="secondary text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 font-semibold">
+                <span>← Danh sách bài viết</span>
+            </a>
+        </div>
+    </div>
+
+    <form method="post" action="/bai-viet/luu" enctype="multipart/form-data" class="panel space-y-5" id="article-form">
+        @Html.AntiForgeryToken()
+        <input asp-for="Id" type="hidden" />
+        <div asp-validation-summary="All" class="error notice" role="alert"></div>
+
+        <!-- Hàng 1: Tiêu đề bài viết -->
+        <div>
+            <label class="block text-xs font-bold text-text-primary uppercase tracking-wider mb-1.5">
+                Tiêu đề bài viết <span class="text-rose-400">*</span>
+            </label>
+            <input asp-for="TieuDe" id="editor-input-title" maxlength="250" required
+                   placeholder="VD: Thông báo nghỉ lớp Tổ chức và cấu trúc máy tính (IT010.R12) ngày 20/11/2026..."
+                   class="input-field w-full text-base font-semibold py-2.5" />
+        </div>
+
+        <!-- Hàng 2: Danh mục, Hệ đào tạo, Khoa/Đơn vị đăng, Ngày đăng, Trạng thái, Ghim -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Danh mục bài viết <span class="text-rose-400">*</span></label>
+                <select asp-for="DanhMuc" id="editor-input-category" class="input-field w-full text-sm">
+                    @foreach (var c in PortalRules.Categories)
+                    {
+                        <option value="@c.Key">@c.Value</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Hệ đào tạo</label>
+                <select asp-for="HeDaoTao" id="editor-input-program" class="input-field w-full text-sm">
+                    @foreach (var prog in PortalRules.TrainingPrograms)
+                    {
+                        <option value="@prog">@prog</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Khoa / Đơn vị đăng <span class="text-rose-400">*</span></label>
+                <input asp-for="DonViDang" id="editor-input-unit" list="unit-suggestions" required maxlength="200"
+                       placeholder="Chọn hoặc nhập tên Khoa / Phòng ban..."
+                       class="input-field w-full text-sm" />
+                <datalist id="unit-suggestions">
+                    @foreach (var dept in Model.Departments)
+                    {
+                        <option value="@dept"></option>
+                    }
+                </datalist>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Ngày đăng bài viết</label>
+                <input type="date" name="NgayDang" id="editor-input-date"
+                       value="@(Model.NgayDang?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"))"
+                       class="input-field w-full text-sm" />
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Trạng thái xuất bản</label>
+                <select asp-for="TrangThai" class="input-field w-full text-sm">
+                    <option value="DaXuatBan">🌐 Đã xuất bản (Hiện trên Portal)</option>
+                    <option value="BanNhap">📝 Bản nháp (Lưu nội bộ)</option>
+                </select>
+            </div>
+
+            <div class="flex items-end pb-1">
+                <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-2 rounded-xl bg-canvas border border-surface-hover w-full">
+                    <input asp-for="GhimDauTrang" type="checkbox" class="w-4 h-4 accent-blue-500" />
+                    <span class="text-xs font-semibold text-text-primary">📌 Ghim ưu tiên đầu trang</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Hàng 3: Tóm tắt ngắn -->
+        <div>
+            <label class="block text-xs text-text-muted mb-1">
+                Tóm tắt ngắn (Không bắt buộc — Nếu để trống hệ thống sẽ tự trích từ nội dung)
+            </label>
+            <textarea asp-for="TomTat" maxlength="1000" rows="2"
+                      placeholder="Nhập 1–2 câu tóm tắt nội dung chính của thông báo..."
+                      class="input-field w-full text-sm"></textarea>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TRÌNH SOẠN THẢO VĂN BẢN GIỐNG MICROSOFT WORD (WYSIWYG EDITOR)       -->
+        <!-- =================================================================== -->
+        <div class="space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <label class="text-xs font-bold text-text-primary uppercase tracking-wider">
+                    Soạn thảo Nội dung Chi tiết (Word-like Rich Text Editor) <span class="text-rose-400">*</span>
+                </label>
+
+                <!-- Cụm nút Chèn mẫu nhanh (Thông báo Nghỉ - Bù, Học phí, Học bổng) -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" id="btn-template-nghibu"
+                            class="btn bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/40 text-xs px-3 py-1.5 rounded-lg font-bold transition-colors">
+                        📋 Chèn mẫu Thông báo Nghỉ - Bù
+                    </button>
+                    <button type="button" id="btn-template-hocphi"
+                            class="btn bg-sky-500/15 hover:bg-sky-500 text-sky-300 hover:text-white border border-sky-500/30 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                        💰 Chèn mẫu Thông báo Học phí
+                    </button>
+                </div>
+            </div>
+
+            <!-- Thanh công cụ định dạng kiểu Microsoft Word -->
+            <div class="p-2.5 rounded-t-xl bg-canvas border border-surface-hover flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Thanh công cụ soạn thảo văn bản">
+                <!-- Font chữ -->
+                <select id="word-font-family" class="input-field py-1 px-2 text-xs" title="Chọn Font chữ">
+                    <option value="Inter, sans-serif">Font: Inter (Mặc định)</option>
+                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="Roboto, sans-serif">Roboto</option>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                </select>
+
+                <!-- Kiểu đoạn / Tiêu đề -->
+                <select id="word-format-block" class="input-field py-1 px-2 text-xs" title="Kiểu đoạn văn">
+                    <option value="P">Đoạn văn chuẩn</option>
+                    <option value="H2">Tiêu đề lớn (H2)</option>
+                    <option value="H3">Tiêu đề mục (H3)</option>
+                    <option value="H4">Tiêu đề phụ (H4)</option>
+                    <option value="BLOCKQUOTE">Trích dẫn</option>
+                </select>
+
+                <!-- Cỡ chữ -->
+                <select id="word-font-size" class="input-field py-1 px-2 text-xs" title="Cỡ chữ">
+                    <option value="3">Cỡ chữ: 14pt (Chuẩn)</option>
+                    <option value="2">12pt (Nhỏ)</option>
+                    <option value="4">16pt (Vừa)</option>
+                    <option value="5">20pt (Lớn)</option>
+                    <option value="6">24pt (Rất lớn)</option>
+                </select>
+
+                <span class="h-5 w-px bg-surface-hover mx-0.5"></span>
+
+                <!-- B / I / U / S -->
+                <button type="button" data-command="bold" class="secondary px-2.5 py-1 rounded text-xs font-bold" title="In đậm (Ctrl+B)"><b>B</b></button>
+                <button type="button" data-command="italic" class="secondary px-2.5 py-1 rounded text-xs italic" title="In nghiêng (Ctrl+I)"><i>I</i></button>
+                <button type="button" data-command="underline" class="secondary px-2.5 py-1 rounded text-xs underline" title="Gạch chân (Ctrl+U)"><u>U</u></button>
+                <button type="button" data-command="strikeThrough" class="secondary px-2.5 py-1 rounded text-xs line-through" title="Gạch ngang"><s>S</s></button>
+
+                <span class="h-5 w-px bg-surface-hover mx-0.5"></span>
+
+                <!-- Màu chữ & Màu nền -->
+                <label class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface border border-surface-hover text-xs cursor-pointer" title="Màu chữ">
+                    <span>A</span>
+                    <input type="color" id="word-fore-color" value="#1d4ed8" class="w-4 h-4 border-0 bg-transparent cursor-pointer" />
+                </label>
+                <label class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface border border-surface-hover text-xs cursor-pointer" title="Màu tô sáng nền chữ">
+                    <span>🖍️</span>
+                    <input type="color" id="word-hilite-color" value="#fef08a" class="w-4 h-4 border-0 bg-transparent cursor-pointer" />
+                </label>
+
+                <span class="h-5 w-px bg-surface-hover mx-0.5"></span>
+
+                <!-- Căn lề: Trái, Giữa, Phải, Đều 2 bên -->
+                <button type="button" data-command="justifyLeft" class="secondary px-2 py-1 rounded text-xs" title="Căn lề trái">⬅ Trái</button>
+                <button type="button" data-command="justifyCenter" class="secondary px-2 py-1 rounded text-xs" title="Căn giữa">↔ Giữa</button>
+                <button type="button" data-command="justifyRight" class="secondary px-2 py-1 rounded text-xs" title="Căn lề phải">➡ Phải</button>
+                <button type="button" data-command="justifyFull" class="secondary px-2 py-1 rounded text-xs" title="Căn đều 2 bên">☰ Đều</button>
+
+                <span class="h-5 w-px bg-surface-hover mx-0.5"></span>
+
+                <!-- Danh sách & Thụt lề -->
+                <button type="button" data-command="insertUnorderedList" class="secondary px-2 py-1 rounded text-xs" title="Danh sách dấu đầu dòng">• Danh sách</button>
+                <button type="button" data-command="insertOrderedList" class="secondary px-2 py-1 rounded text-xs" title="Danh sách đánh số">1. Đánh số</button>
+
+                <span class="h-5 w-px bg-surface-hover mx-0.5"></span>
+
+                <!-- Chèn Bảng, Liên kết, Ảnh, Đường kẻ ngang, Xóa định dạng -->
+                <button type="button" id="word-insert-table" class="secondary px-2.5 py-1 rounded text-xs" title="Chèn bảng">⊞ Bảng</button>
+                <button type="button" id="editor-link" class="secondary px-2.5 py-1 rounded text-xs" title="Chèn liên kết">🔗 Link</button>
+                <button type="button" id="word-insert-image" class="secondary px-2.5 py-1 rounded text-xs" title="Chèn hình ảnh">🖼️ Ảnh</button>
+                <button type="button" data-command="insertHorizontalRule" class="secondary px-2 py-1 rounded text-xs" title="Chèn đường kẻ ngang">― Kẻ ngang</button>
+                <button type="button" data-command="removeFormat" class="secondary px-2 py-1 rounded text-xs" title="Xóa định dạng">橡 Xóa ĐD</button>
+                <button type="button" id="word-toggle-source" class="secondary px-2.5 py-1 rounded text-xs ml-auto" title="Chuyển đổi xem mã nguồn HTML">&lt;/&gt; HTML</button>
+            </div>
+
+            <!-- Vùng trang giấy soạn thảo WYSIWYG chuẩn Dark Mode -->
+            <div id="rich-editor"
+                 class="rich-editor min-h-[380px] p-6 rounded-b-xl border border-t-0 border-surface-hover bg-[#0f172a] text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-primary/40 prose max-w-none article-rich-text"
+                 style="background-color:#0f172a; color:#cbd5e1; font-size:15px; line-height:1.75;"
+                 contenteditable="true"
+                 role="textbox"
+                 aria-label="Nội dung bài viết"
+                 aria-multiline="true">@Html.Raw(PortalRules.SanitizeHtml(Model.NoiDung))</div>
+
+            <textarea asp-for="NoiDung" id="article-html" rows="12"
+                      class="input-field w-full font-mono text-xs"
+                      aria-label="Nội dung HTML dự phòng"></textarea>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- ẢNH ĐẠI DIỆN / BANNER & TẢI LÊN / TRÍCH XUẤT FILE PDF ĐÍNH KÈM       -->
+        <!-- =================================================================== -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-surface-hover">
+            <!-- Cột trái: Ảnh đại diện / Banner -->
+            <div class="p-4 rounded-xl bg-canvas border border-surface-hover space-y-2.5">
+                <label class="block text-xs font-bold text-text-primary uppercase tracking-wider">
+                    🖼️ Ảnh đại diện / Mẫu Banner hiển thị trên Portal
+                </label>
+                <input asp-for="ThumbnailUrl" id="editor-input-thumb" maxlength="500"
+                       placeholder="Để trống để dùng Banner tự động theo Danh mục (hoặc nhập /images/portal-news.svg)"
+                       class="input-field w-full text-xs" />
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-text-muted">Chọn nhanh:</span>
+                    <button type="button" onclick="document.getElementById('editor-input-thumb').value=''"
+                            class="secondary px-2.5 py-1 rounded text-xs">
+                        🗓️ Banner tự động theo Danh mục (Khuyên dùng)
+                    </button>
+                    <button type="button" onclick="document.getElementById('editor-input-thumb').value='/images/portal-news.svg'"
+                            class="secondary px-2.5 py-1 rounded text-xs">
+                        📰 Banner Tin tức & Sự kiện
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cột phải: Đính kèm File PDF / Import nội dung từ PDF -->
+            <div class="p-4 rounded-xl bg-canvas border border-surface-hover space-y-2.5">
+                <label class="block text-xs font-bold text-text-primary uppercase tracking-wider">
+                    📄 Đính kèm File PDF / Nhập nội dung từ PDF (Tối đa 8 MB)
+                </label>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input asp-for="File" id="editor-file-upload" type="file"
+                           accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg"
+                           onchange="onEditorAttachmentSelected(this)"
+                           class="input-field text-xs flex-1" />
+                    <button type="button" id="btn-extract-pdf-to-editor" onclick="extractSelectedPdfToEditor()"
+                            class="btn bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-white border border-amber-500/30 text-xs px-3 py-2 rounded-lg font-semibold">
+                        ⚡ Trích xuất chữ từ PDF vào Editor
+                    </button>
+                </div>
+                <p id="editor-pdf-extract-status" class="text-[11px] text-text-muted">
+                    Hỗ trợ đính kèm file <code>.pdf</code>, <code>.docx</code>, <code>.xlsx</code>, <code>.png</code>, <code>.jpg</code>. Nếu chọn file PDF, bấm "Trích xuất chữ từ PDF" để chép tự động nội dung vào trình soạn thảo.
+                </p>
+
+                @if (Model.CurrentAttachment != null)
+                {
+                    <div class="p-2.5 rounded-lg bg-surface border border-surface-hover flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <a href="@Model.CurrentAttachmentUrl" target="_blank" class="text-sky-400 hover:underline font-semibold">
+                            📎 Tệp hiện tại: @Model.CurrentAttachment (@PortalRules.Size(Model.CurrentAttachmentSize ?? 0))
+                        </a>
+                        <label class="inline-flex items-center gap-1.5 text-rose-400 cursor-pointer">
+                            <input asp-for="RemoveAttachment" type="checkbox" />
+                            <span>Gỡ tệp đính kèm này</span>
+                        </label>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Nút Lưu / Hủy -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-surface-hover">
+            <p class="text-xs text-text-muted">
+                💡 Mẹo: Sử dụng nút <strong>"📋 Chèn mẫu Thông báo Nghỉ - Bù"</strong> để tạo nhanh bảng thông báo nghỉ/bù học chuẩn.
+            </p>
+            <div class="flex items-center gap-2.5">
+                <a class="secondary text-xs px-4 py-2.5 rounded-xl font-semibold" href="/bai-viet">Hủy</a>
+                <button type="submit" class="btn bg-primary hover:bg-primary/90 text-white text-xs px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20">
+                    💾 Lưu & Xuất bản bài viết
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Khung ẩn xuất PDF từ trình soạn thảo -->
+<div class="hidden">
+    <div id="editor-pdf-staging" style="padding: 24px; font-family: 'Times New Roman', serif; color: #111827; background: #ffffff; width: 750px;">
+        <div style="display:flex; justify-content:space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 18px;">
+            <div>
+                <div style="font-size:12px; font-weight:bold;">HỆ THỐNG QUẢN LÝ ĐÀO TẠO ACADEMIC LEDGER</div>
+                <div id="editor-pdf-unit" style="font-size:13px; font-weight:bold; color:#1d4ed8;"></div>
+            </div>
+            <div style="text-align:right; font-size:12px;">
+                <div><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></div>
+                <div><em>Độc lập - Tự do - Hạnh phúc</em></div>
+            </div>
+        </div>
+        <h1 id="editor-pdf-title" style="font-size:20px; font-weight:bold; line-height:1.35; margin: 0 0 12px 0; color:#111827;"></h1>
+        <div id="editor-pdf-content" style="font-size:14px; line-height:1.75; color:#111827;"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="~/js/article-editor.js" asp-append-version="true"></script>
+}

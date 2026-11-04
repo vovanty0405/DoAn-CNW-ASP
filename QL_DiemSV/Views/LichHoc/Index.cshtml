@@ -1,50 +1,739 @@
 @model QL_DiemSV.ViewModels.ScheduleEditorViewModel
 @using QL_DiemSV.Models
 @using QL_DiemSV.Services
-@{ViewData["Title"]="Điều phối lịch học"; var s=Model.Section; var hk=s.HocKy; var config=Model.ConfigurationTerm;}
-<div class="academic"><div><p class="muted">Quản lý đào tạo / Admin</p><h1>Điều phối lịch học & Phòng học</h1></div>
-@if(TempData["Error"] is string error){<p class="notice error" role="alert">@error</p>}
-@if(TempData["Message"] is string message){<p class="notice success" role="status">@message</p>}
-<section class="panel"><div class="toolbar"><form method="get"><input type="hidden" name="configHK" value="@config?.MaHK" /><label>Lớp học phần<select name="id" onchange="this.form.submit()">@foreach(var l in Model.Sections){<option value="@l.MaLHP" selected="@(l.MaLHP==s.MaLHP)">@l.MaLHP · @l.TenLopHP</option>}</select></label></form><a class="button secondary" href="/quan-ly-lich-hoc/ma-tran?maHK=@s.MaHK">Ma trận điều phối phòng</a><a class="button secondary" href="/lop-hoc-phan">Quản lý lớp học phần</a></div>
-@if(!string.IsNullOrEmpty(s.MaLHP)) {
-<form method="post" action="/quan-ly-lich-hoc/luu" id="schedule-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@s.MaLHP" /><input type="hidden" name="configHK" value="@config?.MaHK" />
-<div class="toolbar"><label>NMH<input name="nmh" value="@s.NMH" required maxlength="10" /></label><label>Tổ thực hành<input name="tth" value="@s.TTH" maxlength="10" /></label><label>STC<input name="stc" type="number" min="0" max="30" value="@s.STC" required /></label><label>STCHP<input name="stchp" type="number" step="0.01" min="0" max="100" value="@s.STCHP.ToString(System.Globalization.CultureInfo.InvariantCulture)" required /></label><label>Mã lớp hành chính<select name="maLop"><option value="">-- Chưa phân lớp hành chính --</option>@foreach(var classroom in Model.AdministrativeClasses){<option value="@classroom.MaLop" selected="@(classroom.MaLop==s.MaLop)">@classroom.MaLop - @classroom.TenLop</option>}</select></label><label>Sĩ số tối đa<input name="capacity" type="number" min="1" value="@s.SiSoToiDa" required /></label></div>
-<div class="scroll"><table class="editor"><thead><tr><th>TH</th><th>Thứ</th><th>Tiết BĐ</th><th>Số tiết</th><th>Phòng</th><th>Giảng viên</th><th>Loại lịch</th><th>Tuần học</th><th>Tuần báo nghỉ</th><th>Xóa</th></tr></thead><tbody id="schedule-rows">
-@foreach(var l in s.LichHocs.OrderBy(x=>x.Thu).ThenBy(x=>x.TietBatDau)) {
-<tr><td><input type="hidden" data-field="MaLHP" value="@s.MaLHP" /><input data-field="LoaiBuoiHoc" type="checkbox" value="true" checked="@l.LoaiBuoiHoc" aria-label="Thực hành" /></td><td><select data-field="Thu">@for(int d=2;d<=8;d++){<option value="@d" selected="@(d==l.Thu)">@QL_DiemSV.Services.ScheduleRules.DayName(d)</option>}</select></td><td><input data-field="TietBatDau" type="number" min="1" max="12" value="@l.TietBatDau" required /></td><td><input data-field="SoTiet" type="number" min="1" max="12" value="@l.SoTiet" required /></td><td><select data-field="PhongHoc" required>@foreach(var r in Model.Rooms){<option value="@r.MaPhong" selected="@(r.MaPhong==l.PhongHoc)">@r.MaPhong (@r.SucChua) · @RoomMatrixRules.Statuses.GetValueOrDefault(r.TrangThai,r.TrangThai)</option>}</select></td><td><select data-field="MaGV" required>@foreach(var t in Model.Teachers){<option value="@t.MaGV" selected="@(t.MaGV==l.MaGV)">@t.HoTen</option>}</select></td><td><select data-field="LoaiLich">@foreach(var type in RoomMatrixRules.ScheduleTypes){<option value="@type.Key" selected="@(type.Key==l.LoaiLich)">@type.Value</option>}</select></td><td><input data-field="ChuoiTuanHoc" value="@l.ChuoiTuanHoc" required maxlength="200" /></td><td><input data-field="TuanBaoNghi" value="@l.TuanBaoNghi" maxlength="200" placeholder="VD: 3,5" aria-label="Tuần báo nghỉ" /></td><td><button type="button" class="secondary" onclick="this.closest('tr').remove()">Xóa</button></td></tr>
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Điều phối lịch học & Phòng học";
+    var s = Model.Section;
+    var hk = s.HocKy;
+    var config = Model.ConfigurationTerm;
+    var scheduledSections = Model.Sections.Where(x => x.LichHocs.Count > 0).ToList();
+    var unscheduledSections = Model.Sections.Where(x => x.LichHocs.Count == 0).ToList();
+
+    string FormatCohortLabel(string cohort)
+    {
+        if (string.IsNullOrWhiteSpace(cohort)) return "";
+        if (cohort.Length >= 4 && cohort.StartsWith("20") && char.IsDigit(cohort[2]) && char.IsDigit(cohort[3]))
+        {
+            return $"K{cohort.Substring(2, 2)} ({cohort})";
+        }
+        return cohort;
+    }
+
+    var sectionsClientData = Model.Sections.ToDictionary(
+        sec => sec.MaLHP,
+        sec => new
+        {
+            maLHP = sec.MaLHP,
+            tenLopHP = sec.TenLopHP ?? sec.MonHoc?.TenMon ?? sec.MaLHP,
+            tenMon = sec.MonHoc?.TenMon ?? "",
+            maHK = sec.MaHK ?? "",
+            tenHK = sec.HocKy != null ? $"{sec.HocKy.TenHK} ({sec.HocKy.NamHocBatDau}-{sec.HocKy.NamHocKetThuc})" : (sec.MaHK ?? ""),
+            soTuan = sec.HocKy?.SoTuan ?? 15,
+            nmh = string.IsNullOrWhiteSpace(sec.NMH) ? "01" : sec.NMH,
+            tth = sec.TTH ?? "",
+            stc = sec.STC > 0 ? sec.STC : (sec.MonHoc?.SoTinChi ?? 3),
+            stchp = (sec.STCHP > 0 ? sec.STCHP : (sec.MonHoc?.SoTinChi ?? 3)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            maLop = sec.MaLop ?? "",
+            siSoToiDa = sec.SiSoToiDa ?? 40,
+            maGV = sec.MaGV ?? "",
+            schedules = sec.LichHocs.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau).Select(l => new
+            {
+                loaiBuoiHoc = l.LoaiBuoiHoc,
+                thu = l.Thu,
+                tietBatDau = l.TietBatDau,
+                soTiet = l.SoTiet,
+                phongHoc = l.PhongHoc,
+                maGV = l.MaGV,
+                loaiLich = l.LoaiLich,
+                chuoiTuanHoc = l.ChuoiTuanHoc,
+                tuanBaoNghi = l.TuanBaoNghi ?? ""
+            }).ToList()
+        }
+    );
 }
-</tbody></table></div>
-<p class="notice muted">Tuần học: nhập số hoặc khoảng, ví dụ 1-5,8,10-12. Thứ Hai = 2, Chủ nhật = 8. Hệ thống kiểm tra giao nhau theo tuần; cảnh báo khi vượt sức chứa phòng.</p>
-<div class="toolbar"><button type="button" id="add-schedule" class="secondary">+ Thêm buổi học</button><button>Lưu thông tin & Lịch học</button></div></form>
-<template id="schedule-template"><tr><td><input type="hidden" data-field="MaLHP" value="@s.MaLHP" /><input data-field="LoaiBuoiHoc" type="checkbox" value="true" aria-label="Thực hành" /></td><td><select data-field="Thu">@for(int d=2;d<=8;d++){<option value="@d">@QL_DiemSV.Services.ScheduleRules.DayName(d)</option>}</select></td><td><input data-field="TietBatDau" type="number" min="1" max="12" value="1" required /></td><td><input data-field="SoTiet" type="number" min="1" max="12" value="3" required /></td><td><select data-field="PhongHoc" required>@foreach(var r in Model.Rooms){<option value="@r.MaPhong">@r.MaPhong (@r.SucChua) · @RoomMatrixRules.Statuses.GetValueOrDefault(r.TrangThai,r.TrangThai)</option>}</select></td><td><select data-field="MaGV" required>@foreach(var t in Model.Teachers){<option value="@t.MaGV">@t.HoTen</option>}</select></td><td><select data-field="LoaiLich">@foreach(var type in RoomMatrixRules.ScheduleTypes){<option value="@type.Key">@type.Value</option>}</select></td><td><input data-field="ChuoiTuanHoc" value="1-@(hk?.SoTuan ?? 20)" required maxlength="200" /></td><td><input data-field="TuanBaoNghi" maxlength="200" placeholder="VD: 3,5" aria-label="Tuần báo nghỉ" /></td><td><button type="button" class="secondary" onclick="this.closest('tr').remove()">Xóa</button></td></tr></template>
-}else{<p class="muted">Hãy tạo lớp học phần trước khi xếp lịch.</p>}
-</section>
-<section class="panel" id="rooms">
-<div class="section-heading"><div><p class="muted">Danh mục cơ sở vật chất</p><h2>Khai báo phòng học</h2></div><span class="badge neutral">@Model.Rooms.Count phòng</span></div>
-<form method="post" action="/quan-ly-lich-hoc/phong" id="room-form" class="toolbar">
-@Html.AntiForgeryToken()<input type="hidden" name="id" value="@s.MaLHP" /><input type="hidden" name="configHK" value="@config?.MaHK" /><input type="hidden" name="originalMaPhong" />
-<label>Mã phòng<input name="maPhong" required maxlength="50" placeholder="VD: NA301" /></label>
-<label>Tòa nhà / Khu vực<select name="toaNha">@foreach(var b in RoomMatrixRules.Buildings){<option value="@b.Key" selected="@(b.Key=="Khac")">@b.Value</option>}</select></label>
-<label>Sức chứa<input name="sucChua" type="number" min="1" max="10000" required value="40" /></label>
-<label>Trạng thái<select name="trangThai">@foreach(var status in RoomMatrixRules.Statuses){<option value="@status.Key">@status.Value</option>}</select></label>
-<button id="room-save">Thêm phòng</button><button type="button" class="secondary" id="room-cancel" hidden>Hủy sửa</button>
-</form>
-<p id="room-edit-message" class="notice muted" role="status">Chọn Sửa để cập nhật hoặc đổi mã phòng. Mã phòng mới sẽ được cập nhật vào lịch đang liên kết.</p>
-<div class="scroll"><table><thead><tr><th>Mã phòng</th><th>Tòa nhà</th><th>Sức chứa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
-@foreach(var room in Model.Rooms){<tr><td><strong>@room.MaPhong</strong></td><td>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha,room.ToaNha)</td><td>@room.SucChua</td><td><span class="badge @(room.TrangThai=="HoatDong"?"active":room.TrangThai=="BaoTri"?"maintenance":"locked")">@RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai,room.TrangThai)</span></td><td><div class="row-actions"><button type="button" class="secondary room-edit" data-code="@room.MaPhong" data-building="@room.ToaNha" data-capacity="@room.SucChua" data-status="@room.TrangThai">Sửa</button><form method="post" action="/quan-ly-lich-hoc/phong/xoa" class="room-delete">@Html.AntiForgeryToken()<input type="hidden" name="maPhong" value="@room.MaPhong" /><input type="hidden" name="id" value="@s.MaLHP" /><input type="hidden" name="configHK" value="@config?.MaHK" /><button class="danger" aria-label="Xóa phòng @room.MaPhong">Xóa</button></form></div></td></tr>}
-@if(Model.Rooms.Count==0){<tr><td colspan="5" class="empty-state">Chưa có phòng học. Thêm phòng để bắt đầu xếp lịch.</td></tr>}
-</tbody></table></div>
-</section>
-<section class="panel" id="term-config"><div class="section-heading"><div><p class="muted">Thời gian và học phí</p><h2>Cấu hình Học kỳ</h2></div></div>
-<form method="get" action="/quan-ly-lich-hoc#term-config" class="toolbar"><input type="hidden" name="id" value="@s.MaLHP" /><label>Chọn học kỳ cấu hình<select name="configHK" onchange="this.form.submit()">@foreach(var term in Model.Terms){<option value="@term.MaHK" selected="@(term.MaHK==config?.MaHK)">@term.TenHK · @term.NamHocBatDau-@term.NamHocKetThuc</option>}</select></label><button class="secondary">Tải cấu hình</button></form>
-@if(config!=null){
-<p class="notice muted">Đang cấu hình: @config.TenHK · @config.NamHocBatDau-@config.NamHocKetThuc</p>
-<form method="post" action="/quan-ly-lich-hoc/hoc-ky" class="toolbar">@Html.AntiForgeryToken()<input type="hidden" name="maHK" value="@config.MaHK" /><input type="hidden" name="id" value="@s.MaLHP" />
-<label>Ngày bắt đầu tuần 1 (Thứ Hai)<input name="ngayBatDauTuan1" type="date" value="@config.NgayBatDauTuan1?.ToString("yyyy-MM-dd")" required /></label>
-<label>Số tuần<input name="soTuan" type="number" min="1" max="52" value="@config.SoTuan" required /></label>
-<label>Bắt đầu đăng ký (giờ VN)<input name="batDauDangKy" type="datetime-local" value="@config.BatDauDangKy?.ToString("yyyy-MM-ddTHH:mm")" required /></label>
-<label>Kết thúc đăng ký (giờ VN)<input name="ketThucDangKy" type="datetime-local" value="@config.KetThucDangKy?.ToString("yyyy-MM-ddTHH:mm")" required /></label>
-<label>Đơn giá tín chỉ (VNĐ)<input name="donGiaTinChi" type="number" min="0" max="100000000" step="0.01" value="@config.DonGiaTinChi.ToString(System.Globalization.CultureInfo.InvariantCulture)" required /></label><button>Lưu cấu hình học kỳ</button></form>
-}else{<p class="empty-state">Chưa có học kỳ. Hãy tạo học kỳ tại màn hình quản lý lớp học phần.</p>}
-</section></div>
-@section Scripts{<script src="~/js/schedule-admin.js" asp-append-version="true"></script>}
+
+<div class="academic space-y-6">
+    <!-- Header & Quick Navigation -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+            <p class="muted text-xs uppercase tracking-wider font-semibold">Quản lý đào tạo / Điều phối lịch & Phòng học</p>
+            <h1 class="text-2xl font-extrabold text-text-primary flex items-center gap-2.5 mt-1">
+                <span class="p-2 rounded-xl bg-primary/15 text-primary border border-primary/30">
+                    <i data-lucide="calendar-cog" class="w-6 h-6"></i>
+                </span>
+                Điều phối lịch học & Phòng học
+            </h1>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a class="btn bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5"
+               href="/thoi-khoa-bieu?maHK=@s.MaHK">
+                <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+                <span>Xem Thời Khóa Biểu</span>
+            </a>
+            <a class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5"
+               href="/quan-ly-lich-hoc/ma-tran?maHK=@s.MaHK&viewMode=week">
+                <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400"></i>
+                <span>Ma trận điều phối phòng</span>
+            </a>
+            <a class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5"
+               href="/lop-hoc-phan">
+                <i data-lucide="layers" class="w-4 h-4 text-sky-400"></i>
+                <span>Quản lý lớp học phần</span>
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="p-4 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-sm flex items-center gap-2.5" role="alert">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 shrink-0"></i>
+            <span>@error</span>
+        </div>
+    }
+    @if (TempData["Message"] is string message)
+    {
+        <div class="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2.5" role="status">
+            <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400 shrink-0"></i>
+            <span>@message</span>
+        </div>
+    }
+
+    <!-- ===================================================================== -->
+    <!-- PHẦN 1: BẢNG DANH SÁCH LỚP HỌC PHẦN & THÔNG TIN BUỔI HỌC              -->
+    <!-- ===================================================================== -->
+    <section class="panel space-y-4">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-surface-hover pb-4">
+            <div>
+                <h2 class="text-lg font-bold text-text-primary flex items-center gap-2">
+                    <i data-lucide="calendar-check-2" class="w-5 h-5 text-primary"></i>
+                    Danh sách Lớp học phần & Thông tin Buổi học
+                </h2>
+                <p class="text-xs text-text-muted mt-0.5">
+                    Quản lý tập trung lịch học các lớp học phần. Nhấn <strong>"✏️ Sửa buổi học"</strong> ở dòng bất kỳ để mở biểu mẫu điều phối chi tiết.
+                </p>
+            </div>
+
+            <!-- KPI Badges -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="px-3 py-1.5 rounded-xl bg-canvas border border-surface-hover text-xs font-semibold text-text-primary">
+                    Tổng: <strong>@Model.Sections.Count</strong> lớp
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
+                    Đã xếp lịch: <strong>@scheduledSections.Count</strong> lớp
+                </span>
+                <span class="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs font-semibold text-amber-400">
+                    Chưa xếp lịch: <strong>@unscheduledSections.Count</strong> lớp
+                </span>
+            </div>
+        </div>
+
+        <!-- Thanh công cụ lọc: Học kỳ, Khoa, Khóa, Trạng thái buổi học, Tìm kiếm nhanh -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Lọc theo Học kỳ</label>
+                <select id="grid-filter-hk" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                    <option value="">Tất cả Học kỳ (@Model.Sections.Count)</option>
+                    @foreach (var term in Model.Terms)
+                    {
+                        var cnt = Model.Sections.Count(x => x.MaHK == term.MaHK);
+                        <option value="@term.MaHK">@term.TenHK (@term.NamHocBatDau-@term.NamHocKetThuc) [@cnt]</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Lọc theo Khoa</label>
+                <select id="grid-filter-khoa" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                    <option value="">Tất cả Khoa</option>
+                    @foreach (var fac in Model.Faculties)
+                    {
+                        <option value="@fac.MaKhoa">@fac.TenKhoa</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Lọc theo Khóa</label>
+                <select id="grid-filter-khoahoc" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                    <option value="">Tất cả Khóa</option>
+                    @foreach (var cohort in Model.Cohorts)
+                    {
+                        <option value="@cohort">@FormatCohortLabel(cohort)</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Trạng thái buổi học</label>
+                <select id="grid-filter-status" onchange="filterScheduleTable()" class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full">
+                    <option value="ALL">Tất cả (@Model.Sections.Count lớp)</option>
+                    <option value="SCHEDULED">Đã xếp lịch (@scheduledSections.Count lớp)</option>
+                    <option value="UNSCHEDULED">Chưa xếp lịch (@unscheduledSections.Count lớp)</option>
+                </select>
+            </div>
+
+            <div class="sm:col-span-2">
+                <label class="block text-xs text-text-muted mb-1">Tìm kiếm nhanh (Mã LHP, Môn học, Phòng, Giảng viên)</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="grid-filter-search" oninput="filterScheduleTable()"
+                           placeholder="Nhập Mã LHP (VD: LHP002), tên môn, phòng, giảng viên..."
+                           class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full" />
+                    <button type="button" onclick="resetScheduleFilter()" class="secondary px-3 py-2 rounded-xl text-xs whitespace-nowrap">
+                        Đặt lại
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bảng Danh sách Lớp học phần -->
+        <div class="scroll pt-1">
+            <table id="schedule-sections-table" class="w-full text-sm">
+                <thead>
+                    <tr>
+                        <th class="whitespace-nowrap">Mã LHP</th>
+                        <th>Tên lớp học phần / Môn học</th>
+                        <th>Học kỳ & Lớp HC</th>
+                        <th class="text-center whitespace-nowrap">Sĩ số</th>
+                        <th>Tóm tắt lịch học</th>
+                        <th class="text-right whitespace-nowrap">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Sections)
+                    {
+                        var hasSchedule = item.LichHocs.Count > 0;
+                        var tenMon = item.MonHoc?.TenMon ?? item.TenLopHP ?? item.MaLHP;
+                        var tenLop = item.TenLopHP ?? tenMon;
+                        var hkName = item.HocKy != null ? $"{item.HocKy.TenHK} ({item.HocKy.NamHocBatDau}-{item.HocKy.NamHocKetThuc})" : (item.MaHK ?? "---");
+                        var stcVal = item.STC > 0 ? item.STC : (item.MonHoc?.SoTinChi ?? 3);
+                        var nmhVal = string.IsNullOrWhiteSpace(item.NMH) ? "01" : item.NMH;
+
+                        var adminClass = Model.AdministrativeClasses.FirstOrDefault(c => c.MaLop == item.MaLop)
+                                         ?? item.KetQuaHocTaps.Select(k => k.SinhVien?.LopHanhChinh).FirstOrDefault(c => c != null);
+                        var maLopHC = !string.IsNullOrWhiteSpace(item.MaLop) ? item.MaLop : (adminClass?.MaLop ?? "");
+                        var maKhoa = item.MonHoc?.MaKhoa ?? adminClass?.Nganh?.MaKhoa ?? "";
+                        var tenKhoa = item.MonHoc?.Khoa?.TenKhoa ?? Model.Faculties.FirstOrDefault(f => f.MaKhoa == maKhoa)?.TenKhoa ?? "";
+                        var nienKhoa = adminClass?.NienKhoa ?? "";
+                        var cohortLabel = FormatCohortLabel(nienKhoa);
+
+                        var roomsJoined = string.Join(" ", item.LichHocs.Select(l => l.PhongHoc));
+                        var teachersJoined = string.Join(" ", item.LichHocs.Select(l => l.GiangVien?.HoTen ?? l.MaGV));
+                        var searchBlob = $"{item.MaLHP} {tenLop} {tenMon} {item.MaMon} {maLopHC} {tenKhoa} {nienKhoa} {cohortLabel} {roomsJoined} {teachersJoined} {hkName}".ToLowerInvariant();
+
+                        <tr class="schedule-section-row hover:bg-surface-hover/40 transition-colors"
+                            data-hk="@item.MaHK"
+                            data-khoa="@maKhoa"
+                            data-khoahoc="@nienKhoa"
+                            data-scheduled="@(hasSchedule ? "true" : "false")"
+                            data-search="@searchBlob">
+                            <!-- Cột 1: Mã LHP -->
+                            <td class="whitespace-nowrap align-middle">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-primary/15 text-primary border border-primary/30">
+                                    @item.MaLHP
+                                </span>
+                            </td>
+
+                            <!-- Cột 2: Tên lớp học phần / Môn học -->
+                            <td class="align-middle">
+                                <div class="font-bold text-text-primary">@tenLop</div>
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-surface text-text-muted border border-surface-hover">
+                                        Nhóm @nmhVal
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                        @stcVal TC
+                                    </span>
+                                    @if (!string.IsNullOrWhiteSpace(item.MaMon))
+                                    {
+                                        <span class="text-xs text-text-muted">• Mã môn: @item.MaMon</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <!-- Cột 3: Học kỳ & Lớp HC -->
+                            <td class="align-middle">
+                                <div class="text-xs font-semibold text-text-primary">@hkName</div>
+                                <div class="text-xs text-text-muted mt-0.5 flex flex-wrap items-center gap-1">
+                                    @if (!string.IsNullOrWhiteSpace(maLopHC))
+                                    {
+                                        <span class="text-sky-400 font-medium">@maLopHC</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Chưa gán lớp HC</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(tenKhoa))
+                                    {
+                                        <span>• @tenKhoa</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(cohortLabel))
+                                    {
+                                        <span>• @cohortLabel</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <!-- Cột 4: Sĩ số -->
+                            <td class="text-center whitespace-nowrap align-middle">
+                                <span class="px-2.5 py-1 rounded-lg bg-canvas border border-surface-hover text-xs font-semibold text-text-primary">
+                                    @item.KetQuaHocTaps.Count/@(item.SiSoToiDa ?? 40)
+                                </span>
+                            </td>
+
+                            <!-- Cột 5: Tóm tắt lịch học -->
+                            <td class="align-middle">
+                                @if (hasSchedule)
+                                {
+                                    <div class="space-y-1.5">
+                                        @foreach (var buoi in item.LichHocs.OrderBy(x => x.Thu).ThenBy(x => x.TietBatDau))
+                                        {
+                                            var tietKetThuc = buoi.TietBatDau + buoi.SoTiet - 1;
+                                            <div class="flex flex-wrap items-center gap-1.5 text-xs bg-canvas/80 border border-surface-hover rounded-lg px-2.5 py-1.5">
+                                                <span class="font-bold text-primary">
+                                                    @ScheduleRules.DayName(buoi.Thu) • Tiết @buoi.TietBatDau–@tietKetThuc
+                                                </span>
+                                                <span class="text-text-muted">•</span>
+                                                <span class="text-text-primary font-medium">Phòng @buoi.PhongHoc</span>
+                                                <span class="text-text-muted">•</span>
+                                                <span class="text-text-muted">GV: <strong class="text-text-primary">@(buoi.GiangVien?.HoTen ?? buoi.MaGV)</strong></span>
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold @(buoi.LoaiBuoiHoc ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400")">
+                                                    @(buoi.LoaiBuoiHoc ? "Thực hành" : "Lý thuyết")
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge maintenance">Chưa xếp lịch</span>
+                                }
+                            </td>
+
+                            <!-- Cột 6: Thao tác -->
+                            <td class="text-right whitespace-nowrap align-middle">
+                                <div class="inline-flex items-center justify-end gap-1.5">
+                                    <a href="/thoi-khoa-bieu?maHK=@item.MaHK&maLHP=@item.MaLHP&mode=week"
+                                       class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"
+                                       title="Xem trên Thời khóa biểu">
+                                        <span>📅 Xem trên TKB</span>
+                                    </a>
+
+                                    <button type="button"
+                                            onclick="openScheduleModal('@item.MaLHP')"
+                                            class="btn bg-primary/15 hover:bg-primary text-primary hover:text-white border border-primary/30 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors inline-flex items-center gap-1">
+                                        <span>✏️ Sửa buổi học</span>
+                                    </button>
+
+                                    @if (hasSchedule)
+                                    {
+                                        <form method="post" action="/quan-ly-lich-hoc/xoa-lich" class="inline"
+                                              onsubmit="return confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch học đã xếp của lớp @item.MaLHP (@tenLop)?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.MaLHP" />
+                                            <input type="hidden" name="configHK" value="@config?.MaHK" />
+                                            <button type="submit"
+                                                    class="danger text-xs px-2.5 py-1.5 rounded-lg font-semibold inline-flex items-center gap-1"
+                                                    title="Xóa lịch học của lớp @item.MaLHP">
+                                                <span>🗑️ Xóa</span>
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" disabled
+                                                class="secondary opacity-40 cursor-not-allowed text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"
+                                                title="Lớp học phần này chưa có lịch học để xóa">
+                                            <span>🗑️ Xóa</span>
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="schedule-table-empty" class="hidden py-10 text-center text-sm text-text-muted">
+            Không tìm thấy lớp học phần nào khớp với điều kiện lọc hiện tại. Nhấn <strong>"Đặt lại"</strong> để hiển thị toàn bộ danh sách.
+        </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- POPUP MODAL: BIỂU MẪU ĐIỀU PHỐI CHI TIẾT                              -->
+    <!-- ===================================================================== -->
+    <div id="schedule-editor-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+        <div class="panel w-full max-w-6xl bg-surface border border-surface-hover rounded-2xl shadow-2xl p-6 space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-4 border-b border-surface-hover pb-4">
+                <div>
+                    <p class="muted text-xs uppercase font-semibold tracking-wider">Biểu mẫu điều phối chi tiết</p>
+                    <h2 class="text-xl font-extrabold text-text-primary mt-0.5" id="modal-schedule-title">
+                        Thiết lập Buổi học Lớp học phần
+                    </h2>
+                    <p class="text-xs text-text-muted mt-1" id="modal-schedule-subtitle"></p>
+                </div>
+                <button type="button" onclick="closeScheduleModal()"
+                        class="p-2 rounded-xl bg-canvas hover:bg-surface-hover text-text-muted hover:text-text-primary border border-surface-hover transition-colors"
+                        aria-label="Đóng hộp thoại">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body Form -->
+            <form method="post" action="/quan-ly-lich-hoc/luu" id="schedule-form" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="modal-input-id" value="@s.MaLHP" />
+                <input type="hidden" name="configHK" value="@config?.MaHK" />
+
+                <div class="toolbar">
+                    <label>NMH<input name="nmh" id="modal-input-nmh" value="@s.NMH" required maxlength="10" /></label>
+                    <label>Tổ thực hành<input name="tth" id="modal-input-tth" value="@s.TTH" maxlength="10" /></label>
+                    <label>STC<input name="stc" id="modal-input-stc" type="number" min="0" max="30" value="@s.STC" required /></label>
+                    <label>STCHP<input name="stchp" id="modal-input-stchp" type="number" step="0.01" min="0" max="100" value="@s.STCHP.ToString(System.Globalization.CultureInfo.InvariantCulture)" required /></label>
+                    <label>
+                        Mã lớp hành chính
+                        <select name="maLop" id="modal-input-maLop">
+                            <option value="">-- Chưa phân lớp hành chính --</option>
+                            @foreach (var classroom in Model.AdministrativeClasses)
+                            {
+                                <option value="@classroom.MaLop">@classroom.MaLop - @classroom.TenLop</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Sĩ số tối đa<input name="capacity" id="modal-input-capacity" type="number" min="1" value="@(s.SiSoToiDa ?? 40)" required /></label>
+                </div>
+
+                <div class="scroll">
+                    <table class="editor">
+                        <thead>
+                            <tr>
+                                <th>TH</th>
+                                <th>Thứ</th>
+                                <th>Tiết BĐ</th>
+                                <th>Số tiết</th>
+                                <th>Phòng</th>
+                                <th>Giảng viên</th>
+                                <th>Loại lịch</th>
+                                <th>Tuần học</th>
+                                <th>Tuần báo nghỉ</th>
+                                <th>Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-rows">
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="notice muted">
+                    Tuần học: nhập số hoặc khoảng, ví dụ <code>1-5,8,10-12</code>. Thứ Hai = 2, Chủ nhật = 8. Hệ thống kiểm tra giao nhau theo tuần; cảnh báo khi vượt sức chứa phòng.
+                </p>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-surface-hover">
+                    <button type="button" id="add-schedule" class="secondary">+ Thêm buổi học</button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="secondary" onclick="closeScheduleModal()">Đóng</button>
+                        <button type="submit">💾 Lưu thông tin & Lịch học</button>
+                    </div>
+                </div>
+            </form>
+
+            <template id="schedule-template">
+                <tr>
+                    <td>
+                        <input type="hidden" data-field="MaLHP" value="" />
+                        <input data-field="LoaiBuoiHoc" type="checkbox" value="true" aria-label="Thực hành" />
+                    </td>
+                    <td>
+                        <select data-field="Thu">
+                            @for (int d = 2; d <= 8; d++)
+                            {
+                                <option value="@d">@QL_DiemSV.Services.ScheduleRules.DayName(d)</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input data-field="TietBatDau" type="number" min="1" max="12" value="1" required /></td>
+                    <td><input data-field="SoTiet" type="number" min="1" max="12" value="3" required /></td>
+                    <td>
+                        <select data-field="PhongHoc" required>
+                            @foreach (var r in Model.Rooms)
+                            {
+                                <option value="@r.MaPhong">@r.MaPhong (@r.SucChua) · @RoomMatrixRules.Statuses.GetValueOrDefault(r.TrangThai, r.TrangThai)</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <select data-field="MaGV" required>
+                            @foreach (var t in Model.Teachers)
+                            {
+                                <option value="@t.MaGV">@t.HoTen</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <select data-field="LoaiLich">
+                            @foreach (var type in RoomMatrixRules.ScheduleTypes)
+                            {
+                                <option value="@type.Key">@type.Value</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input data-field="ChuoiTuanHoc" value="1-15" required maxlength="200" /></td>
+                    <td><input data-field="TuanBaoNghi" maxlength="200" placeholder="VD: 3,5" aria-label="Tuần báo nghỉ" /></td>
+                    <td><button type="button" class="secondary" onclick="this.closest('tr').remove()">Xóa</button></td>
+                </tr>
+            </template>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PHẦN 2: KHAI BÁO PHÒNG HỌC                                            -->
+    <!-- ===================================================================== -->
+    <section class="panel" id="rooms">
+        <div class="section-heading">
+            <div>
+                <p class="muted">Danh mục cơ sở vật chất</p>
+                <h2>Khai báo phòng học</h2>
+            </div>
+            <span class="badge neutral">@Model.Rooms.Count phòng</span>
+        </div>
+        <form method="post" action="/quan-ly-lich-hoc/phong" id="room-form" class="toolbar">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@s.MaLHP" />
+            <input type="hidden" name="configHK" value="@config?.MaHK" />
+            <input type="hidden" name="originalMaPhong" />
+            <label>Mã phòng<input name="maPhong" required maxlength="50" placeholder="VD: NA301" /></label>
+            <label>
+                Tòa nhà / Khu vực
+                <select name="toaNha">
+                    @foreach (var b in RoomMatrixRules.Buildings)
+                    {
+                        <option value="@b.Key" selected="@(b.Key == "Khac")">@b.Value</option>
+                    }
+                </select>
+            </label>
+            <label>Sức chứa<input name="sucChua" type="number" min="1" max="10000" required value="40" /></label>
+            <label>
+                Trạng thái
+                <select name="trangThai">
+                    @foreach (var status in RoomMatrixRules.Statuses)
+                    {
+                        <option value="@status.Key">@status.Value</option>
+                    }
+                </select>
+            </label>
+            <button id="room-save">Thêm phòng</button>
+            <button type="button" class="secondary" id="room-cancel" hidden>Hủy sửa</button>
+        </form>
+        <p id="room-edit-message" class="notice muted" role="status">
+            Chọn Sửa để cập nhật hoặc đổi mã phòng. Mã phòng mới sẽ được cập nhật vào lịch đang liên kết.
+        </p>
+        <div class="scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã phòng</th>
+                        <th>Tòa nhà</th>
+                        <th>Sức chứa</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var room in Model.Rooms)
+                    {
+                        <tr>
+                            <td><strong>@room.MaPhong</strong></td>
+                            <td>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha, room.ToaNha)</td>
+                            <td>@room.SucChua</td>
+                            <td>
+                                <span class="badge @(room.TrangThai == "HoatDong" ? "active" : room.TrangThai == "BaoTri" ? "maintenance" : "locked")">
+                                    @RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai, room.TrangThai)
+                                </span>
+                            </td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="secondary room-edit"
+                                            data-code="@room.MaPhong"
+                                            data-building="@room.ToaNha"
+                                            data-capacity="@room.SucChua"
+                                            data-status="@room.TrangThai">
+                                        Sửa
+                                    </button>
+                                    <form method="post" action="/quan-ly-lich-hoc/phong/xoa" class="room-delete">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="maPhong" value="@room.MaPhong" />
+                                        <input type="hidden" name="id" value="@s.MaLHP" />
+                                        <input type="hidden" name="configHK" value="@config?.MaHK" />
+                                        <button class="danger" aria-label="Xóa phòng @room.MaPhong">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Rooms.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="empty-state">Chưa có phòng học. Thêm phòng để bắt đầu xếp lịch.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- PHẦN 3: CẤU HÌNH HỌC KỲ                                               -->
+    <!-- ===================================================================== -->
+    <partial name="_TermConfiguration" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/schedule-admin.js" asp-append-version="true"></script>
+    <script src="~/js/term-configuration.js" asp-append-version="true"></script>
+    <script>
+        const SECTIONS_DATA = @Html.Raw(JsonSerializer.Serialize(sectionsClientData));
+
+        function filterScheduleTable() {
+            const hk = document.getElementById('grid-filter-hk')?.value || '';
+            const khoa = document.getElementById('grid-filter-khoa')?.value || '';
+            const khoahoc = document.getElementById('grid-filter-khoahoc')?.value || '';
+            const status = document.getElementById('grid-filter-status')?.value || 'ALL';
+            const q = (document.getElementById('grid-filter-search')?.value || '').trim().toLowerCase();
+
+            const rows = document.querySelectorAll('.schedule-section-row');
+            let visible = 0;
+
+            rows.forEach(row => {
+                const rowHk = row.getAttribute('data-hk') || '';
+                const rowKhoa = row.getAttribute('data-khoa') || '';
+                const rowKhoahoc = row.getAttribute('data-khoahoc') || '';
+                const isScheduled = row.getAttribute('data-scheduled') === 'true';
+                const search = row.getAttribute('data-search') || '';
+
+                let match = true;
+                if (hk && rowHk !== hk) match = false;
+                if (khoa && rowKhoa !== khoa) match = false;
+                if (khoahoc && rowKhoahoc !== khoahoc) match = false;
+                if (status === 'SCHEDULED' && !isScheduled) match = false;
+                if (status === 'UNSCHEDULED' && isScheduled) match = false;
+                if (q && !search.includes(q)) match = false;
+
+                row.classList.toggle('hidden', !match);
+                if (match) visible++;
+            });
+
+            const emptyEl = document.getElementById('schedule-table-empty');
+            if (emptyEl) {
+                emptyEl.classList.toggle('hidden', visible > 0);
+            }
+        }
+
+        function resetScheduleFilter() {
+            document.getElementById('grid-filter-hk').value = '';
+            document.getElementById('grid-filter-khoa').value = '';
+            document.getElementById('grid-filter-khoahoc').value = '';
+            document.getElementById('grid-filter-status').value = 'ALL';
+            document.getElementById('grid-filter-search').value = '';
+            filterScheduleTable();
+        }
+
+        function createScheduleRowElement(maLHP, rowData, defaultWeeks, defaultMaGV) {
+            const tpl = document.getElementById('schedule-template');
+            const fragment = tpl.content.cloneNode(true);
+            const tr = fragment.querySelector('tr');
+
+            tr.querySelector('[data-field="MaLHP"]').value = maLHP;
+
+            const loaiBuoiHocEl = tr.querySelector('[data-field="LoaiBuoiHoc"]');
+            const thuEl = tr.querySelector('[data-field="Thu"]');
+            const tietBDEl = tr.querySelector('[data-field="TietBatDau"]');
+            const soTietEl = tr.querySelector('[data-field="SoTiet"]');
+            const phongEl = tr.querySelector('[data-field="PhongHoc"]');
+            const gvEl = tr.querySelector('[data-field="MaGV"]');
+            const loaiLichEl = tr.querySelector('[data-field="LoaiLich"]');
+            const tuanHocEl = tr.querySelector('[data-field="ChuoiTuanHoc"]');
+            const tuanNghiEl = tr.querySelector('[data-field="TuanBaoNghi"]');
+
+            if (rowData) {
+                loaiBuoiHocEl.checked = !!rowData.loaiBuoiHoc;
+                thuEl.value = String(rowData.thu || 2);
+                tietBDEl.value = rowData.tietBatDau || 1;
+                soTietEl.value = rowData.soTiet || 3;
+                if (rowData.phongHoc) phongEl.value = rowData.phongHoc;
+                if (rowData.maGV) gvEl.value = rowData.maGV;
+                if (rowData.loaiLich) loaiLichEl.value = rowData.loaiLich;
+                tuanHocEl.value = rowData.chuoiTuanHoc || defaultWeeks;
+                tuanNghiEl.value = rowData.tuanBaoNghi || '';
+            } else {
+                tuanHocEl.value = defaultWeeks;
+                if (defaultMaGV) gvEl.value = defaultMaGV;
+            }
+
+            return tr;
+        }
+
+        function openScheduleModal(maLHP) {
+            const sec = SECTIONS_DATA[maLHP];
+            if (!sec) return;
+
+            document.getElementById('modal-input-id').value = sec.maLHP;
+            document.getElementById('modal-input-nmh').value = sec.nmh || '01';
+            document.getElementById('modal-input-tth').value = sec.tth || '';
+            document.getElementById('modal-input-stc').value = sec.stc ?? 3;
+            document.getElementById('modal-input-stchp').value = sec.stchp ?? '3';
+            document.getElementById('modal-input-maLop').value = sec.maLop || '';
+            document.getElementById('modal-input-capacity').value = sec.siSoToiDa || 40;
+
+            document.getElementById('modal-schedule-title').innerHTML =
+                `Thiết lập Buổi học: <span class="text-primary">${sec.maLHP} — ${sec.tenLopHP}</span>`;
+            document.getElementById('modal-schedule-subtitle').textContent =
+                `Học kỳ: ${sec.tenHK} • Nhóm ${sec.nmh} • ${sec.stc} tín chỉ`;
+
+            const defaultWeeks = `1-${sec.soTuan || 15}`;
+            const tpl = document.getElementById('schedule-template');
+            if (tpl) {
+                const tplMaLHP = tpl.content.querySelector('[data-field="MaLHP"]');
+                if (tplMaLHP) tplMaLHP.value = sec.maLHP;
+                const tplWeeks = tpl.content.querySelector('[data-field="ChuoiTuanHoc"]');
+                if (tplWeeks) tplWeeks.value = defaultWeeks;
+            }
+
+            const tbody = document.getElementById('schedule-rows');
+            tbody.innerHTML = '';
+
+            if (sec.schedules && sec.schedules.length > 0) {
+                sec.schedules.forEach(item => {
+                    tbody.appendChild(createScheduleRowElement(sec.maLHP, item, defaultWeeks, sec.maGV));
+                });
+            } else {
+                tbody.appendChild(createScheduleRowElement(sec.maLHP, null, defaultWeeks, sec.maGV));
+            }
+
+            const modal = document.getElementById('schedule-editor-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function closeScheduleModal() {
+            const modal = document.getElementById('schedule-editor-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            filterScheduleTable();
+            if (window.lucide) lucide.createIcons();
+
+            const modal = document.getElementById('schedule-editor-modal');
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeScheduleModal();
+                });
+            }
+        });
+    </script>
+}

@@ -1,0 +1,13 @@
+@model QL_DiemSV.ViewModels.CurriculumDetailViewModel
+@using QL_DiemSV.Services
+@{Layout="_PortalLayout";var c=Model.Curriculum;ViewData["Title"]=c.TenChuongTrinh;}
+<link rel="stylesheet" href="~/css/curriculum.css" asp-append-version="true" />
+<div class="curriculum-detail-page">
+<a href="/Portal/Curriculums">← Quay lại danh sách chương trình</a><h1>@c.TenChuongTrinh ngành @c.NganhHoc?.TenNganh (Khóa @c.KhoaHoc)</h1><p>Hệ @c.HeDaoTao</p>
+@if(!c.TrangThai){<p class="portal-alert">Bản ẩn — chỉ Admin xem được.</p>}
+<nav class="curriculum-pills">@foreach(var group in Model.Alternatives.GroupBy(x=>x.KhoaHoc)){var target=group.FirstOrDefault(x=>x.TenChuongTrinh==c.TenChuongTrinh)??group.First();<a class="@(group.Key==c.KhoaHoc?"selected":"")" href="/Portal/CurriculumDetail/@target.Id">@group.Key</a>}</nav>
+<nav class="curriculum-pills">@foreach(var alt in Model.Alternatives.Where(x=>x.KhoaHoc==c.KhoaHoc)){<a class="@(alt.Id==c.Id?"selected":"")" href="/Portal/CurriculumDetail/@alt.Id">@alt.TenChuongTrinh</a>}</nav>
+<div class="curriculum-sections">@for(int n=1;n<=11;n++){var section=c.Sections.FirstOrDefault(x=>x.ThuTu==n);<details class="curriculum-section"><summary><span class="section-number">@n</span><strong>@CurriculumRules.Titles[n-1]</strong><i>⌄</i></summary><div class="article-content curriculum-content curriculum-section-content">@if(string.IsNullOrWhiteSpace(section?.NoiDung)){<p>Nội dung đang được cập nhật.</p>}else{@Html.Raw(PortalRules.SanitizeHtml(section.NoiDung))}</div></details>}</div>
+</div>
+<script src="~/js/curriculum-tables.js" asp-append-version="true"></script>
+<script src="~/js/curriculum.js" asp-append-version="true"></script>

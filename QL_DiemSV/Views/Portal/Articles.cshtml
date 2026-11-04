@@ -1,0 +1,201 @@
+@model QL_DiemSV.ViewModels.PortalArticlesViewModel
+@using QL_DiemSV.Services
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = "Tất cả bài viết & Thông báo";
+    int startItem = Model.Total == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    int endItem = Math.Min(Model.Total, Model.Page * Model.PageSize);
+}
+
+<section class="portal-articles-page">
+    <!-- Đầu trang: Bên trái Tiêu đề lớn + Tổng số bài viết | Bên phải Ô tìm kiếm bo tròn -->
+    <div class="articles-page-header">
+        <div>
+            <h1 class="articles-page-title">Bài viết</h1>
+            <p class="articles-page-count"><strong id="live-article-count">@Model.Total</strong> bài viết</p>
+        </div>
+
+        <form method="get" action="/Portal/Articles" class="articles-search-round" id="portal-articles-search-form">
+            <input type="hidden" name="category" value="@Model.Category" />
+            <input type="text"
+                   name="search"
+                   id="portal-articles-search-input"
+                   value="@Model.Search"
+                   oninput="filterPortalCardsRealtime(this.value)"
+                   placeholder="Tìm kiếm bài viết..."
+                   aria-label="Tìm kiếm bài viết" />
+            <button type="submit" aria-label="Tìm kiếm">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+        </form>
+    </div>
+
+    <!-- Thanh lọc Danh mục dạng Pill Buttons -->
+    <nav class="articles-pill-bar" aria-label="Lọc danh mục bài viết">
+        <a class="pill-btn @(Model.Category == "all" ? "active" : "")"
+           href="@Url.Action("Articles", "Portal", new { category = "all", search = Model.Search })">
+            Tất cả
+        </a>
+        @foreach (var cat in PortalRules.Categories)
+        {
+            <a class="pill-btn @(Model.Category == cat.Key ? "active" : "")"
+               href="@Url.Action("Articles", "Portal", new { category = cat.Key, search = Model.Search })">
+                @cat.Value
+            </a>
+        }
+    </nav>
+
+    <!-- Lưới hiển thị dạng Thẻ Card 3 cột (3-column Card Grid) -->
+    <div class="articles-card-grid-3" id="portal-articles-card-grid">
+        @foreach (var article in Model.Articles)
+        {
+            var localDate = PortalRules.Local(article.NgayDang);
+            var catLabel = PortalRules.Categories.GetValueOrDefault(article.DanhMuc, article.DanhMuc);
+            var programLabel = string.IsNullOrWhiteSpace(article.HeDaoTao) ? "Đại học chính quy" : article.HeDaoTao;
+            var hasCustomThumb = PortalRules.SafeUrl(article.ThumbnailUrl, true) && article.DanhMuc != "NghiBu";
+            var bannerTitle = PortalRules.CategoryBannerTitle(article.DanhMuc);
+            var searchText = $"{article.TieuDe} {catLabel} {programLabel} {article.DonViDang} {localDate:dd/MM/yyyy}".ToLowerInvariant();
+
+            <a href="/Portal/ArticleDetail/@article.Id"
+               class="portal-article-card"
+               data-search="@searchText">
+                <!-- Phần ảnh bìa (Thumbnail) phía trên Card -->
+                <div class="portal-card-thumb">
+                    @if (hasCustomThumb)
+                    {
+                        <img src="@article.ThumbnailUrl" alt="@article.TieuDe" loading="lazy" />
+                    }
+                    else if (article.DanhMuc == "NghiBu")
+                    {
+                        <!-- Banner minh họa mặc định cho Thông báo Nghỉ - Bù: Biểu tượng tờ lịch cam + dòng chữ "Thông báo nghỉ lớp" -->
+                        <div class="default-banner banner-nghibu">
+                            <div class="calendar-illust">
+                                <div class="cal-top"><span></span><span></span></div>
+                                <div class="cal-body">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 14l2 2 4-4"/></svg>
+                                </div>
+                            </div>
+                            <div class="banner-text">
+                                <strong>Thông báo nghỉ lớp</strong>
+                                <small>@article.DonViDang</small>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Banner minh họa mặc định theo từng danh mục -->
+                        <div class="default-banner banner-cat-@article.DanhMuc.ToLowerInvariant()">
+                            <div class="calendar-illust cat-icon-box">
+                                <div class="cal-top"><span></span><span></span></div>
+                                <div class="cal-body">
+                                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </div>
+                            </div>
+                            <div class="banner-text">
+                                <strong>@bannerTitle</strong>
+                                <small>@article.DonViDang</small>
+                            </div>
+                        </div>
+                    }
+                    @if (PortalRules.IsNew(article.NgayDang))
+                    {
+                        <span class="card-new-badge">MỚI</span>
+                    }
+                </div>
+
+                <!-- Phần thân Card -->
+                <div class="portal-card-body">
+                    <!-- Hàng badge: 2 pill badges viền xanh nhạt -->
+                    <div class="portal-card-badges">
+                        <span class="pill-outline-blue">@catLabel</span>
+                        <span class="pill-outline-blue">@programLabel</span>
+                    </div>
+
+                    <!-- Tiêu đề bài viết in đậm (giới hạn 2 dòng line-clamp-2) -->
+                    <h3 class="portal-card-title" title="@article.TieuDe">
+                        @if (article.GhimDauTrang)
+                        {
+                            <span title="Bài viết ghim">📌 </span>
+                        }
+                        @article.TieuDe
+                    </h3>
+
+                    <!-- Ngày đăng ở dưới cùng -->
+                    <div class="portal-card-footer">
+                        <time datetime="@article.NgayDang.ToString("O")">@localDate.ToString("dd/MM/yyyy")</time>
+                        <span class="card-unit-label">@article.DonViDang</span>
+                    </div>
+                </div>
+            </a>
+        }
+    </div>
+
+    @if (Model.Articles.Count == 0)
+    {
+        <div class="portal-panel" style="text-align:center; padding:48px 24px;">
+            <p class="portal-empty" style="font-size:15px;">Không tìm thấy bài viết nào phù hợp với điều kiện lọc hiện tại.</p>
+            <a href="/Portal/Articles" class="portal-button" style="margin-top:12px;">Xem tất cả bài viết</a>
+        </div>
+    }
+
+    <!-- Cuối trang: Thanh Phân trang (Pagination) đầy đủ -->
+    <div class="articles-pagination-bar">
+        <div class="pagination-summary">
+            Hiển thị <strong>@startItem–@endItem</strong> trên tổng số <strong>@Model.Total</strong> bài viết
+        </div>
+
+        <div class="pagination-controls" role="navigation" aria-label="Phân trang danh sách bài viết">
+            @if (Model.Page > 1)
+            {
+                <a class="page-btn" href="@Url.Action("Articles", "Portal", new { category = Model.Category, search = Model.Search, page = 1 })" title="Trang đầu">« Đầu</a>
+                <a class="page-btn" href="@Url.Action("Articles", "Portal", new { category = Model.Category, search = Model.Search, page = Model.Page - 1 })" title="Trang trước">‹ Trước</a>
+            }
+            else
+            {
+                <span class="page-btn disabled">« Đầu</span>
+                <span class="page-btn disabled">‹ Trước</span>
+            }
+
+            @{
+                int startPage = Math.Max(1, Model.Page - 2);
+                int endPage = Math.Min(Model.TotalPages, startPage + 4);
+                if (endPage - startPage < 4) startPage = Math.Max(1, endPage - 4);
+            }
+            @for (int p = startPage; p <= endPage; p++)
+            {
+                <a class="page-btn @(p == Model.Page ? "active" : "")"
+                   href="@Url.Action("Articles", "Portal", new { category = Model.Category, search = Model.Search, page = p })">
+                    @p
+                </a>
+            }
+
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a class="page-btn" href="@Url.Action("Articles", "Portal", new { category = Model.Category, search = Model.Search, page = Model.Page + 1 })" title="Trang sau">Sau ›</a>
+                <a class="page-btn" href="@Url.Action("Articles", "Portal", new { category = Model.Category, search = Model.Search, page = Model.TotalPages })" title="Trang cuối">Cuối »</a>
+            }
+            else
+            {
+                <span class="page-btn disabled">Sau ›</span>
+                <span class="page-btn disabled">Cuối »</span>
+            }
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        function filterPortalCardsRealtime(keyword) {
+            const q = (keyword || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('#portal-articles-card-grid .portal-article-card');
+            let visible = 0;
+            cards.forEach(c => {
+                const text = c.getAttribute('data-search') || '';
+                const match = !q || text.includes(q);
+                c.style.display = match ? 'flex' : 'none';
+                if (match) visible++;
+            });
+        }
+    </script>
+}
+

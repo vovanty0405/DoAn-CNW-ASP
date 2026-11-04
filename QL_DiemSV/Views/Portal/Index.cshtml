@@ -1,16 +1,254 @@
 @model QL_DiemSV.ViewModels.PortalViewModel
 @using QL_DiemSV.Services
-@{Layout="_PortalLayout";ViewData["Title"]="Cổng thông tin đào tạo";}
-<section class="portal-hero"><div><span class="eyebrow">STUDENT & LECTURER PORTAL</span><h1>Hành trình học tập.<br />Kết nối mỗi ngày.</h1><p>Thông báo, lịch học và chương trình đào tạo — mọi thông tin bạn cần trong một không gian.</p><a href="#articles" class="hero-link">Khám phá thông tin mới ↓</a></div><div class="hero-graphic" aria-hidden="true"><span>ACADEMIC<br /><b>LEDGER</b></span><i>Tri thức mở lối tương lai</i></div></section>
-<section class="quick-actions" aria-label="Truy cập nhanh">@foreach(var item in new[]{("▦","Lịch phòng học","/quan-ly-lich-hoc/ma-tran"),("◷","Tra cứu TKB","/portal/tra-cuu-tkb"),("▤","Chương trình ĐT","#curriculum"),("▧","Văn bản - Biểu mẫu","#documents"),("✎","Đăng ký học phần","/dang-ky-hoc-phan"),("✉","Liên hệ","#contact")}){<a href="@item.Item3"><span aria-hidden="true">@item.Item1</span><strong>@item.Item2</strong><small>Truy cập →</small></a>}</section>
-<section class="portal-panel" id="articles"><div class="portal-heading"><h2>📢 BÀI VIẾT</h2><a href="/portal?category=all#articles">Xem tất cả →</a></div>
-<nav class="article-tabs" aria-label="Danh mục bài viết"><a class="@(Model.Category=="all"?"active":"")" href="@Url.Action("Index",new{category="all",search=Model.Search})#articles">Tất cả <span>@Model.Counts.Values.Sum()</span></a>@foreach(var c in PortalRules.Categories){<a class="@(Model.Category==c.Key?"active":"")" href="@Url.Action("Index",new{category=c.Key,search=Model.Search})#articles">@c.Value <span>@Model.Counts.GetValueOrDefault(c.Key)</span></a>}</nav>
-<form method="get" class="portal-search"><input type="hidden" name="category" value="@Model.Category" /><input name="search" value="@Model.Search" placeholder="Tìm thông báo, học phí, hướng dẫn…" aria-label="Tìm bài viết" /><button>Tìm kiếm</button></form>
-<div class="article-grid">@foreach(var article in Model.Articles){var date=PortalRules.Local(article.NgayDang);<article class="article-item"><div class="date-tile"><strong>@date.ToString("dd")</strong><span>TH @date.ToString("MM")</span></div><div><h3><a href="/portal/bai-viet/@article.Id">@if(article.GhimDauTrang){<span title="Bài viết ưu tiên">📌</span>} @article.TieuDe</a>@if(PortalRules.IsNew(article.NgayDang)){<span class="new-tag">MỚI</span>}</h3><div class="article-meta"><span class="category-badge">@PortalRules.Categories.GetValueOrDefault(article.DanhMuc,article.DanhMuc)</span><span>♙ @article.DonViDang</span></div></div></article>}
-@if(Model.Articles.Count==0){<p class="portal-empty">Chưa có bài viết được xuất bản phù hợp. Vui lòng quay lại sau.</p>}</div>
-@if(Model.Total>12){<nav class="portal-pagination" aria-label="Phân trang bài viết">@if(Model.Page>1){<a href="@Url.Action("Index",new{category=Model.Category,search=Model.Search,page=Model.Page-1})#articles">← Trang trước</a>}<span>Trang @Model.Page / @((Model.Total+11)/12)</span>@if(Model.Page*12<Model.Total){<a href="@Url.Action("Index",new{category=Model.Category,search=Model.Search,page=Model.Page+1})#articles">Trang sau →</a>}</nav>}
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = "Cổng thông tin đào tạo";
+    int totalArticlesCount = Model.Counts.Values.Sum();
+}
+
+<section class="portal-hero">
+    <div>
+        <span class="eyebrow">STUDENT & LECTURER PORTAL</span>
+        <h1>Hành trình học tập.<br />Kết nối mỗi ngày.</h1>
+        <p>Thông báo, lịch học và chương trình đào tạo — mọi thông tin bạn cần trong một không gian.</p>
+        <a href="#articles" class="hero-link">Khám phá thông tin mới ↓</a>
+    </div>
+    <div class="hero-graphic" aria-hidden="true">
+        <span>ACADEMIC<br /><b>LEDGER</b></span>
+        <i>Tri thức mở lối tương lai</i>
+    </div>
 </section>
-<div class="portal-columns"><section class="portal-panel"><div class="portal-heading"><h2>TIN TỨC & SỰ KIỆN</h2><a href="/portal?category=TinTuc#articles">Tất cả tin →</a></div><div class="news-grid">@foreach(var news in Model.News){<a class="news-card" href="/portal/bai-viet/@news.Id"><img src="@(PortalRules.SafeUrl(news.ThumbnailUrl,true)?news.ThumbnailUrl:"/images/portal-news.svg")" alt="" loading="lazy" /><div><span class="news-date">@PortalRules.Local(news.NgayDang).ToString("dd/MM/yyyy")</span><h3>@news.TieuDe</h3><p>@news.TomTat</p></div></a>}@if(Model.News.Count==0){<div class="portal-empty news-empty"><img src="/images/portal-news.svg" alt="" /><p>Tin tức và sự kiện mới sẽ được cập nhật tại đây.</p></div>}</div></section>
-<aside class="portal-panel"><div class="portal-heading"><h2>📅 LỊCH PHÒNG HỌC HÔM NAY</h2></div><p class="widget-date">@RoomMatrixRules.Today.ToString("dd/MM/yyyy") · cập nhật khi tải trang</p><table class="portal-table room-widget"><thead><tr><th>PHÒNG</th><th>TIẾT TRONG NGÀY</th><th>HIỆN TẠI</th></tr></thead><tbody>@foreach(var r in Model.Rooms){<tr><td><strong>@r.Room</strong></td><td>@(string.IsNullOrEmpty(r.Periods)?"—":r.Periods)</td><td><span class="room-status @(r.Status=="Đang học"?"busy":"")">@r.Status</span></td></tr>}@if(Model.Rooms.Count==0){<tr><td colspan="3">Chưa khai báo phòng học.</td></tr>}</tbody></table><a href="/quan-ly-lich-hoc/ma-tran" class="widget-link">Xem toàn bộ lịch phòng học →</a></aside></div>
-<div class="portal-columns"><section class="portal-panel" id="curriculum"><div class="portal-heading"><h2>🎓 CHƯƠNG TRÌNH ĐÀO TẠO</h2></div>@foreach(var group in Model.Majors.GroupBy(x=>x.HeDaoTao)){<h3 class="program-group">HỆ @group.Key.ToUpper()</h3><div class="program-grid">@foreach(var major in group){<a class="program-card" href="/portal/chuong-trinh/@major.MaNganh"><span class="program-icon">▤</span><strong>@major.TenNganh</strong><small>@major.MaNganh · @major.KhungChuongTrinhs.Count môn · @major.KhungChuongTrinhs.Sum(x=>x.MonHoc?.SoTinChi??0) tín chỉ</small><span>Khám phá chương trình →</span></a>}</div>}@if(Model.Majors.Count==0){<p class="portal-empty">Chưa có ngành đào tạo trong CSDL.</p>}</section>
-<aside class="document-stack" id="documents">@foreach(var group in new[]{("QuyChe","QUY CHẾ - QUY ĐỊNH","regulations"),("BieuMau","BIỂU MẪU","forms")}){<section class="portal-panel" id="@group.Item3"><div class="portal-heading"><h2>@group.Item2</h2></div>@foreach(var doc in Model.Documents.Where(x=>x.Loai==group.Item1&&PortalRules.SafeUrl(x.FileUrl))){<a class="document-item" href="@doc.FileUrl" download><span class="file-icon">▧</span><span><strong>@doc.TieuDe</strong><small>@PortalRules.Size(doc.DungLuongBytes)</small></span><span>↓</span></a>}@if(!Model.Documents.Any(x=>x.Loai==group.Item1&&PortalRules.SafeUrl(x.FileUrl))){<p class="portal-empty">Tài liệu đang được cập nhật.</p>}</section>}</aside></div>
+
+<section class="quick-actions" aria-label="Truy cập nhanh">
+    @foreach (var item in new[]
+    {
+        ("▦", "Lịch phòng học", "/quan-ly-lich-hoc/ma-tran"),
+        ("◷", "Tra cứu TKB", "/portal/tra-cuu-tkb"),
+        ("▤", "Chương trình ĐT", "#curriculum"),
+        ("▧", "Văn bản - Biểu mẫu", "#documents"),
+        ("✎", "Đăng ký học phần", "/dang-ky-hoc-phan"),
+        ("✉", "Liên hệ", "#contact")
+    })
+    {
+        <a href="@item.Item3">
+            <span aria-hidden="true">@item.Item1</span>
+            <strong>@item.Item2</strong>
+            <small>Truy cập →</small>
+        </a>
+    }
+</section>
+
+<!-- ======================================================================= -->
+<!-- MÀN HÌNH 1: SECTION "BÀI VIẾT" MẶC ĐỊNH TRÊN TRANG CHỦ PORTAL            -->
+<!-- ======================================================================= -->
+<section class="portal-panel" id="articles">
+    <div class="portal-heading">
+        <h2>📢 BÀI VIẾT</h2>
+        <a href="/Portal/Articles" class="portal-see-all-top">Xem tất cả →</a>
+    </div>
+
+    <!-- Thanh Tabs lọc danh mục (nằm ngang, có hiển thị số lượng bài viết dạng badge bên cạnh tên tab) -->
+    <nav class="article-tabs" id="home-article-tabs" aria-label="Danh mục bài viết">
+        <a class="@(Model.Category == "all" ? "active" : "")"
+           data-tab-cat="all"
+           href="@Url.Action("Index", new { category = "all" })#articles"
+           onclick="return switchHomeArticleTab(event, 'all')">
+            Tất cả <span>@totalArticlesCount</span>
+        </a>
+        @foreach (var key in PortalRules.HomeTabKeys)
+        {
+            var label = PortalRules.Categories.GetValueOrDefault(key, key);
+            var cnt = Model.Counts.GetValueOrDefault(key, 0);
+            <a class="@(Model.Category == key ? "active" : "")"
+               data-tab-cat="@key"
+               href="@Url.Action("Index", new { category = key })#articles"
+               onclick="return switchHomeArticleTab(event, '@key')">
+                @label <span>@cnt</span>
+            </a>
+        }
+    </nav>
+
+    <!-- Lưới 2 cột (2-column grid) hiển thị tối đa 8 bài viết mới nhất -->
+    <div class="article-grid-home" id="home-articles-grid">
+        @foreach (var article in Model.AllPublishedArticles)
+        {
+            var date = PortalRules.Local(article.NgayDang);
+            var isNew = PortalRules.IsNew(article.NgayDang);
+            var catName = PortalRules.Categories.GetValueOrDefault(article.DanhMuc, article.DanhMuc);
+
+            <article class="article-item-home" data-cat="@article.DanhMuc">
+                <!-- Bên trái: Ô vuông bo góc nền xám nhạt hiển thị ngày đăng (Số ngày cỡ lớn màu đỏ + TH tháng) -->
+                <div class="date-tile-home" aria-label="Ngày đăng @date.ToString("dd/MM/yyyy")">
+                    <strong>@date.Day</strong>
+                    <span>TH @date.Month</span>
+                </div>
+
+                <!-- Bên phải: Tiêu đề + Badge MỚI + Danh mục & Đơn vị đăng -->
+                <div class="article-item-body">
+                    <h3>
+                        <a href="/Portal/ArticleDetail/@article.Id">
+                            @if (article.GhimDauTrang)
+                            {
+                                <span class="pin-indicator" title="Bài viết ghim ưu tiên">📌</span>
+                            }
+                            @article.TieuDe
+                        </a>
+                        @if (isNew)
+                        {
+                            <span class="new-tag-pink">MỚI</span>
+                        }
+                    </h3>
+
+                    <div class="article-meta-home">
+                        <span class="category-badge-gray">@catName</span>
+                        <span class="unit-author">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            @article.DonViDang
+                        </span>
+                    </div>
+                </div>
+            </article>
+        }
+    </div>
+
+    <div id="home-articles-empty" class="portal-empty" style="display:none; text-align:center;">
+        Chưa có bài viết nào thuộc danh mục này.
+    </div>
+
+    <!-- Chân khung (Footer của section): Nút/Link căn giữa Xem tất cả bài viết → -->
+    <div class="article-section-footer">
+        <a href="/Portal/Articles" id="home-see-all-footer" class="btn-see-all-articles">
+            Xem tất cả bài viết →
+        </a>
+    </div>
+</section>
+
+<div class="portal-columns">
+    <section class="portal-panel">
+        <div class="portal-heading">
+            <h2>TIN TỨC & SỰ KIỆN</h2>
+            <a href="/Portal/Articles?category=TinTuc">Tất cả tin →</a>
+        </div>
+        <div class="news-grid">
+            @foreach (var news in Model.News)
+            {
+                <a class="news-card" href="/Portal/ArticleDetail/@news.Id">
+                    <img src="@(PortalRules.SafeUrl(news.ThumbnailUrl, true) ? news.ThumbnailUrl : "/images/portal-news.svg")" alt="" loading="lazy" />
+                    <div>
+                        <span class="news-date">@PortalRules.Local(news.NgayDang).ToString("dd/MM/yyyy")</span>
+                        <h3>@news.TieuDe</h3>
+                        <p>@news.TomTat</p>
+                    </div>
+                </a>
+            }
+            @if (Model.News.Count == 0)
+            {
+                <div class="portal-empty news-empty">
+                    <img src="/images/portal-news.svg" alt="" />
+                    <p>Tin tức và sự kiện mới sẽ được cập nhật tại đây.</p>
+                </div>
+            }
+        </div>
+    </section>
+
+    <aside class="portal-panel">
+        <div class="portal-heading">
+            <h2>📅 LỊCH PHÒNG HỌC HÔM NAY</h2>
+        </div>
+        <p class="widget-date">@RoomMatrixRules.Today.ToString("dd/MM/yyyy") · cập nhật khi tải trang</p>
+        <table class="portal-table room-widget">
+            <thead>
+                <tr>
+                    <th>PHÒNG</th>
+                    <th>TIẾT TRONG NGÀY</th>
+                    <th>HIỆN TẠI</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Rooms)
+                {
+                    <tr>
+                        <td><strong>@r.Room</strong></td>
+                        <td>@(string.IsNullOrEmpty(r.Periods) ? "—" : r.Periods)</td>
+                        <td><span class="room-status @(r.Status == "Đang học" ? "busy" : "")">@r.Status</span></td>
+                    </tr>
+                }
+                @if (Model.Rooms.Count == 0)
+                {
+                    <tr><td colspan="3">Chưa khai báo phòng học.</td></tr>
+                }
+            </tbody>
+        </table>
+        <a href="/quan-ly-lich-hoc/ma-tran" class="widget-link">Xem toàn bộ lịch phòng học →</a>
+    </aside>
+</div>
+
+<div class="portal-columns">
+    <partial name="_CurriculumHome" model="Model.Curriculums" />
+
+    <aside class="document-stack" id="documents">
+        @foreach (var group in new[] { ("QuyChe", "QUY CHẾ - QUY ĐỊNH", "regulations"), ("BieuMau", "BIỂU MẪU", "forms") })
+        {
+            <section class="portal-panel" id="@group.Item3">
+                <div class="portal-heading">
+                    <h2>@group.Item2</h2>
+                </div>
+                @foreach (var doc in Model.Documents.Where(x => x.Loai == group.Item1 && PortalRules.SafeUrl(x.FileUrl)))
+                {
+                    <a class="document-item" href="@doc.FileUrl" download>
+                        <span class="file-icon">▧</span>
+                        <span>
+                            <strong>@doc.TieuDe</strong>
+                            <small>@PortalRules.Size(doc.DungLuongBytes)</small>
+                        </span>
+                        <span>↓</span>
+                    </a>
+                }
+                @if (!Model.Documents.Any(x => x.Loai == group.Item1 && PortalRules.SafeUrl(x.FileUrl)))
+                {
+                    <p class="portal-empty">Tài liệu đang được cập nhật.</p>
+                }
+            </section>
+        }
+    </aside>
+</div>
+
+@section Scripts {
+    <script>
+        function applyHomeArticleTab(cat) {
+            const tabs = document.querySelectorAll('#home-article-tabs [data-tab-cat]');
+            tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab-cat') === cat));
+
+            const items = document.querySelectorAll('#home-articles-grid .article-item-home');
+            let shown = 0;
+            items.forEach(item => {
+                const itemCat = item.getAttribute('data-cat');
+                const matches = (cat === 'all' || itemCat === cat);
+                if (matches && shown < 8) {
+                    item.style.display = 'flex';
+                    shown++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            const emptyEl = document.getElementById('home-articles-empty');
+            if (emptyEl) emptyEl.style.display = shown === 0 ? 'block' : 'none';
+
+            const footerLink = document.getElementById('home-see-all-footer');
+            if (footerLink) {
+                footerLink.href = cat === 'all' ? '/Portal/Articles' : `/Portal/Articles?category=${encodeURIComponent(cat)}`;
+            }
+        }
+
+        function switchHomeArticleTab(e, cat) {
+            if (e) e.preventDefault();
+            applyHomeArticleTab(cat);
+            return false;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            applyHomeArticleTab('@Model.Category');
+        });
+    </script>
+}

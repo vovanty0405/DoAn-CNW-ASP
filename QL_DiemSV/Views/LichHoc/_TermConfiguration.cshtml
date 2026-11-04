@@ -1,0 +1,56 @@
+@model QL_DiemSV.ViewModels.ScheduleEditorViewModel
+@using System.Globalization
+@using System.Text.Json
+@using QL_DiemSV.Services
+@{
+    var config=Model.ConfigurationTerm;
+    var terms=Model.Terms.Select(term=>new {
+        code=term.MaHK,label=$"{term.TenHK} · {term.NamHocBatDau}-{term.NamHocKetThuc}",
+        first=term.NgayBatDauTuan1?.ToString("yyyy-MM-dd"),weeks=term.SoTuan,
+        opens=term.BatDauDangKy?.ToString("yyyy-MM-ddTHH:mm"),closes=term.KetThucDangKy?.ToString("yyyy-MM-ddTHH:mm"),
+        price=term.DonGiaTinChi.ToString(CultureInfo.InvariantCulture)
+    });
+}
+<section class="panel" id="term-config">
+    <div class="section-heading">
+        <div><p class="muted">Thời gian và học phí</p><h2>Cấu hình Học kỳ</h2></div>
+        <span class="badge neutral">@Model.Terms.Count học kỳ</span>
+    </div>
+    <form method="post" action="/quan-ly-lich-hoc/hoc-ky" id="term-form" class="toolbar term-toolbar">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Section.MaLHP" />
+        <label class="term-picker">Chọn học kỳ
+            <select name="maHK" id="term-select" required disabled="@(Model.Terms.Count==0)">
+                <option value="">-- Chọn học kỳ --</option>
+                @foreach(var term in Model.Terms){<option value="@term.MaHK" selected="@(term.MaHK==config?.MaHK)">@term.TenHK · @term.NamHocBatDau-@term.NamHocKetThuc</option>}
+            </select>
+        </label>
+        <label>Ngày bắt đầu tuần 1 (Thứ Hai)<input name="ngayBatDauTuan1" type="date" value="@config?.NgayBatDauTuan1?.ToString("yyyy-MM-dd")" required /></label>
+        <label class="term-weeks">Số tuần<input name="soTuan" type="number" min="1" max="52" value="@(config?.SoTuan??20)" required /></label>
+        <label>Bắt đầu ĐK (giờ VN)<input name="batDauDangKy" type="datetime-local" value="@config?.BatDauDangKy?.ToString("yyyy-MM-ddTHH:mm")" required /></label>
+        <label>Kết thúc ĐK (giờ VN)<input name="ketThucDangKy" type="datetime-local" value="@config?.KetThucDangKy?.ToString("yyyy-MM-ddTHH:mm")" required /></label>
+        <label class="term-price">Đơn giá tín chỉ (VNĐ)<input name="donGiaTinChi" type="number" min="0" max="100000000" step="0.01" value="@(config?.DonGiaTinChi.ToString(CultureInfo.InvariantCulture)??"635000")" required /></label>
+        <div class="term-form-actions"><button id="term-save" disabled="@(config==null)">Lưu cấu hình học kỳ</button><button type="button" class="secondary" id="term-cancel" hidden="@(config==null)">Hủy chọn</button></div>
+    </form>
+    <p id="term-edit-message" class="notice muted" role="status" aria-live="polite">Chọn Sửa để cập nhật thông tin học kỳ hoặc Xóa để gỡ bỏ.</p>
+    <div class="scroll">
+        <table id="term-table">
+            <thead><tr><th>Tên học kỳ</th><th>Tuần 1 bắt đầu</th><th>Thời gian đăng ký môn</th><th>Đơn giá TC</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            @foreach(var term in Model.Terms){
+                var status=TermConfigurationPresentation.Status(term,RoomMatrixRules.Today);
+                <tr data-term-row="@term.MaHK" class="@(term.MaHK==config?.MaHK?"term-selected-row":"")">
+                    <td><strong>@term.TenHK · @term.NamHocBatDau-@term.NamHocKetThuc</strong></td>
+                    <td>@(term.NgayBatDauTuan1?.ToString("dd/MM/yyyy")??"Chưa cấu hình") <small class="muted">(@term.SoTuan tuần)</small></td>
+                    <td><span>@(term.BatDauDangKy?.ToString("dd/MM/yyyy HH:mm")??"Chưa cấu hình")</span> → <span>@(term.KetThucDangKy?.ToString("dd/MM/yyyy HH:mm")??"Chưa cấu hình")</span></td>
+                    <td class="term-money">@term.DonGiaTinChi.ToString("N0",CultureInfo.InvariantCulture) đ</td>
+                    <td><span class="badge @status.Css">@status.Label</span></td>
+                    <td><div class="row-actions"><button type="button" class="secondary term-edit" data-term="@term.MaHK">Sửa</button><form method="post" action="/quan-ly-lich-hoc/hoc-ky/xoa" class="term-delete">@Html.AntiForgeryToken()<input type="hidden" name="maHK" value="@term.MaHK" /><input type="hidden" name="id" value="@Model.Section.MaLHP" /><input type="hidden" name="configHK" value="@config?.MaHK" /><button class="danger" aria-label="Xóa @term.TenHK năm học @term.NamHocBatDau-@term.NamHocKetThuc">Xóa</button></form></div></td>
+                </tr>
+            }
+            @if(Model.Terms.Count==0){<tr><td colspan="6" class="empty-state">Chưa có học kỳ. Tạo học kỳ tại <a href="/lop-hoc-phan">Quản lý lớp học phần</a> rồi quay lại cấu hình.</td></tr>}
+            </tbody>
+        </table>
+    </div>
+    <script id="term-config-data" type="application/json">@Html.Raw(JsonSerializer.Serialize(terms))</script>
+</section>

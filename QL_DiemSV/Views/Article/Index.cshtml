@@ -1,10 +1,752 @@
 @model QL_DiemSV.ViewModels.ArticleListViewModel
 @using QL_DiemSV.Services
-@{ViewData["Title"]="Quản lý bài viết";}
-<div class="academic"><div class="section-heading"><div><p class="muted">Cổng đào tạo / Biên tập nội dung</p><h1>Bài viết & Thông báo</h1></div><div><a class="button secondary" href="/portal">Xem Portal</a> <a class="button" href="/bai-viet/them">+ Thêm bài viết mới</a></div></div>
-@if(TempData["Message"] is string msg){<p class="success" role="status">@msg</p>}
-<section class="panel"><form method="get" class="toolbar"><label>Tìm kiếm<input name="search" value="@Model.Search" placeholder="Tiêu đề hoặc đơn vị đăng" /></label><label>Danh mục<select name="category"><option value="">Tất cả</option>@foreach(var c in PortalRules.Categories){<option value="@c.Key" selected="@(Model.Category==c.Key)">@c.Value</option>}</select></label><label>Trạng thái<select name="status"><option value="">Tất cả</option><option value="BanNhap" selected="@(Model.Status=="BanNhap")">Bản nháp</option><option value="DaXuatBan" selected="@(Model.Status=="DaXuatBan")">Đã xuất bản</option></select></label><button>Lọc bài viết</button></form>
-<p class="notice muted">@(User.IsInRole("Admin")?"Bạn đang quản lý toàn bộ bài viết.":"Bạn đang quản lý các bài viết do mình đăng.") Tổng: @Model.Total bài.</p>
-<div class="scroll"><table><thead><tr><th>Tiêu đề</th><th>Danh mục</th><th>Đơn vị đăng</th><th>Ngày đăng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>@foreach(var a in Model.Articles){<tr><td><a href="/portal/bai-viet/@a.Id">@(a.GhimDauTrang?"📌 ":"")@a.TieuDe</a></td><td>@PortalRules.Categories.GetValueOrDefault(a.DanhMuc,a.DanhMuc)</td><td>@a.DonViDang</td><td>@PortalRules.Local(a.NgayDang).ToString("dd/MM/yyyy HH:mm")</td><td class="@(a.TrangThai=="DaXuatBan"?"success":"pending")">@(a.TrangThai=="DaXuatBan"?"Đã xuất bản":"Bản nháp")</td><td><div class="row-actions"><a class="button secondary" href="/bai-viet/@a.Id/sua">Sửa</a><form method="post" action="/bai-viet/@a.Id/ghim">@Html.AntiForgeryToken()<button class="secondary">@(a.GhimDauTrang?"Bỏ ghim":"Ghim")</button></form><form method="post" action="/bai-viet/@a.Id/xoa" onsubmit="return confirm('Xóa bài viết này?')">@Html.AntiForgeryToken()<button class="danger">Xóa</button></form></div></td></tr>}@if(Model.Articles.Count==0){<tr><td colspan="6" class="empty-state">Chưa có bài viết phù hợp.</td></tr>}</tbody></table></div>
-<div class="toolbar" style="margin-top:18px">@if(Model.Page>1){<a class="button secondary" href="@Url.Action("Index",new{search=Model.Search,category=Model.Category,status=Model.Status,page=Model.Page-1})">← Trang trước</a>}<span>Trang @Model.Page / @Math.Max(1,(Model.Total+19)/20)</span>@if(Model.Page*20<Model.Total){<a class="button secondary" href="@Url.Action("Index",new{search=Model.Search,category=Model.Category,status=Model.Status,page=Model.Page+1})">Trang sau →</a>}</div>
-</section></div>
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Quản lý Bài viết & Thông báo";
+    int startIdx = Model.Total == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    int endIdx = Math.Min(Model.Total, Model.Page * Model.PageSize);
+
+    var articlesJsonData = Model.Articles.ToDictionary(
+        a => a.Id,
+        a => new
+        {
+            id = a.Id,
+            code = $"BV{a.Id:D3}",
+            tieuDe = a.TieuDe,
+            tomTat = a.TomTat,
+            noiDung = a.NoiDung,
+            danhMuc = PortalRules.Categories.GetValueOrDefault(a.DanhMuc, a.DanhMuc),
+            heDaoTao = string.IsNullOrWhiteSpace(a.HeDaoTao) ? "Đại học chính quy" : a.HeDaoTao,
+            donViDang = a.DonViDang,
+            ngayDang = PortalRules.FormatVietnameseDateWithDay(a.NgayDang),
+            ngayDangShort = PortalRules.Local(a.NgayDang).ToString("dd/MM/yyyy HH:mm"),
+            trangThai = a.TrangThai == "DaXuatBan" ? "Đã xuất bản" : "Bản nháp",
+            fileDinhKemUrl = a.FileDinhKemUrl,
+            tenFileDinhKem = a.TenFileDinhKem
+        }
+    );
+}
+
+<div class="academic space-y-6">
+    <!-- Header & Cụm nút hành động chính -->
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+        <div>
+            <p class="muted text-xs uppercase tracking-wider font-semibold">Cổng thông tin đào tạo / Quản trị nội dung</p>
+            <h1 class="text-2xl font-extrabold text-text-primary flex items-center gap-2.5 mt-1">
+                <span class="p-2 rounded-xl bg-primary/15 text-primary border border-primary/30">
+                    <i data-lucide="newspaper" class="w-6 h-6"></i>
+                </span>
+                Quản lý Bài viết & Thông báo
+            </h1>
+        </div>
+
+        <!-- Cụm nút hành động: + Thêm bài viết mới | 📥 Nhập từ file (Import PDF/Word) | 📤 Xuất danh sách / Xuất PDF -->
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="/Portal/Articles" target="_blank"
+               class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 font-semibold">
+                <i data-lucide="external-link" class="w-4 h-4 text-sky-400"></i>
+                <span>Xem Portal</span>
+            </a>
+
+            <button type="button" onclick="openImportPdfModal()"
+                    class="btn bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 font-semibold">
+                <span>📥 Nhập từ file (Import PDF/Word)</span>
+            </button>
+
+            <button type="button" onclick="exportFilteredListToPdf()"
+                    class="btn bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 font-semibold">
+                <span>📤 Xuất danh sách / Xuất PDF</span>
+            </button>
+
+            <a href="/bai-viet/them"
+               class="btn bg-primary hover:bg-primary/90 text-white text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 font-bold shadow-lg shadow-primary/20">
+                <span>+ Thêm bài viết mới</span>
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Message"] is string msg)
+    {
+        <div class="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2.5" role="status">
+            <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400 shrink-0"></i>
+            <span>@msg</span>
+        </div>
+    }
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="panel p-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-text-muted">Tổng bài viết (theo bộ lọc)</p>
+                <p class="text-2xl font-extrabold text-text-primary mt-1">@Model.Total</p>
+            </div>
+            <span class="p-3 rounded-xl bg-primary/15 text-primary"><i data-lucide="file-text" class="w-5 h-5"></i></span>
+        </div>
+        <div class="panel p-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-text-muted">Đã xuất bản</p>
+                <p class="text-2xl font-extrabold text-emerald-400 mt-1">@Model.TotalPublished</p>
+            </div>
+            <span class="p-3 rounded-xl bg-emerald-500/15 text-emerald-400"><i data-lucide="globe" class="w-5 h-5"></i></span>
+        </div>
+        <div class="panel p-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-text-muted">Bản nháp</p>
+                <p class="text-2xl font-extrabold text-amber-400 mt-1">@Model.TotalDraft</p>
+            </div>
+            <span class="p-3 rounded-xl bg-amber-500/15 text-amber-400"><i data-lucide="file-edit" class="w-5 h-5"></i></span>
+        </div>
+        <div class="panel p-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-text-muted">Đang ghim đầu trang</p>
+                <p class="text-2xl font-extrabold text-sky-400 mt-1">@Model.TotalPinned</p>
+            </div>
+            <span class="p-3 rounded-xl bg-sky-500/15 text-sky-400"><i data-lucide="pin" class="w-5 h-5"></i></span>
+        </div>
+    </div>
+
+    <!-- Thanh công cụ & Bộ lọc -->
+    <section class="panel space-y-4">
+        <form method="get" action="/bai-viet" id="admin-article-filter-form" class="space-y-3">
+            <input type="hidden" name="pageSize" id="hidden-page-size" value="@Model.PageSize" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 items-end">
+                <!-- Tìm kiếm -->
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-text-muted mb-1">Tìm kiếm (Tiêu đề, Nội dung, Người đăng/Khoa)</label>
+                    <input type="text" name="search" value="@Model.Search"
+                           placeholder="Nhập từ khóa tiêu đề, nội dung, đơn vị đăng..."
+                           class="input-field w-full text-sm" />
+                </div>
+
+                <!-- Danh mục -->
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Danh mục</label>
+                    <select name="category" class="input-field w-full text-sm">
+                        <option value="">-- Tất cả Danh mục --</option>
+                        @foreach (var c in PortalRules.Categories)
+                        {
+                            <option value="@c.Key" selected="@(Model.Category == c.Key)">@c.Value</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Khoa / Đơn vị -->
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Khoa / Đơn vị đăng</label>
+                    <select name="department" class="input-field w-full text-sm">
+                        <option value="">-- Tất cả Khoa/Đơn vị --</option>
+                        @foreach (var dept in Model.Departments)
+                        {
+                            <option value="@dept" selected="@(Model.Department == dept)">@dept</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Hệ đào tạo -->
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Hệ đào tạo</label>
+                    <select name="program" class="input-field w-full text-sm">
+                        <option value="">-- Tất cả Hệ đào tạo --</option>
+                        @foreach (var prog in PortalRules.TrainingPrograms)
+                        {
+                            <option value="@prog" selected="@(Model.Program == prog)">@prog</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Trạng thái -->
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Trạng thái</label>
+                    <select name="status" class="input-field w-full text-sm">
+                        <option value="">-- Tất cả Trạng thái --</option>
+                        <option value="DaXuatBan" selected="@(Model.Status == "DaXuatBan")">Đã xuất bản</option>
+                        <option value="BanNhap" selected="@(Model.Status == "BanNhap")">Bản nháp</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Hàng lọc thứ 2: Khoảng ngày đăng + Nút Lọc / Đặt lại -->
+            <div class="flex flex-wrap items-end justify-between gap-3 pt-2 border-t border-surface-hover">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Từ ngày đăng</label>
+                        <input type="date" name="fromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="input-field text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Đến ngày đăng</label>
+                        <input type="date" name="toDate" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="input-field text-xs" />
+                    </div>
+                    <button type="submit" class="btn bg-primary text-white text-xs px-4 py-2 rounded-xl font-semibold">
+                        🔍 Lọc bài viết
+                    </button>
+                    <a href="/bai-viet" class="secondary text-xs px-3.5 py-2 rounded-xl">
+                        Đặt lại bộ lọc
+                    </a>
+                </div>
+
+                <!-- Nút xóa hàng loạt khi chọn Checkbox -->
+                <div id="bulk-actions-bar" class="hidden items-center gap-2">
+                    <span class="text-xs text-amber-400 font-semibold">Đã chọn <strong id="selected-count">0</strong> bài viết</span>
+                    <button type="button" onclick="submitBulkDelete()" class="danger text-xs px-3 py-1.5 rounded-lg font-semibold">
+                        🗑️ Xóa các mục đã chọn
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Bảng dữ liệu Bài viết -->
+        <form method="post" action="/bai-viet/xoa-nhieu" id="bulk-delete-form">
+            @Html.AntiForgeryToken()
+            <div class="scroll" id="admin-articles-table-container">
+                <table class="w-full text-sm" id="admin-articles-table">
+                    <thead>
+                        <tr>
+                            <th class="w-10 text-center" data-html2canvas-ignore="true">
+                                <input type="checkbox" id="check-all-articles" onchange="toggleSelectAllArticles(this.checked)" aria-label="Chọn tất cả" />
+                            </th>
+                            <th class="whitespace-nowrap">Mã/ID</th>
+                            <th class="whitespace-nowrap" data-html2canvas-ignore="true">Ảnh/Banner</th>
+                            <th>Tiêu đề bài viết</th>
+                            <th class="whitespace-nowrap">Danh mục</th>
+                            <th>Đơn vị đăng</th>
+                            <th class="whitespace-nowrap">Ngày đăng</th>
+                            <th class="whitespace-nowrap">Trạng thái</th>
+                            <th class="text-right whitespace-nowrap" data-html2canvas-ignore="true">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in Model.Articles)
+                        {
+                            var localDate = PortalRules.Local(a.NgayDang);
+                            var isNew = PortalRules.IsNew(a.NgayDang);
+                            var catLabel = PortalRules.Categories.GetValueOrDefault(a.DanhMuc, a.DanhMuc);
+                            var progLabel = string.IsNullOrWhiteSpace(a.HeDaoTao) ? "Đại học chính quy" : a.HeDaoTao;
+                            var hasThumb = PortalRules.SafeUrl(a.ThumbnailUrl, true) && a.DanhMuc != "NghiBu";
+
+                            <tr class="hover:bg-surface-hover/40 transition-colors">
+                                <!-- Cột 1: Checkbox -->
+                                <td class="text-center align-middle" data-html2canvas-ignore="true">
+                                    <input type="checkbox" name="ids" value="@a.Id" class="article-row-checkbox" onchange="updateBulkSelectionState()" aria-label="Chọn bài viết @a.Id" />
+                                </td>
+
+                                <!-- Cột 2: Mã/ID -->
+                                <td class="whitespace-nowrap align-middle">
+                                    <span class="px-2 py-1 rounded-lg text-xs font-mono font-bold bg-canvas border border-surface-hover text-primary">
+                                        #BV@(a.Id.ToString("D3"))
+                                    </span>
+                                </td>
+
+                                <!-- Cột 3: Ảnh/Banner -->
+                                <td class="align-middle" data-html2canvas-ignore="true">
+                                    <div class="w-20 h-12 rounded-lg overflow-hidden border border-surface-hover bg-canvas flex items-center justify-center shrink-0">
+                                        @if (hasThumb)
+                                        {
+                                            <img src="@a.ThumbnailUrl" alt="" class="w-full h-full object-cover" />
+                                        }
+                                        else if (a.DanhMuc == "NghiBu")
+                                        {
+                                            <div class="w-full h-full bg-amber-500/15 text-amber-400 flex flex-col items-center justify-center text-[10px] font-bold leading-tight">
+                                                <span>🗓️</span>
+                                                <span>Nghỉ - Bù</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="w-full h-full bg-primary/15 text-primary flex flex-col items-center justify-center text-[10px] font-bold leading-tight">
+                                                <span>📢</span>
+                                                <span>Banner</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+
+                                <!-- Cột 4: Tiêu đề bài viết (kèm badge Mới / Ghim) -->
+                                <td class="align-middle max-w-md">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        @if (a.GhimDauTrang)
+                                        {
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Đang ghim đầu trang">
+                                                📌 Ghim
+                                            </span>
+                                        }
+                                        <a href="/Portal/ArticleDetail/@a.Id" target="_blank" class="font-bold text-text-primary hover:text-primary transition-colors line-clamp-2">
+                                            @a.TieuDe
+                                        </a>
+                                        @if (isNew)
+                                        {
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                                MỚI
+                                            </span>
+                                        }
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2 text-[11px] text-text-muted mt-1">
+                                        <span>🎓 @progLabel</span>
+                                        @if (!string.IsNullOrEmpty(a.TenFileDinhKem))
+                                        {
+                                            <span class="text-sky-400">• 📎 @a.TenFileDinhKem</span>
+                                        }
+                                    </div>
+                                </td>
+
+                                <!-- Cột 5: Danh mục -->
+                                <td class="whitespace-nowrap align-middle">
+                                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold @(a.DanhMuc == "NghiBu" ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" : "bg-primary/15 text-primary border border-primary/30")">
+                                        @catLabel
+                                    </span>
+                                </td>
+
+                                <!-- Cột 6: Đơn vị đăng -->
+                                <td class="align-middle text-xs font-medium text-text-primary">
+                                    @a.DonViDang
+                                </td>
+
+                                <!-- Cột 7: Ngày đăng -->
+                                <td class="whitespace-nowrap align-middle text-xs text-text-muted">
+                                    @localDate.ToString("dd/MM/yyyy HH:mm")
+                                </td>
+
+                                <!-- Cột 8: Trạng thái -->
+                                <td class="whitespace-nowrap align-middle">
+                                    @if (a.TrangThai == "DaXuatBan")
+                                    {
+                                        <span class="badge active">Đã xuất bản</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge maintenance">Bản nháp</span>
+                                    }
+                                </td>
+
+                                <!-- Cột 9: Thao tác: 👁️ Xem thử | ✏️ Sửa | 📄 Xuất PDF bài viết | 🗑️ Xóa -->
+                                <td class="text-right whitespace-nowrap align-middle" data-html2canvas-ignore="true">
+                                    <div class="inline-flex items-center justify-end gap-1.5">
+                                        <button type="button" onclick="openPreviewArticleModal(@a.Id)"
+                                                class="secondary text-xs px-2.5 py-1.5 rounded-lg"
+                                                title="Xem thử bài viết">
+                                            👁️ Xem thử
+                                        </button>
+
+                                        <a href="/bai-viet/@a.Id/sua"
+                                           class="btn bg-primary/15 hover:bg-primary text-primary hover:text-white border border-primary/30 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors">
+                                            ✏️ Sửa
+                                        </a>
+
+                                        <button type="button" onclick="exportSingleArticlePdf(@a.Id)"
+                                                class="btn bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors"
+                                                title="Xuất bài viết này ra file PDF">
+                                            📄 Xuất PDF
+                                        </button>
+
+                                        <button type="button" onclick="confirmDeleteSingleArticle(@a.Id, '@Html.Raw(a.TieuDe.Replace("'", "\\'"))')"
+                                                class="danger text-xs px-2.5 py-1.5 rounded-lg font-semibold">
+                                            🗑️ Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Articles.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9" class="empty-state py-10 text-center text-text-muted">
+                                    Không tìm thấy bài viết nào khớp với điều kiện lọc hiện tại.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </form>
+
+        <!-- Form ẩn để xóa từng bài viết -->
+        <form method="post" id="single-delete-form" class="hidden">
+            @Html.AntiForgeryToken()
+        </form>
+
+        <!-- Thanh Phân trang (Pagination) + Chọn số dòng hiển thị (10, 20, 50 dòng/trang) -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-surface-hover text-xs">
+            <div class="flex flex-wrap items-center gap-3 text-text-muted">
+                <span>Hiển thị <strong>@startIdx–@endIdx</strong> / <strong>@Model.Total</strong> bài viết</span>
+                <label class="inline-flex items-center gap-1.5">
+                    <span>Số dòng/trang:</span>
+                    <select onchange="changeAdminPageSize(this.value)" class="input-field py-1 px-2 text-xs">
+                        @foreach (var size in new[] { 10, 20, 50 })
+                        {
+                            <option value="@size" selected="@(Model.PageSize == size)">@size dòng</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5">
+                @if (Model.Page > 1)
+                {
+                    <a class="secondary px-2.5 py-1.5 rounded-lg"
+                       href="@Url.Action("Index", new { search = Model.Search, category = Model.Category, department = Model.Department, program = Model.Program, status = Model.Status, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), pageSize = Model.PageSize, page = 1 })">« Đầu</a>
+                    <a class="secondary px-2.5 py-1.5 rounded-lg"
+                       href="@Url.Action("Index", new { search = Model.Search, category = Model.Category, department = Model.Department, program = Model.Program, status = Model.Status, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), pageSize = Model.PageSize, page = Model.Page - 1 })">‹ Trước</a>
+                }
+
+                @{
+                    int pStart = Math.Max(1, Model.Page - 2);
+                    int pEnd = Math.Min(Model.TotalPages, pStart + 4);
+                    if (pEnd - pStart < 4) pStart = Math.Max(1, pEnd - 4);
+                }
+                @for (int p = pStart; p <= pEnd; p++)
+                {
+                    <a class="px-3 py-1.5 rounded-lg font-semibold @(p == Model.Page ? "bg-primary text-white" : "secondary")"
+                       href="@Url.Action("Index", new { search = Model.Search, category = Model.Category, department = Model.Department, program = Model.Program, status = Model.Status, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), pageSize = Model.PageSize, page = p })">
+                        @p
+                    </a>
+                }
+
+                @if (Model.Page < Model.TotalPages)
+                {
+                    <a class="secondary px-2.5 py-1.5 rounded-lg"
+                       href="@Url.Action("Index", new { search = Model.Search, category = Model.Category, department = Model.Department, program = Model.Program, status = Model.Status, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), pageSize = Model.PageSize, page = Model.Page + 1 })">Sau ›</a>
+                    <a class="secondary px-2.5 py-1.5 rounded-lg"
+                       href="@Url.Action("Index", new { search = Model.Search, category = Model.Category, department = Model.Department, program = Model.Program, status = Model.Status, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), pageSize = Model.PageSize, page = Model.TotalPages })">Cuối »</a>
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL XEM THỬ BÀI VIẾT & XUẤT PDF                                       -->
+<!-- ======================================================================= -->
+<div id="preview-article-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="panel w-full max-w-4xl bg-surface border border-surface-hover rounded-2xl shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-4 border-b border-surface-hover pb-3">
+            <div>
+                <span class="text-xs uppercase font-bold text-primary" id="preview-modal-badges"></span>
+                <h2 class="text-xl font-extrabold text-text-primary mt-1" id="preview-modal-title"></h2>
+                <p class="text-xs text-text-muted mt-1" id="preview-modal-meta"></p>
+            </div>
+            <button type="button" onclick="closePreviewArticleModal()" class="secondary px-2.5 py-1.5 rounded-lg">✕</button>
+        </div>
+
+        <div id="preview-modal-body" class="p-4 rounded-xl bg-canvas border border-surface-hover text-sm leading-relaxed space-y-3 overflow-x-auto article-rich-text">
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-surface-hover">
+            <a id="preview-modal-portal-link" href="#" target="_blank" class="text-xs text-primary hover:underline font-semibold">
+                🌐 Mở trên trang Portal →
+            </a>
+            <div class="flex items-center gap-2">
+                <button type="button" id="preview-modal-pdf-btn" class="btn bg-emerald-600 text-white text-xs px-3.5 py-2 rounded-xl font-semibold">
+                    📄 Tải xuống PDF
+                </button>
+                <button type="button" onclick="closePreviewArticleModal()" class="secondary text-xs px-3.5 py-2 rounded-xl">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- MODAL NHẬP BÀI VIẾT TỪ FILE PDF / WORD / TXT (IMPORT PDF)               -->
+<!-- ======================================================================= -->
+<div id="import-pdf-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="panel w-full max-w-3xl bg-surface border border-surface-hover rounded-2xl shadow-2xl p-6 space-y-4 my-8 max-h-[92vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-4 border-b border-surface-hover pb-3">
+            <div>
+                <p class="text-xs uppercase font-semibold text-amber-400">Trích xuất & Tạo bài viết nhanh từ tài liệu</p>
+                <h2 class="text-xl font-extrabold text-text-primary mt-0.5">📥 Nhập bài viết từ file PDF / Word</h2>
+            </div>
+            <button type="button" onclick="closeImportPdfModal()" class="secondary px-2.5 py-1.5 rounded-lg">✕</button>
+        </div>
+
+        <form method="post" action="/bai-viet/luu" enctype="multipart/form-data" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Id" value="0" />
+
+            <div class="p-4 rounded-xl bg-canvas border border-dashed border-primary/50 space-y-2">
+                <label class="block text-xs font-bold text-text-primary">
+                    1. Chọn file PDF / Tài liệu đính kèm (.pdf, .txt, .docx - tối đa 8 MB)
+                </label>
+                <input type="file" name="File" id="import-pdf-file-input"
+                       accept=".pdf,.txt,.docx"
+                       onchange="handleImportPdfFileSelect(this)"
+                       class="input-field w-full text-xs" required />
+                <p id="import-pdf-status" class="text-xs text-text-muted">
+                    Khi chọn file <strong>.pdf</strong>, hệ thống sẽ tự động đọc văn bản trong file PDF để điền vào Tiêu đề và Nội dung bài viết, đồng thời lưu đính kèm file gốc.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-text-muted mb-1">Tiêu đề bài viết (tự động trích xuất hoặc nhập tay)</label>
+                    <input type="text" name="TieuDe" id="import-input-title" required maxlength="250"
+                           placeholder="Tiêu đề bài viết..." class="input-field w-full text-sm" />
+                </div>
+
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Danh mục</label>
+                    <select name="DanhMuc" class="input-field w-full text-sm">
+                        @foreach (var c in PortalRules.Categories)
+                        {
+                            <option value="@c.Key">@c.Value</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Hệ đào tạo</label>
+                    <select name="HeDaoTao" class="input-field w-full text-sm">
+                        @foreach (var p in PortalRules.TrainingPrograms)
+                        {
+                            <option value="@p">@p</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Khoa / Đơn vị đăng</label>
+                    <input type="text" name="DonViDang" value="Phòng Đào tạo Đại học" list="admin-dept-datalist" required class="input-field w-full text-sm" />
+                    <datalist id="admin-dept-datalist">
+                        @foreach (var dept in Model.Departments)
+                        {
+                            <option value="@dept"></option>
+                        }
+                    </datalist>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Trạng thái</label>
+                    <select name="TrangThai" class="input-field w-full text-sm">
+                        <option value="DaXuatBan">Đã xuất bản</option>
+                        <option value="BanNhap">Bản nháp</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs text-text-muted mb-1">Nội dung trích xuất từ file (HTML / Văn bản)</label>
+                <textarea name="NoiDung" id="import-input-content" rows="7" required
+                          class="input-field w-full text-xs font-mono"
+                          placeholder="Nội dung trích xuất từ file PDF sẽ hiển thị tại đây..."></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-surface-hover">
+                <button type="button" onclick="closeImportPdfModal()" class="secondary text-xs px-4 py-2 rounded-xl">Hủy</button>
+                <button type="submit" class="btn bg-primary text-white text-xs px-4 py-2 rounded-xl font-bold">
+                    💾 Lưu & Đăng bài viết từ File
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Khung ẩn dùng để render bản in PDF chuẩn A4 khi xuất 1 bài viết -->
+<div class="hidden">
+    <div id="pdf-export-staging" style="padding: 24px; font-family: 'Times New Roman', serif; color: #111827; background: #ffffff; width: 750px;">
+        <div style="display:flex; justify-content:space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 18px;">
+            <div>
+                <div style="font-size:12px; font-weight:bold; text-transform:uppercase;">HỆ THỐNG QUẢN LÝ ĐÀO TẠO ACADEMIC LEDGER</div>
+                <div id="pdf-stage-unit" style="font-size:13px; font-weight:bold; color:#1d4ed8;"></div>
+            </div>
+            <div style="text-align:right; font-size:12px;">
+                <div><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></div>
+                <div><em>Độc lập - Tự do - Hạnh phúc</em></div>
+            </div>
+        </div>
+        <div id="pdf-stage-badges" style="font-size:12px; color:#4b5563; margin-bottom: 6px;"></div>
+        <h1 id="pdf-stage-title" style="font-size:20px; font-weight:bold; line-height:1.35; margin: 0 0 10px 0; color:#111827;"></h1>
+        <div id="pdf-stage-meta" style="font-size:12px; color:#6b7280; margin-bottom: 18px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;"></div>
+        <div id="pdf-stage-content" style="font-size:14px; line-height:1.75; color:#111827;"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        const ADMIN_ARTICLES_MAP = @Html.Raw(JsonSerializer.Serialize(articlesJsonData));
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        function changeAdminPageSize(size) {
+            document.getElementById('hidden-page-size').value = size;
+            document.getElementById('admin-article-filter-form').submit();
+        }
+
+        function toggleSelectAllArticles(checked) {
+            document.querySelectorAll('.article-row-checkbox').forEach(cb => cb.checked = checked);
+            updateBulkSelectionState();
+        }
+
+        function updateBulkSelectionState() {
+            const checked = document.querySelectorAll('.article-row-checkbox:checked');
+            const bar = document.getElementById('bulk-actions-bar');
+            const cnt = document.getElementById('selected-count');
+            if (cnt) cnt.textContent = checked.length;
+            if (bar) {
+                bar.classList.toggle('hidden', checked.length === 0);
+                bar.classList.toggle('flex', checked.length > 0);
+            }
+        }
+
+        function submitBulkDelete() {
+            const checked = document.querySelectorAll('.article-row-checkbox:checked');
+            if (checked.length === 0) return;
+            if (confirm(`Bạn có chắc chắn muốn xóa ${checked.length} bài viết đã chọn?`)) {
+                document.getElementById('bulk-delete-form').submit();
+            }
+        }
+
+        function confirmDeleteSingleArticle(id, title) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa bài viết "${title}" (#BV${String(id).padStart(3, '0')})?`)) return;
+            const form = document.getElementById('single-delete-form');
+            form.action = `/bai-viet/${id}/xoa`;
+            form.submit();
+        }
+
+        function openPreviewArticleModal(id) {
+            const a = ADMIN_ARTICLES_MAP[id];
+            if (!a) return;
+            document.getElementById('preview-modal-badges').textContent = `${a.danhMuc} • ${a.heDaoTao} • ${a.trangThai}`;
+            document.getElementById('preview-modal-title').textContent = a.tieuDe;
+            document.getElementById('preview-modal-meta').textContent = `📅 ${a.ngayDang} • 👥 ${a.donViDang}`;
+            document.getElementById('preview-modal-body').innerHTML = a.noiDung;
+            document.getElementById('preview-modal-portal-link').href = `/Portal/ArticleDetail/${a.id}`;
+            document.getElementById('preview-modal-pdf-btn').onclick = () => exportSingleArticlePdf(a.id);
+
+            const modal = document.getElementById('preview-article-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closePreviewArticleModal() {
+            const modal = document.getElementById('preview-article-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function exportSingleArticlePdf(id) {
+            const a = ADMIN_ARTICLES_MAP[id];
+            if (!a || typeof html2pdf === 'undefined') return;
+
+            document.getElementById('pdf-stage-unit').textContent = a.donViDang;
+            document.getElementById('pdf-stage-badges').textContent = `Danh mục: ${a.danhMuc} | Hệ đào tạo: ${a.heDaoTao}`;
+            document.getElementById('pdf-stage-title').textContent = a.tieuDe;
+            document.getElementById('pdf-stage-meta').textContent = `Ngày đăng: ${a.ngayDang} • Mã bài viết: #${a.code}`;
+            document.getElementById('pdf-stage-content').innerHTML = a.noiDung;
+
+            const element = document.getElementById('pdf-export-staging');
+            const opt = {
+                margin: [12, 12, 12, 12],
+                filename: `${a.code}_BaiViet.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function exportFilteredListToPdf() {
+            const tableContainer = document.getElementById('admin-articles-table-container');
+            if (!tableContainer || typeof html2pdf === 'undefined') {
+                window.print();
+                return;
+            }
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: 'DanhSach_BaiViet_ThongBao.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(tableContainer).save();
+        }
+
+        function openImportPdfModal() {
+            const modal = document.getElementById('import-pdf-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeImportPdfModal() {
+            const modal = document.getElementById('import-pdf-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function handleImportPdfFileSelect(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('import-pdf-status');
+            const titleInput = document.getElementById('import-input-title');
+            const contentInput = document.getElementById('import-input-content');
+
+            const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ');
+            if (!titleInput.value.trim()) {
+                titleInput.value = baseName;
+            }
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'txt') {
+                const text = await file.text();
+                const paragraphs = text.split(/\r?\n/).filter(l => l.trim().length > 0).map(l => `<p>${l}</p>`).join('\n');
+                contentInput.value = paragraphs || `<p>${baseName}</p>`;
+                statusEl.textContent = `✓ Đã trích xuất văn bản từ tệp ${file.name}.`;
+                return;
+            }
+
+            if (ext === 'pdf' && window.pdfjsLib) {
+                try {
+                    statusEl.textContent = '⏳ Đang đọc và trích xuất văn bản từ file PDF...';
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    let htmlParts = [];
+                    let firstLine = '';
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageLines = [];
+                        let currentLine = '';
+                        let lastY = null;
+
+                        for (const item of textContent.items) {
+                            const y = item.transform ? Math.round(item.transform[5]) : null;
+                            if (lastY !== null && y !== null && Math.abs(y - lastY) > 6) {
+                                if (currentLine.trim()) pageLines.push(currentLine.trim());
+                                currentLine = item.str;
+                            } else {
+                                currentLine += (currentLine && !currentLine.endsWith(' ') ? ' ' : '') + item.str;
+                            }
+                            if (y !== null) lastY = y;
+                        }
+                        if (currentLine.trim()) pageLines.push(currentLine.trim());
+
+                        if (!firstLine && pageLines.length > 0) {
+                            firstLine = pageLines[0];
+                        }
+                        pageLines.forEach(line => {
+                            htmlParts.push(`<p>${line}</p>`);
+                        });
+                    }
+
+                    if (firstLine && firstLine.length > 8 && firstLine.length <= 240) {
+                        titleInput.value = firstLine;
+                    }
+                    contentInput.value = htmlParts.length > 0
+                        ? htmlParts.join('\n')
+                        : `<p>Đính kèm tài liệu PDF: <strong>${file.name}</strong>. Vui lòng xem chi tiết trong file đính kèm bên dưới.</p>`;
+                    statusEl.textContent = `✓ Đã trích xuất thành công ${pdf.numPages} trang từ file PDF "${file.name}".`;
+                } catch (err) {
+                    contentInput.value = `<p>Tài liệu đính kèm: <strong>${file.name}</strong>. Vui lòng tải xuống hoặc xem trực tiếp file PDF đính kèm.</p>`;
+                    statusEl.textContent = `✓ Đã đính kèm file PDF "${file.name}".`;
+                }
+            } else {
+                contentInput.value = `<p>Tài liệu đính kèm: <strong>${file.name}</strong>. Vui lòng tải xuống tệp đính kèm để xem chi tiết.</p>`;
+                statusEl.textContent = `✓ Đã chọn tệp đính kèm "${file.name}".`;
+            }
+        }
+    </script>
+}

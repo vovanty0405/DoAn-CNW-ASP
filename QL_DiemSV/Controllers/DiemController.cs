@@ -57,11 +57,40 @@ public class DiemController : ControllerBase
         return new Dictionary<string, double?>();
     }
 
+    private static (int tyLeQT, int tyLeThi) GetValidTyLe(LopHocPhan lhp)
+    {
+        if (lhp.TyLeQuaTrinh >= 0 && lhp.TyLeThiKetThuc >= 0 && lhp.TyLeQuaTrinh + lhp.TyLeThiKetThuc == 100)
+        {
+            return (lhp.TyLeQuaTrinh, lhp.TyLeThiKetThuc);
+        }
+        return (40, 60);
+    }
+
+    private async Task<bool> VerifyUserPasswordAsync(string? password)
+    {
+        if (string.IsNullOrWhiteSpace(password)) return false;
+        var uname = User.Identity?.Name ?? "admin";
+        var currentUser = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Username == uname);
+        if (currentUser == null) return false;
+
+        try
+        {
+            return currentUser.PasswordHash.StartsWith("$2")
+                ? BCrypt.Net.BCrypt.Verify(password, currentUser.PasswordHash)
+                : currentUser.PasswordHash == password;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     [HttpGet("lophocphan/{maLHP}")]
     public async Task<IActionResult> GetBangDiemLopHocPhan(string maLHP)
     {
         var lhp = await _db.LopHocPhans
             .Include(l => l.MonHoc)
+                .ThenInclude(m => m!.Khoa)
             .Include(l => l.GiangVien)
             .Include(l => l.HocKy)
             .FirstOrDefaultAsync(l => l.MaLHP == maLHP);
@@ -76,6 +105,7 @@ public class DiemController : ControllerBase
             .ToListAsync();
 
         var cauHinh = ParseCauHinhDiem(lhp.CauHinhDiem);
+        var (tyLeQT, tyLeThi) = GetValidTyLe(lhp);
 
         var danhSachDiem = kqList.Select(k =>
         {
@@ -115,8 +145,15 @@ public class DiemController : ControllerBase
                     lhp.MaMon,
                     lhp.MaGV,
                     lhp.MaHK,
+                    lhp.PhongHoc,
+                    NMH = string.IsNullOrWhiteSpace(lhp.NMH) ? "01" : lhp.NMH,
+                    STC = lhp.STC > 0 ? lhp.STC : (lhp.MonHoc?.SoTinChi ?? 3),
+                    SiSoHienTai = kqList.Count,
+                    SoSVDaNhapDiem = kqList.Count(k => k.DiemTongKet != null),
                     lhp.TrangThai,
                     lhp.TrangThaiNhapDiem,
+                    TyLeQuaTrinh = tyLeQT,
+                    TyLeThiKetThuc = tyLeThi,
                     CauHinhDiem = cauHinh,
                     lhp.MonHoc,
                     lhp.GiangVien,
@@ -124,6 +161,50 @@ public class DiemController : ControllerBase
                 },
                 danhSachDiem
             }
+        });
+    }
+
+    public class TyLeDiemHocPhanDto
+    {
+        public int tyLeQuaTrinh { get; set; } = 40;
+        public int tyLeThiKetThuc { get; set; } = 60;
+    }
+
+    [HttpPut("lophocphan/{maLHP}/ty-le")]
+    public async Task<IActionResult> UpdateTyLeDiemHocPhan(string maLHP, [FromBody] TyLeDiemHocPhanDto req)
+    {
+        var lhp = await _db.LopHocPhans.FindAsync(maLHP);
+        if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
+
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Admin";
+        if (lhp.TrangThaiNhapDiem == "Đã khóa" && role != "Admin" && role != "KhaoThi")
+            return BadRequest(new { status = "error", message = "Bảng điểm đã khóa, không thể thay đổi cấu hình tỷ lệ điểm học phần!" });
+
+        if (req.tyLeQuaTrinh < 0 || req.tyLeThiKetThuc < 0 || req.tyLeQuaTrinh + req.tyLeThiKetThuc != 100)
+            return BadRequest(new { status = "error", message = $"Tổng tỷ lệ Điểm Quá trình ({req.tyLeQuaTrinh}%) và Điểm Thi Kết thúc ({req.tyLeThiKetThuc}%) phải bằng 100%!" });
+
+        lhp.TyLeQuaTrinh = req.tyLeQuaTrinh;
+        lhp.TyLeThiKetThuc = req.tyLeThiKetThuc;
+
+        var kqList = await _db.KetQuaHocTaps.Where(k => k.MaLHP == maLHP).ToListAsync();
+        foreach (var kq in kqList)
+        {
+            var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(
+                kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, lhp.TyLeQuaTrinh, lhp.TyLeThiKetThuc);
+            kq.DiemTongKet = tk;
+            kq.DiemChu = dc;
+            kq.GhiChu = gc;
+        }
+
+        await _db.SaveChangesAsync();
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cấu hình tỷ lệ học phần",
+            $"Cập nhật tỷ lệ điểm học phần lớp {maLHP}: Quá trình {lhp.TyLeQuaTrinh}% - Thi kết thúc {lhp.TyLeThiKetThuc}%");
+
+        return Ok(new
+        {
+            status = "success",
+            message = $"Đã cập nhật tỷ lệ điểm học phần: Quá trình {lhp.TyLeQuaTrinh}% - Thi {lhp.TyLeThiKetThuc}%",
+            data = new { lhp.TyLeQuaTrinh, lhp.TyLeThiKetThuc }
         });
     }
 
@@ -138,7 +219,8 @@ public class DiemController : ControllerBase
         var lhp = await _db.LopHocPhans.FindAsync(maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
-        if (lhp.TrangThaiNhapDiem == "Đã khóa")
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Admin";
+        if (lhp.TrangThaiNhapDiem == "Đã khóa" && role != "Admin" && role != "KhaoThi")
             return BadRequest(new { status = "error", message = "Bảng điểm đã khóa, không thể thay đổi cấu hình cột điểm!" });
 
         if (req.cauHinhDiem == null || !req.cauHinhDiem.Any())
@@ -149,6 +231,7 @@ public class DiemController : ControllerBase
             return BadRequest(new { status = "error", message = $"Tổng trọng số các cột điểm quá trình phải bằng 100% (Hiện tại: {totalWeight}%)" });
 
         lhp.CauHinhDiem = JsonSerializer.Serialize(req.cauHinhDiem);
+        var (tyLeQT, tyLeThi) = GetValidTyLe(lhp);
 
         // Tính lại điểm quá trình tổng (DiemCK) và điểm tổng kết cho các sinh viên trong lớp
         var kqList = await _db.KetQuaHocTaps.Where(k => k.MaLHP == maLHP).ToListAsync();
@@ -160,7 +243,7 @@ public class DiemController : ControllerBase
             {
                 double qtSum = req.cauHinhDiem.Sum(c => (chiTiet[c.id] ?? 0) * (c.weight / 100.0));
                 kq.DiemCK = Math.Round(qtSum, 1, MidpointRounding.AwayFromZero);
-                var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2);
+                var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, tyLeQT, tyLeThi);
                 kq.DiemTongKet = tk;
                 kq.DiemChu = dc;
                 kq.GhiChu = gc;
@@ -187,6 +270,8 @@ public class DiemController : ControllerBase
     {
         public List<DiemRowItemDto> danhSachDiem { get; set; } = new();
         public string? password { get; set; }
+        public int? tyLeQuaTrinh { get; set; }
+        public int? tyLeThiKetThuc { get; set; }
     }
 
     [HttpPut("lophocphan/{maLHP}/hang-loat")]
@@ -195,27 +280,10 @@ public class DiemController : ControllerBase
         var lhp = await _db.LopHocPhans.FindAsync(maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
-        // Xác thực mật khẩu nếu người dùng gửi kèm password
-        if (!string.IsNullOrEmpty(req.password))
+        // Bắt buộc xác thực mật khẩu khi Lưu Bảng Điểm
+        if (!await VerifyUserPasswordAsync(req.password))
         {
-            var uname = User.Identity?.Name ?? "admin";
-            var currentUser = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Username == uname);
-            if (currentUser != null)
-            {
-                bool validPwd = false;
-                try
-                {
-                    validPwd = currentUser.PasswordHash.StartsWith("$2")
-                        ? BCrypt.Net.BCrypt.Verify(req.password, currentUser.PasswordHash)
-                        : currentUser.PasswordHash == req.password;
-                }
-                catch { validPwd = false; }
-
-                if (!validPwd)
-                {
-                    return BadRequest(new { status = "error", message = "Mật khẩu xác nhận không chính xác!" });
-                }
-            }
+            return BadRequest(new { status = "error", message = "Mật khẩu xác nhận không chính xác!" });
         }
 
         var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Admin";
@@ -224,6 +292,15 @@ public class DiemController : ControllerBase
             return BadRequest(new { status = "error", message = "Bảng điểm của lớp này đã bị khóa! Vui lòng gửi yêu cầu mở khóa." });
         }
 
+        if (req.tyLeQuaTrinh != null && req.tyLeThiKetThuc != null &&
+            req.tyLeQuaTrinh >= 0 && req.tyLeThiKetThuc >= 0 &&
+            req.tyLeQuaTrinh.Value + req.tyLeThiKetThuc.Value == 100)
+        {
+            lhp.TyLeQuaTrinh = req.tyLeQuaTrinh.Value;
+            lhp.TyLeThiKetThuc = req.tyLeThiKetThuc.Value;
+        }
+
+        var (tyLeQT, tyLeThi) = GetValidTyLe(lhp);
         var cauHinh = ParseCauHinhDiem(lhp.CauHinhDiem);
         var kqRecords = await _db.KetQuaHocTaps.Where(k => k.MaLHP == maLHP).ToListAsync();
 
@@ -254,18 +331,15 @@ public class DiemController : ControllerBase
                 double qtSum = cauHinh.Sum(c => (chiTiet[c.id] ?? 0) * (c.weight / 100.0));
                 kq.DiemCK = Math.Round(qtSum, 1, MidpointRounding.AwayFromZero);
             }
-            else if (item.DiemCK != null)
+            else
             {
                 kq.DiemCK = item.DiemCK;
             }
 
-            if (item.DiemThiLan1 != null || req.danhSachDiem.Any(x => x.MaSV == item.MaSV))
-            {
-                if (item.DiemThiLan1 != null) kq.DiemThiLan1 = item.DiemThiLan1;
-                if (item.DiemThiLan2 != null) kq.DiemThiLan2 = item.DiemThiLan2;
-            }
+            kq.DiemThiLan1 = item.DiemThiLan1;
+            kq.DiemThiLan2 = item.DiemThiLan2;
 
-            var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2);
+            var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, tyLeQT, tyLeThi);
             kq.DiemTongKet = tk;
             kq.DiemChu = dc;
             kq.GhiChu = gc;
@@ -277,13 +351,14 @@ public class DiemController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật bảng điểm", $"Đã lưu điểm cho {req.danhSachDiem.Count} sinh viên tại lớp {maLHP}");
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật bảng điểm", $"Đã lưu điểm cho {req.danhSachDiem.Count} sinh viên tại lớp {maLHP} (Tỷ lệ QT {tyLeQT}% - Thi {tyLeThi}%)");
         return Ok(new { status = "success", message = "Đã cập nhật bảng điểm thành công!" });
     }
 
     public class TrangThaiDto
     {
         public string? TrangThaiNhapDiem { get; set; }
+        public string? password { get; set; }
     }
 
     [HttpPut("lophocphan/{maLHP}/trang-thai")]
@@ -296,6 +371,16 @@ public class DiemController : ControllerBase
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
         string newStatus = req.TrangThaiNhapDiem ?? "Đã khóa";
+
+        // Khi Khóa sổ điểm hoặc Admin Mở khóa sổ điểm thì bắt buộc xác thực mật khẩu
+        if (newStatus == "Đã khóa" || newStatus == "Đang nhập")
+        {
+            if (!await VerifyUserPasswordAsync(req.password))
+            {
+                return BadRequest(new { status = "error", message = "Mật khẩu xác nhận không chính xác!" });
+            }
+        }
+
         lhp.TrangThaiNhapDiem = newStatus;
 
         var uname = User.Identity?.Name ?? "GV";

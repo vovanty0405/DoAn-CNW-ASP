@@ -9,7 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin,GiangVien")]
+[Authorize(Roles = "Admin,GiangVien,KhaoThi")]
 public class LopHocPhanController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -44,10 +44,15 @@ public class LopHocPhanController : ControllerBase
             l.MaGV,
             l.PhongHoc,
             l.SiSoToiDa,
+            NMH = string.IsNullOrWhiteSpace(l.NMH) ? "01" : l.NMH,
+            STC = l.STC > 0 ? l.STC : (l.MonHoc != null ? l.MonHoc.SoTinChi : 3),
             SiSoHienTai = l.KetQuaHocTaps.Count,
+            SoSVDaNhapDiem = l.KetQuaHocTaps.Count(k => k.DiemTongKet != null),
             l.TrangThai,
             l.CauHinhDiem,
             l.TrangThaiNhapDiem,
+            TyLeQuaTrinh = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeQuaTrinh : 40,
+            TyLeThiKetThuc = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeThiKetThuc : 60,
             l.MonHoc,
             l.HocKy,
             l.GiangVien
@@ -89,10 +94,15 @@ public class LopHocPhanController : ControllerBase
                 l.MaGV,
                 l.PhongHoc,
                 l.SiSoToiDa,
+                NMH = string.IsNullOrWhiteSpace(l.NMH) ? "01" : l.NMH,
+                STC = l.STC > 0 ? l.STC : (l.MonHoc != null ? l.MonHoc.SoTinChi : 3),
                 SiSoHienTai = students.Count,
+                SoSVDaNhapDiem = l.KetQuaHocTaps.Count(k => k.DiemTongKet != null),
                 l.TrangThai,
                 l.CauHinhDiem,
                 l.TrangThaiNhapDiem,
+                TyLeQuaTrinh = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeQuaTrinh : 40,
+                TyLeThiKetThuc = (l.TyLeQuaTrinh + l.TyLeThiKetThuc == 100) ? l.TyLeThiKetThuc : 60,
                 l.MonHoc,
                 l.HocKy,
                 l.GiangVien,
@@ -262,6 +272,11 @@ public class LopHocPhanController : ControllerBase
         {
             model.TrangThaiNhapDiem = "Vui lòng nhập điểm";
         }
+        if (model.TyLeQuaTrinh < 0 || model.TyLeThiKetThuc < 0 || model.TyLeQuaTrinh + model.TyLeThiKetThuc != 100)
+        {
+            model.TyLeQuaTrinh = 40;
+            model.TyLeThiKetThuc = 60;
+        }
 
         var course = await _db.MonHocs.FindAsync(model.MaMon);
         if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == model.MaHK)) return BadRequest(new { status = "error", message = "Môn học hoặc học kỳ không tồn tại." });
@@ -291,6 +306,11 @@ public class LopHocPhanController : ControllerBase
             item.CauHinhDiem ??= defaultCauHinh;
             item.TrangThaiNhapDiem ??= "Vui lòng nhập điểm";
             item.TrangThai ??= "MoDangKy";
+            if (item.TyLeQuaTrinh < 0 || item.TyLeThiKetThuc < 0 || item.TyLeQuaTrinh + item.TyLeThiKetThuc != 100)
+            {
+                item.TyLeQuaTrinh = 40;
+                item.TyLeThiKetThuc = 60;
+            }
             var course = await _db.MonHocs.FindAsync(item.MaMon);
             if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == item.MaHK)) continue;
             item.STC = course.SoTinChi; item.STCHP = course.SoTinChi;

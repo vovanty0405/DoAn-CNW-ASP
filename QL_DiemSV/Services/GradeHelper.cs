@@ -31,20 +31,38 @@ public static class GradeHelper
     }
 
     /// <summary>
-    /// Quy tắc tính điểm tổng kết cuối cùng (bao gồm QC 6.0 cho thi lại / cải thiện).
-    /// DiemCK trong DB đóng vai trò là Điểm Quá Trình Tổng (40%).
+    /// Quy tắc tính điểm tổng kết cuối cùng theo tỷ lệ động (TyLeQuaTrinh% - TyLeThiKetThuc%),
+    /// bao gồm quy chế QC 6.0 cho thi lại / cải thiện Lần 2, và hỗ trợ môn 100% Quá trình (TyLeThiKetThuc == 0).
+    /// DiemCK trong DB đóng vai trò là Điểm Quá Trình Tổng.
     /// </summary>
     public static (double? diemTK, string? diemChu, string? ghiChu) TinhDiemTongKetCuoiCung(
-        double? diemQT, double? diemThi1, double? diemThi2)
+        double? diemQT, double? diemThi1, double? diemThi2, double tyLeQT = 40, double tyLeThi = 60)
     {
-        if (diemQT == null || diemThi1 == null)
+        if (diemQT == null)
         {
             return (null, null, null);
         }
 
+        double wQt = tyLeQT / 100.0;
+        double wThi = tyLeThi / 100.0;
         double qt = diemQT.Value;
+
+        // Trường hợp môn học 100% Quá trình - 0% Thi kết thúc (Đồ án, Thực hành...)
+        if (tyLeThi <= 0)
+        {
+            double tkQtOnly = Math.Round(qt * wQt, 1, MidpointRounding.AwayFromZero);
+            string dcQtOnly = QuyDoiDiemChu(tkQtOnly);
+            string gcQtOnly = tkQtOnly >= 4.0 ? "Đạt" : "Học lại";
+            return (tkQtOnly, dcQtOnly, gcQtOnly);
+        }
+
+        if (diemThi1 == null)
+        {
+            return (null, null, null);
+        }
+
         double t1 = diemThi1.Value;
-        double tk1 = Math.Round(qt * 0.4 + t1 * 0.6, 1, MidpointRounding.AwayFromZero);
+        double tk1 = Math.Round((qt * wQt) + (t1 * wThi), 1, MidpointRounding.AwayFromZero);
 
         if (diemThi2 == null)
         {
@@ -54,7 +72,7 @@ public static class GradeHelper
         }
 
         double t2 = diemThi2.Value;
-        double tk2Raw = Math.Round(qt * 0.4 + t2 * 0.6, 1, MidpointRounding.AwayFromZero);
+        double tk2Raw = Math.Round((qt * wQt) + (t2 * wThi), 1, MidpointRounding.AwayFromZero);
 
         double finalTK;
         string ghiChu;

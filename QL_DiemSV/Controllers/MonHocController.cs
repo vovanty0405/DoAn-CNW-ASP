@@ -114,6 +114,10 @@ public class MonHocController : ControllerBase
         if (req.MonTienQuyet != null && req.MonTienQuyet.Any())
         {
             var distinctPrereqs = req.MonTienQuyet.Where(p => !string.IsNullOrWhiteSpace(p) && p != mh.MaMon).Distinct().ToList();
+            if (await HasCircularDependencyAsync(mh.MaMon, distinctPrereqs))
+            {
+                return BadRequest(new { status = "error", message = "Phát hiện vòng lặp môn tiên quyết (Circular Dependency)! Không thể thêm môn học." });
+            }
             foreach (var p in distinctPrereqs)
             {
                 _db.DieuKienMonHocs.Add(new DieuKienMonHoc { MaMon = mh.MaMon, MaMonTienQuyet = p });

@@ -1,426 +1,1660 @@
-@using System.Security.Claims
 @{
-    Layout = "_Layout";
-    var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "SinhVien";
-    var maGV = User.FindFirst("MaGV")?.Value ?? "";
+    ViewData["Title"] = "Quản Lý Điểm Số Lớp Học Phần";
+    var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Admin";
+    var userMaGV = User.FindFirst("MaGV")?.Value ?? "";
 }
 
-<div class="max-w-[1600px] mx-auto space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-            <div class="text-xs text-text-muted font-medium mb-1">Điểm số & Phúc khảo &gt; Sổ điểm Học phần</div>
-            <h1 class="text-2xl font-bold text-text-primary">Quản Lý Điểm Số Lớp Học Phần</h1>
-            <p class="text-xs text-text-muted mt-1">
-                Công thức chuẩn: <strong class="text-primary">Tổng kết = Điểm Quá trình (40%) + Điểm Thi Kết thúc (60%)</strong> • Quy chế thi lại Lần 2 tối đa <strong class="text-amber-400">6.0 điểm (QC 6.0)</strong>.
-            </p>
-        </div>
+<div class="space-y-6 animate-fade-in">
 
-        <div class="flex flex-wrap items-center gap-2.5">
-            <button onclick="openCauHinhModal()" id="btn-config-cols" class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-xs font-bold text-text-primary flex items-center gap-1.5">
-                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-primary"></i> Cấu hình cột QT (100%)
-            </button>
-            <button onclick="exportBangDiemExcel()" class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-xs font-bold text-text-primary flex items-center gap-1.5">
-                <i data-lucide="download" class="w-4 h-4 text-[#10B981]"></i> Xuất Excel
-            </button>
-            <button id="btn-lock-action" onclick="handleStatusTransition()" class="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-xs font-bold flex items-center gap-1.5">
-                <i data-lucide="lock" class="w-4 h-4"></i> <span id="lock-action-text">Chốt sổ điểm</span>
-            </button>
-            <button id="btn-save-grades" onclick="openPasswordConfirmModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-lg shadow-primary/25 flex items-center gap-1.5">
-                <i data-lucide="save" class="w-4 h-4"></i> Lưu Bảng Điểm
-            </button>
-        </div>
-    </div>
-
-    <!-- Top Selector Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3 flex-1">
+    <!-- ========================================================================= -->
+    <!-- BƯỚC 1: MÀN HÌNH TỔNG QUAN DANH SÁCH LỚP HỌC PHẦN (CARD GRID VIEW)       -->
+    <!-- ========================================================================= -->
+    <div id="step-overview-cards" class="space-y-6">
+        <!-- Header & KPI Summary -->
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-                <label class="block text-[11px] text-text-muted mb-1">Học kỳ</label>
-                <select id="ds-hk" onchange="filterLhpOptions()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none"></select>
+                <h1 class="text-2xl font-bold text-text-primary flex items-center gap-2.5">
+                    <span class="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                        <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    </span>
+                    Quản Lý Điểm Số Lớp Học Phần
+                </h1>
+                <p class="text-text-muted text-sm mt-1">
+                    Chọn một lớp học phần bên dưới để mở sổ điểm chi tiết, cấu hình tỷ lệ trọng số (QT / Thi) và nhập điểm sinh viên
+                </p>
             </div>
-            <div class="min-w-[320px] flex-1 max-w-md">
-                <label class="block text-[11px] text-text-muted mb-1">Chọn Lớp Học Phần</label>
-                <select id="ds-lhp" onchange="loadBangDiem()" class="w-full bg-canvas border border-primary rounded-lg px-3 py-2 text-sm font-bold text-primary outline-none"></select>
-            </div>
-            <div class="relative min-w-[220px]">
-                <label class="block text-[11px] text-text-muted mb-1">Tìm sinh viên</label>
-                <input id="ds-search" oninput="renderGradeRows()" placeholder="Tìm Mã SV, Họ tên..." class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+
+            <!-- Thống kê nhanh -->
+            <div class="flex flex-wrap items-center gap-2.5">
+                <div class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                    <span class="text-xs text-text-muted">Tổng lớp:</span>
+                    <span id="stat-total-lhp" class="text-sm font-bold text-text-primary">0</span>
+                </div>
+                <div class="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-xs text-emerald-300">Đang nhập:</span>
+                    <span id="stat-open-lhp" class="text-sm font-bold text-emerald-400">0</span>
+                </div>
+                <div class="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span class="text-xs text-amber-300">Đã khóa sổ:</span>
+                    <span id="stat-locked-lhp" class="text-sm font-bold text-amber-400">0</span>
+                </div>
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <div class="text-right">
-                <div class="text-[11px] text-text-muted">Trạng thái sổ điểm</div>
-                <div id="ds-status-badge" class="text-xs font-bold text-[#10B981] mt-0.5">--</div>
+        <!-- Thanh Bộ Lọc Đầu Trang (Filter Bar) -->
+        <div class="card p-4 bg-surface border border-surface-hover rounded-2xl shadow-md">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                <!-- 1. Học kỳ -->
+                <div>
+                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-primary"></i> Học kỳ
+                    </label>
+                    <select id="filter-hk" onchange="applyCardFilters()"
+                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:border-primary">
+                        <option value="">-- Tất cả Học kỳ --</option>
+                    </select>
+                </div>
+
+                <!-- 2. Khoa / Bộ môn -->
+                <div>
+                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                        <i data-lucide="building-2" class="w-3.5 h-3.5 text-indigo-400"></i> Khoa / Bộ môn
+                    </label>
+                    <select id="filter-khoa" onchange="onFilterKhoaChange()"
+                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:border-primary">
+                        <option value="">-- Tất cả Khoa --</option>
+                    </select>
+                </div>
+
+                <!-- 3. Môn học -->
+                <div>
+                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                        <i data-lucide="book-open" class="w-3.5 h-3.5 text-sky-400"></i> Môn học
+                    </label>
+                    <select id="filter-mon" onchange="applyCardFilters()"
+                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:border-primary">
+                        <option value="">-- Tất cả Môn học --</option>
+                    </select>
+                </div>
+
+                <!-- 4. Giảng viên -->
+                <div>
+                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                        <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-400"></i> Giảng viên
+                    </label>
+                    <select id="filter-gv" onchange="applyCardFilters()"
+                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:border-primary">
+                        <option value="">-- Tất cả Giảng viên --</option>
+                    </select>
+                </div>
+
+                <!-- 5. Trạng thái sổ điểm -->
+                <div>
+                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-400"></i> Trạng thái sổ điểm
+                    </label>
+                    <select id="filter-status" onchange="applyCardFilters()"
+                            class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:border-primary">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="OPEN">Đang nhập điểm</option>
+                        <option value="LOCKED">Đã khóa sổ</option>
+                        <option value="PENDING_UNLOCK">Chờ mở khóa</option>
+                    </select>
+                </div>
+
+                <!-- 6. Tìm kiếm nhanh + Đặt lại -->
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-primary"></i> Tìm kiếm nhanh
+                        </label>
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="filter-search" oninput="applyCardFilters()"
+                                   placeholder="Mã LHP, tên lớp, môn..."
+                                   class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl py-2 pl-9 pr-3 text-sm w-full focus:outline-none focus:border-primary" />
+                        </div>
+                    </div>
+                    <button type="button" onclick="resetCardFilters()" title="Đặt lại bộ lọc"
+                            class="mt-6 p-2.5 rounded-xl bg-canvas hover:bg-surface-hover text-text-muted hover:text-text-primary border border-surface-hover transition-colors">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lưới Thẻ Lớp Học Phần (Course Section Cards Grid) -->
+        <div id="lhp-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div class="col-span-full py-16 text-center text-text-muted">
+                <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto mb-2 text-primary"></i>
+                Đang tải danh sách lớp học phần...
             </div>
         </div>
     </div>
 
-    <!-- Grade Table -->
-    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-                <thead id="ds-thead" class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase"></thead>
-                <tbody id="ds-tbody" class="divide-y divide-surface-hover"></tbody>
-            </table>
+    <!-- ========================================================================= -->
+    <!-- BƯỚC 2: MÀN HÌNH CHI TIẾT SỔ ĐIỂM LỚP HỌC PHẦN (DETAIL GRADEBOOK VIEW)   -->
+    <!-- ========================================================================= -->
+    <div id="step-detail-gradebook" class="hidden space-y-5 animate-fade-in">
+        <!-- Thanh điều hướng trên cùng: Nút quay lại + Cụm nút chức năng -->
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-4 border-b border-surface-hover">
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="backToCardOverview()"
+                        class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2 shadow-sm transition-all hover:border-primary/40">
+                    <i data-lucide="arrow-left" class="w-4 h-4 text-primary"></i>
+                    <span>Quay lại danh sách Lớp học phần</span>
+                </button>
+            </div>
+
+            <!-- Cụm nút chức năng góc phải -->
+            <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+                <button type="button" id="btn-config-tyle" onclick="openTyLeModal()"
+                        class="btn bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="percent" class="w-4 h-4 text-indigo-400"></i>
+                    <span>Cấu hình tỷ lệ Học phần (QT / Thi)</span>
+                </button>
+
+                <button type="button" id="btn-config-cols" onclick="openConfigModal()"
+                        class="btn bg-surface hover:bg-surface-hover text-text-primary border border-surface-hover rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="sliders" class="w-4 h-4 text-primary"></i>
+                    <span id="btn-config-cols-label">Cấu hình cột QT (100%)</span>
+                </button>
+
+                <button type="button" onclick="exportBangDiemExcel()"
+                        class="btn bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    <span>Xuất Excel</span>
+                </button>
+
+                <div id="lock-actions-container" class="flex items-center gap-2"></div>
+
+                <button type="button" id="btn-save-grades" onclick="handleSaveClick()"
+                        class="btn btn-primary bg-primary text-white rounded-xl text-sm px-4 py-2 flex items-center gap-1.5 shadow-lg shadow-primary/20">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <span>Lưu Bảng Điểm</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Banner thông tin lớp học phần & Công thức động -->
+        <div class="card p-4 bg-surface border border-surface-hover rounded-2xl">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div class="space-y-1.5">
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <span id="detail-badge-malhp" class="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-primary/15 text-primary border border-primary/30">LHP---</span>
+                        <h2 id="detail-title-tenlhp" class="text-xl font-bold text-text-primary">Tên Lớp Học Phần</h2>
+                        <span id="detail-badge-nmh" class="px-2 py-0.5 rounded text-xs font-medium bg-canvas text-text-muted border border-surface-hover">Nhóm 01</span>
+                        <span id="detail-badge-stc" class="px-2 py-0.5 rounded text-xs font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">3 TC</span>
+                    </div>
+                    <!-- Dòng mô tả công thức động -->
+                    <p id="detail-formula-subtitle" class="text-text-muted text-xs sm:text-sm flex flex-wrap items-center gap-1.5">
+                        <i data-lucide="calculator" class="w-4 h-4 text-primary shrink-0"></i>
+                        <span>Công thức chuẩn: Tổng kết = Điểm Quá trình (<strong class="text-primary">40%</strong>) + Điểm Thi Kết thúc (<strong class="text-amber-400">60%</strong>) • Quy chế thi lại Lần 2 tối đa 6.0 điểm (QC 6.0)</span>
+                    </p>
+                </div>
+
+                <!-- Thông tin Giảng viên, Học kỳ, Tỷ lệ -->
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <div class="px-3 py-2 rounded-lg bg-canvas border border-surface-hover flex items-center gap-2">
+                        <i data-lucide="calendar" class="w-4 h-4 text-primary"></i>
+                        <div>
+                            <div class="text-[10px] text-text-muted uppercase">Học kỳ</div>
+                            <div id="detail-info-hk" class="font-semibold text-text-primary">---</div>
+                        </div>
+                    </div>
+                    <div class="px-3 py-2 rounded-lg bg-canvas border border-surface-hover flex items-center gap-2">
+                        <i data-lucide="user" class="w-4 h-4 text-emerald-400"></i>
+                        <div>
+                            <div class="text-[10px] text-text-muted uppercase">Giảng viên</div>
+                            <div id="detail-info-gv" class="font-semibold text-text-primary">---</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openTyLeModal()" title="Nhấn để thay đổi tỷ lệ điểm học phần"
+                            class="px-3 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 flex items-center gap-2 transition-colors text-left">
+                        <i data-lucide="scale" class="w-4 h-4 text-indigo-400"></i>
+                        <div>
+                            <div class="text-[10px] text-indigo-300 uppercase">Tỷ lệ Học phần</div>
+                            <div id="detail-info-tyle" class="font-bold text-indigo-400">QT 40% - Thi 60%</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thanh thông tin phụ: Tìm sinh viên trong bảng & Trạng thái sổ điểm -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div class="relative w-full sm:w-96">
+                <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="detail-student-search" oninput="filterStudentRows()"
+                       placeholder="Tìm nhanh sinh viên theo Mã SV, Họ tên, Lớp..."
+                       class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl py-2 pl-9 pr-14 text-sm w-full focus:outline-none focus:border-primary" />
+                <span id="detail-student-count" class="text-xs text-text-muted absolute right-3 top-1/2 -translate-y-1/2 font-mono">0 SV</span>
+            </div>
+
+            <div id="lhp-info-bar" class="flex flex-wrap items-center gap-3 text-sm">
+                <span id="lhp-status-badge" class="badge badge-info">Đang nhập</span>
+            </div>
+        </div>
+
+        <!-- Bảng Nhập Điểm Chi Tiết -->
+        <div class="card bg-surface rounded-2xl overflow-hidden border border-surface-hover shadow-lg">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse" id="grade-table">
+                    <thead>
+                        <tr id="grade-thead-row" class="border-b border-surface-hover bg-canvas/70 text-text-muted text-xs uppercase tracking-wider">
+                            <th class="p-3.5 w-12 text-center">STT</th>
+                            <th class="p-3.5">Mã SV</th>
+                            <th class="p-3.5">Họ và Tên</th>
+                            <th class="p-3.5">Lớp HC</th>
+                            <th class="p-3.5 text-center">Điểm QT Tổng (40%)</th>
+                            <th class="p-3.5 text-center">Thi Lần 1 (60%)</th>
+                            <th class="p-3.5 text-center">Thi Lần 2 (QC 6.0)</th>
+                            <th class="p-3.5 text-center">Tổng Kết</th>
+                            <th class="p-3.5 text-center">Điểm Chữ</th>
+                            <th class="p-3.5 text-center">Đánh Giá</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grade-tbody" class="divide-y divide-surface-hover text-sm">
+                        <tr>
+                            <td colspan="12" class="p-8 text-center text-text-muted">Đang tải dữ liệu bảng điểm...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Cấu hình Cột điểm Quá trình -->
-<div id="col-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
-            <h3 class="text-lg font-bold text-text-primary">Cấu Hình Cột Điểm Quá Trình (Tổng 100%)</h3>
-            <button onclick="document.getElementById('col-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-5 h-5"></i></button>
-        </div>
-        <div class="p-6 space-y-4">
-            <p class="text-xs text-text-muted">Các cột điểm thành phần bên dưới sẽ kết hợp theo trọng số để tạo thành <strong class="text-primary">Điểm Quá Trình Tổng (chiếm 40% điểm học phần)</strong>.</p>
-            <div id="col-list" class="space-y-2.5"></div>
-            <button type="button" onclick="addColItem()" class="w-full py-2 rounded-lg border border-dashed border-primary text-primary text-xs font-bold hover:bg-primary/10">+ Thêm cột điểm thành phần</button>
-            <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('col-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover text-xs text-text-muted">Hủy</button>
-                <button type="button" onclick="saveCauHinhCols()" class="px-5 py-2 rounded-lg bg-primary text-white text-xs font-bold">Lưu Cấu Hình</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Xác nhận Mật khẩu khi Lưu điểm -->
-<div id="pwd-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
-            <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
-                <i data-lucide="shield-alert" class="w-4 h-4"></i> Xác Thực Bảo Mật Khi Lưu Điểm
+<!-- ========================================================================= -->
+<!-- MODAL 1: CẤU HÌNH TỶ LỆ ĐIỂM HỌC PHẦN (QT % - THI KẾT THÚC %)             -->
+<!-- ========================================================================= -->
+<div id="tyle-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+        <div class="flex justify-between items-center p-5 border-b border-surface-hover bg-canvas/40">
+            <h3 class="text-lg font-bold text-text-primary flex items-center gap-2">
+                <span class="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                    <i data-lucide="percent" class="w-5 h-5"></i>
+                </span>
+                Cấu Hình Tỷ Lệ Điểm Học Phần
             </h3>
-            <button onclick="document.getElementById('pwd-modal').classList.add('hidden')" class="text-text-muted hover:text-[#ef4444]"><i data-lucide="x" class="w-4 h-4"></i></button>
-        </div>
-        <form onsubmit="confirmSaveBangDiem(event)" class="p-6 space-y-4">
-            <p class="text-xs text-text-muted leading-relaxed">
-                Vui lòng nhập mật khẩu đăng nhập hiện tại của bạn để xác nhận ghi nhận điểm vào Cơ sở dữ liệu.
-            </p>
-            <input id="confirm-pwd" type="password" required placeholder="Nhập mật khẩu tài khoản..."
-                   class="w-full bg-canvas border border-surface-hover rounded-lg px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-amber-400" />
-            <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm hover:bg-amber-400">
-                Xác Nhận Lưu Điểm
+            <button type="button" onclick="closeTyLeModal()" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-hover">
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
-        </form>
+        </div>
+
+        <div class="p-5 space-y-5">
+            <p class="text-xs text-text-muted leading-relaxed">
+                Thiết lập trọng số giữa <strong class="text-primary">Điểm Quá trình</strong> và <strong class="text-amber-400">Điểm Thi Kết thúc</strong> cho lớp học phần này (Tổng bắt buộc = <strong class="text-emerald-400">100%</strong>). Hệ thống sẽ tự động cập nhật công thức và tính lại điểm Tổng kết cho toàn bộ sinh viên.
+            </p>
+
+            <!-- Preset chọn nhanh -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                    Chọn nhanh cấu hình chuẩn (Presets)
+                </label>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" onclick="selectTyLePreset(40, 60)" id="preset-btn-40-60"
+                            class="tyle-preset-btn p-3 rounded-xl border border-surface-hover bg-canvas hover:border-primary/50 text-left transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-bold text-text-primary">40% QT - 60% Thi</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-semibold">Chuẩn</span>
+                        </div>
+                        <div class="text-[11px] text-text-muted mt-1">Môn lý thuyết kết hợp thực hành</div>
+                    </button>
+
+                    <button type="button" onclick="selectTyLePreset(50, 50)" id="preset-btn-50-50"
+                            class="tyle-preset-btn p-3 rounded-xl border border-surface-hover bg-canvas hover:border-primary/50 text-left transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-bold text-text-primary">50% QT - 50% Thi</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 font-semibold">Cân bằng</span>
+                        </div>
+                        <div class="text-[11px] text-text-muted mt-1">Môn chuyên ngành có bài tập lớn</div>
+                    </button>
+
+                    <button type="button" onclick="selectTyLePreset(30, 70)" id="preset-btn-30-70"
+                            class="tyle-preset-btn p-3 rounded-xl border border-surface-hover bg-canvas hover:border-primary/50 text-left transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-bold text-text-primary">30% QT - 70% Thi</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold">Lý thuyết</span>
+                        </div>
+                        <div class="text-[11px] text-text-muted mt-1">Môn đại cương / lý thuyết nền tảng</div>
+                    </button>
+
+                    <button type="button" onclick="selectTyLePreset(100, 0)" id="preset-btn-100-0"
+                            class="tyle-preset-btn p-3 rounded-xl border border-surface-hover bg-canvas hover:border-primary/50 text-left transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-bold text-emerald-400">100% QT - 0% Thi</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold">Không thi CK</span>
+                        </div>
+                        <div class="text-[11px] text-text-muted mt-1">Đồ án / Thực hành / Thực tập</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2 Ô input số tự động bù trừ 100% -->
+            <div class="p-4 rounded-xl bg-canvas border border-surface-hover space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-primary mb-1.5">
+                            % Điểm Quá trình (QT)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="input-tyle-qt" min="0" max="100" step="5" value="40"
+                                   oninput="onTyLeInputChanged('qt')"
+                                   class="input-field bg-surface text-primary border border-surface-hover rounded-xl py-2.5 pr-9 text-base font-bold text-center w-full" />
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-amber-400 mb-1.5">
+                            % Điểm Thi Kết thúc
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="input-tyle-thi" min="0" max="100" step="5" value="60"
+                                   oninput="onTyLeInputChanged('thi')"
+                                   class="input-field bg-surface text-amber-400 border border-surface-hover rounded-xl py-2.5 pr-9 text-base font-bold text-center w-full" />
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted font-bold">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thanh trực quan tỷ lệ -->
+                <div class="space-y-1.5">
+                    <div class="h-3 w-full rounded-full bg-surface overflow-hidden flex border border-surface-hover">
+                        <div id="tyle-visual-bar-qt" class="h-full bg-primary transition-all duration-300" style="width: 40%"></div>
+                        <div id="tyle-visual-bar-thi" class="h-full bg-amber-400 transition-all duration-300" style="width: 60%"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span id="tyle-preview-text" class="text-text-muted">
+                            Tổng kết = <strong class="text-primary">QT × 40%</strong> + <strong class="text-amber-400">Thi × 60%</strong>
+                        </span>
+                        <span id="tyle-sum-badge" class="font-bold text-emerald-400">Tổng: 100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-surface-hover">
+                <button type="button" onclick="closeTyLeModal()" class="btn bg-surface-hover text-text-primary rounded-xl px-4 py-2">Hủy</button>
+                <button type="button" onclick="saveTyLeHocPhan()" class="btn btn-primary bg-primary text-white rounded-xl px-4 py-2 flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Áp dụng & Lưu Tỷ Lệ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: CẤU HÌNH CỘT ĐIỂM QUÁ TRÌNH THÀNH PHẦN (TỔNG = 100% CỦA QT)      -->
+<!-- ========================================================================= -->
+<div id="config-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+        <div class="flex justify-between items-center p-5 border-b border-surface-hover">
+            <h3 class="text-lg font-bold text-text-primary flex items-center gap-2">
+                <i data-lucide="sliders" class="w-5 h-5 text-primary"></i>
+                Cấu Hình Cột Điểm Quá Trình (Tổng = 100% của Điểm QT)
+            </h3>
+            <button onclick="closeConfigModal()" class="text-text-muted hover:text-text-primary">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4">
+            <p class="text-xs text-text-muted">
+                Tùy chỉnh các cột điểm thành phần của <strong class="text-primary">Điểm Quá Trình</strong> (VD: Chuyên cần, Thảo luận, Giữa kỳ...). Tổng trọng số các cột thành phần phải bằng <strong class="text-emerald-400">100%</strong>.
+            </p>
+            <div id="config-cols-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+            <div class="flex justify-between items-center pt-2">
+                <button type="button" onclick="addConfigCol()" class="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Thêm cột điểm thành phần
+                </button>
+                <span class="text-sm font-semibold">Tổng: <span id="config-total-weight" class="text-emerald-400">100%</span></span>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-surface-hover">
+                <button type="button" onclick="closeConfigModal()" class="btn bg-surface-hover text-text-primary rounded-xl px-4 py-2">Hủy</button>
+                <button type="button" onclick="saveConfigCols()" class="btn btn-primary bg-primary text-white rounded-xl px-4 py-2">Lưu Cấu Hình Cột QT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: XÁC NHẬN MẬT KHẨU KHI LƯU BẢNG ĐIỂM / KHÓA SỔ / MỞ KHÓA SỔ       -->
+<!-- ========================================================================= -->
+<div id="pwd-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+        <div class="p-5 border-b border-surface-hover flex justify-between items-center bg-canvas/40">
+            <h3 id="pwd-modal-title" class="text-lg font-bold text-text-primary flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-5 h-5 text-primary"></i>
+                <span>Xác Nhận Mật Khẩu</span>
+            </h3>
+            <button onclick="closePwdModal()" class="text-text-muted hover:text-text-primary"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-5 space-y-4">
+            <p id="pwd-modal-desc" class="text-sm text-text-muted leading-relaxed">
+                Vui lòng nhập mật khẩu tài khoản của bạn để xác nhận thực hiện thao tác này:
+            </p>
+            <input type="password" id="confirm-pwd-input"
+                   onkeydown="if(event.key === 'Enter') confirmPasswordAction()"
+                   class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-primary"
+                   placeholder="Nhập mật khẩu xác thực..." />
+            <div class="flex justify-end gap-2 pt-2 border-t border-surface-hover">
+                <button type="button" onclick="closePwdModal()" class="btn bg-surface-hover text-text-primary rounded-xl px-4 py-2">Hủy</button>
+                <button type="button" id="pwd-modal-submit-btn" onclick="confirmPasswordAction()" class="btn btn-primary bg-primary text-white rounded-xl px-4 py-2 flex items-center gap-1.5">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                    <span>Xác Nhận</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
 @section Scripts {
-    <script>
-        const USER_ROLE = "@roleName";
-        const USER_MAGV = "@maGV";
-        let allLhps = [], hks = [];
-        let currentLhpInfo = null;
-        let cauHinhCols = [];
-        let editingColsTemp = [];
-        let rowsData = [];
+<script>
+    const USER_ROLE = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userRole));
+    const USER_MAGV = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userMaGV));
 
-        async function initPage() {
-            const [resHk, resLhp] = await Promise.all([apiFetch('/api/hocky'), apiFetch('/api/lophocphan')]);
-            hks = resHk.data || [];
-            allLhps = resLhp.data || [];
+    // State cho Bước 1 (Danh sách Card Lớp học phần)
+    let allLHP = [];
+    let filteredLHP = [];
+    let allHocKy = [];
+    let allKhoa = [];
+    let allMonHoc = [];
+    let allGiangVien = [];
+    let currentActiveMaHK = '';
 
+    // State cho Bước 2 (Chi tiết Sổ điểm Lớp học phần)
+    let currentMaLHP = '';
+    let currentLHPInfo = null;
+    let currentCauHinh = [];
+    let currentTyLeQT = 40;
+    let currentTyLeThi = 60;
+    let currentRows = [];
+    let tempConfigCols = [];
+
+    // State cho Modal xác nhận mật khẩu ('SAVE_GRADES' | 'LOCK_STATUS' | 'UNLOCK_STATUS')
+    let pendingPwdAction = null;
+    let pendingTargetStatus = null;
+
+    // Helper chuẩn hóa dữ liệu từ API (tương thích cả PascalCase lẫn camelCase)
+    function normHocKy(h) {
+        if (!h) return null;
+        return {
+            maHK: h.MaHK ?? h.maHK ?? '',
+            tenHK: h.TenHK ?? h.tenHK ?? '',
+            namHocBatDau: h.NamHocBatDau ?? h.namHocBatDau ?? '',
+            namHocKetThuc: h.NamHocKetThuc ?? h.namHocKetThuc ?? ''
+        };
+    }
+
+    function normKhoa(k) {
+        if (!k) return null;
+        return {
+            maKhoa: k.MaKhoa ?? k.maKhoa ?? '',
+            tenKhoa: k.TenKhoa ?? k.tenKhoa ?? ''
+        };
+    }
+
+    function normMonHoc(m) {
+        if (!m) return null;
+        return {
+            maMon: m.MaMon ?? m.maMon ?? '',
+            tenMon: m.TenMon ?? m.tenMon ?? '',
+            soTinChi: m.SoTinChi ?? m.soTinChi ?? 3,
+            maKhoa: m.MaKhoa ?? m.maKhoa ?? '',
+            khoa: normKhoa(m.Khoa ?? m.khoa)
+        };
+    }
+
+    function normGiangVien(g) {
+        if (!g) return null;
+        return {
+            maGV: g.MaGV ?? g.maGV ?? '',
+            hoTen: g.HoTen ?? g.hoTen ?? '',
+            maKhoa: g.MaKhoa ?? g.maKhoa ?? ''
+        };
+    }
+
+    function normLHP(l) {
+        if (!l) return null;
+        const mon = normMonHoc(l.MonHoc ?? l.monHoc);
+        const hk = normHocKy(l.HocKy ?? l.hocKy);
+        const gv = normGiangVien(l.GiangVien ?? l.giangVien);
+        const qt = l.TyLeQuaTrinh ?? l.tyLeQuaTrinh;
+        const thi = l.TyLeThiKetThuc ?? l.tyLeThiKetThuc;
+        const validWeight = (qt != null && thi != null && (Number(qt) + Number(thi) === 100));
+
+        return {
+            maLHP: l.MaLHP ?? l.maLHP ?? '',
+            tenLopHP: l.TenLopHP ?? l.tenLopHP ?? mon?.tenMon ?? '',
+            maMon: l.MaMon ?? l.maMon ?? mon?.maMon ?? '',
+            maHK: l.MaHK ?? l.maHK ?? hk?.maHK ?? '',
+            maGV: l.MaGV ?? l.maGV ?? gv?.maGV ?? '',
+            phongHoc: l.PhongHoc ?? l.phongHoc ?? '',
+            siSoToiDa: l.SiSoToiDa ?? l.siSoToiDa ?? 40,
+            nmh: l.NMH ?? l.nmh ?? '01',
+            stc: l.STC ?? l.stc ?? mon?.soTinChi ?? 3,
+            siSoHienTai: l.SiSoHienTai ?? l.siSoHienTai ?? 0,
+            soSVDaNhapDiem: l.SoSVDaNhapDiem ?? l.soSVDaNhapDiem ?? 0,
+            trangThai: l.TrangThai ?? l.trangThai ?? 'MoDangKy',
+            trangThaiNhapDiem: l.TrangThaiNhapDiem ?? l.trangThaiNhapDiem ?? 'Đang nhập',
+            tyLeQuaTrinh: validWeight ? Number(qt) : 40,
+            tyLeThiKetThuc: validWeight ? Number(thi) : 60,
+            cauHinhDiem: l.CauHinhDiem ?? l.cauHinhDiem ?? null,
+            monHoc: mon,
+            hocKy: hk,
+            giangVien: gv
+        };
+    }
+
+    function normDiemRow(r) {
+        const sv = r.SinhVien ?? r.sinhVien;
+        return {
+            maKQ: r.MaKQ ?? r.maKQ,
+            maSV: r.MaSV ?? r.maSV ?? '',
+            maLHP: r.MaLHP ?? r.maLHP ?? '',
+            diemCC: r.DiemCC ?? r.diemCC ?? null,
+            diemGK: r.DiemGK ?? r.diemGK ?? null,
+            diemCK: r.DiemCK ?? r.diemCK ?? null,
+            diemThiLan1: r.DiemThiLan1 ?? r.diemThiLan1 ?? null,
+            diemThiLan2: r.DiemThiLan2 ?? r.diemThiLan2 ?? null,
+            diemTongKet: r.DiemTongKet ?? r.diemTongKet ?? null,
+            diemChu: r.DiemChu ?? r.diemChu ?? null,
+            ghiChu: r.GhiChu ?? r.ghiChu ?? null,
+            chiTietDiemQT: r.ChiTietDiemQT ?? r.chiTietDiemQT ?? {},
+            sinhVien: sv ? {
+                maSV: sv.MaSV ?? sv.maSV ?? '',
+                hoTen: sv.HoTen ?? sv.hoTen ?? '',
+                maLop: sv.MaLop ?? sv.maLop ?? (sv.LopHanhChinh?.MaLop ?? sv.lopHanhChinh?.maLop ?? '')
+            } : null
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initOverviewData();
+    });
+
+    // =========================================================================
+    // PHẦN 1: KHỞI TẠO & LỌC DANH SÁCH THẺ LỚP HỌC PHẦN (BƯỚC 1)
+    // =========================================================================
+    async function initOverviewData() {
+        try {
+            let lhpUrl = '/api/lophocphan';
             if (USER_ROLE === 'GiangVien' && USER_MAGV) {
-                allLhps = allLhps.filter(l => l.MaGV === USER_MAGV);
+                lhpUrl += `?maGV=${encodeURIComponent(USER_MAGV)}`;
             }
 
-            document.getElementById('ds-hk').innerHTML = '<option value="">Tất cả Học kỳ</option>' +
-                hks.map(h => `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`).join('');
+            const [hkRes, khoaRes, monRes, gvRes, lhpRes] = await Promise.all([
+                fetch('/api/hocky').then(r => r.json()).catch(() => ({ data: [] })),
+                fetch('/api/khoa').then(r => r.json()).catch(() => ({ data: [] })),
+                fetch('/api/monhoc').then(r => r.json()).catch(() => ({ data: [] })),
+                fetch('/api/giangvien').then(r => r.json()).catch(() => ({ data: [] })),
+                fetch(lhpUrl).then(r => r.json()).catch(() => ({ data: [] }))
+            ]);
 
-            filterLhpOptions();
-        }
+            allHocKy = (hkRes.data || []).map(normHocKy).filter(Boolean);
+            allKhoa = (khoaRes.data || []).map(normKhoa).filter(Boolean);
+            allMonHoc = (monRes.data || []).map(normMonHoc).filter(Boolean);
+            allGiangVien = (gvRes.data || []).map(normGiangVien).filter(Boolean);
+            allLHP = (lhpRes.data || []).map(normLHP).filter(l => l && l.maLHP);
 
-        function filterLhpOptions() {
-            const maHK = document.getElementById('ds-hk').value;
-            const filtered = allLhps.filter(l => !maHK || l.MaHK === maHK);
-            const sel = document.getElementById('ds-lhp');
-            sel.innerHTML = filtered.map(l => `<option value="${l.MaLHP}">${l.MaLHP} - ${l.TenLopHP} (${l.TrangThaiNhapDiem || 'Đang nhập'})</option>`).join('');
-            if (filtered.length > 0) loadBangDiem();
-            else {
-                document.getElementById('ds-tbody').innerHTML = `<tr><td colspan="10" class="p-8 text-center text-text-muted">Không có lớp học phần nào</td></tr>`;
+            detectCurrentSemester();
+            populateFilterDropdowns();
+            applyCardFilters();
+
+            // Nếu trên URL có truyền sẵn ?maLHP=... thì mở thẳng sổ điểm của lớp đó
+            const params = new URLSearchParams(window.location.search);
+            const urlMaLHP = params.get('maLHP');
+            if (urlMaLHP && allLHP.some(l => l.maLHP === urlMaLHP)) {
+                await openGradebookDetail(urlMaLHP);
             }
+        } catch (err) {
+            showToast('Lỗi tải danh sách lớp học phần', 'error');
+        }
+    }
+
+    function detectCurrentSemester() {
+        if (!allHocKy.length) return;
+        const nowYear = new Date().getFullYear();
+        const openSemesters = new Set(
+            allLHP.filter(l => isStatusOpen(l.trangThaiNhapDiem)).map(l => l.maHK)
+        );
+        const matchCurrent = allHocKy.find(h =>
+            openSemesters.has(h.maHK) && (Number(h.namHocBatDau) === nowYear || Number(h.namHocKetThuc) === nowYear)
+        ) || allHocKy.find(h => openSemesters.has(h.maHK)) || allHocKy[0];
+
+        currentActiveMaHK = matchCurrent ? matchCurrent.maHK : '';
+    }
+
+    function isStatusOpen(status) {
+        return !status || status === 'Đang nhập' || status === 'Vui lòng nhập điểm';
+    }
+
+    function populateFilterDropdowns() {
+        // 1. Học kỳ
+        const hkSelect = document.getElementById('filter-hk');
+        hkSelect.innerHTML = `<option value="">-- Tất cả Học kỳ (${allLHP.length} lớp) --</option>` +
+            allHocKy.map(h => {
+                const isCurrent = h.maHK === currentActiveMaHK;
+                const countInHK = allLHP.filter(l => l.maHK === h.maHK).length;
+                const label = `${h.tenHK || h.maHK} (${h.namHocBatDau}-${h.namHocKetThuc}) [${countInHK} lớp]${isCurrent ? ' ★' : ''}`;
+                return `<option value="${h.maHK}">${label}</option>`;
+            }).join('');
+
+        hkSelect.value = '';
+
+        // 2. Khoa
+        const khoaSelect = document.getElementById('filter-khoa');
+        khoaSelect.innerHTML = `<option value="">-- Tất cả Khoa --</option>` +
+            allKhoa.map(k => `<option value="${k.maKhoa}">${k.tenKhoa}</option>`).join('');
+
+        // 3. Môn học & Giảng viên
+        populateMonAndGVDropdowns('');
+    }
+
+    function populateMonAndGVDropdowns(selectedKhoa) {
+        const monSelect = document.getElementById('filter-mon');
+        const gvSelect = document.getElementById('filter-gv');
+        const currentMon = monSelect.value;
+        const currentGV = gvSelect.value;
+
+        const monList = selectedKhoa
+            ? allMonHoc.filter(m => m.maKhoa === selectedKhoa)
+            : allMonHoc;
+
+        const gvList = selectedKhoa
+            ? allGiangVien.filter(g => g.maKhoa === selectedKhoa)
+            : allGiangVien;
+
+        monSelect.innerHTML = `<option value="">-- Tất cả Môn học --</option>` +
+            monList.map(m => `<option value="${m.maMon}">${m.maMon} - ${m.tenMon}</option>`).join('');
+
+        gvSelect.innerHTML = `<option value="">-- Tất cả Giảng viên --</option>` +
+            gvList.map(g => `<option value="${g.maGV}">${g.hoTen} (${g.maGV})</option>`).join('');
+
+        if (monList.some(m => m.maMon === currentMon)) monSelect.value = currentMon;
+        if (gvList.some(g => g.maGV === currentGV)) gvSelect.value = currentGV;
+
+        if (USER_ROLE === 'GiangVien' && USER_MAGV) {
+            gvSelect.value = USER_MAGV;
+            gvSelect.disabled = true;
+        }
+    }
+
+    function onFilterKhoaChange() {
+        const selectedKhoa = document.getElementById('filter-khoa').value;
+        populateMonAndGVDropdowns(selectedKhoa);
+        applyCardFilters();
+    }
+
+    function resetCardFilters() {
+        document.getElementById('filter-hk').value = '';
+        document.getElementById('filter-khoa').value = '';
+        populateMonAndGVDropdowns('');
+        document.getElementById('filter-mon').value = '';
+        if (USER_ROLE !== 'GiangVien') {
+            document.getElementById('filter-gv').value = '';
+        }
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-search').value = '';
+        applyCardFilters();
+    }
+
+    function applyCardFilters() {
+        const maHK = document.getElementById('filter-hk').value;
+        const maKhoa = document.getElementById('filter-khoa').value;
+        const maMon = document.getElementById('filter-mon').value;
+        const maGV = document.getElementById('filter-gv').value;
+        const statusFilter = document.getElementById('filter-status').value;
+        const keyword = (document.getElementById('filter-search').value || '').trim().toLowerCase();
+
+        filteredLHP = allLHP.filter(l => {
+            if (maHK && l.maHK !== maHK) return false;
+            if (maKhoa && l.monHoc?.maKhoa !== maKhoa) return false;
+            if (maMon && l.maMon !== maMon) return false;
+            if (maGV && l.maGV !== maGV) return false;
+
+            if (statusFilter === 'OPEN' && !isStatusOpen(l.trangThaiNhapDiem)) return false;
+            if (statusFilter === 'LOCKED' && l.trangThaiNhapDiem !== 'Đã khóa') return false;
+            if (statusFilter === 'PENDING_UNLOCK' && l.trangThaiNhapDiem !== 'Chờ mở khóa') return false;
+
+            if (keyword) {
+                const searchStr = `${l.maLHP} ${l.tenLopHP || ''} ${l.maMon || ''} ${l.monHoc?.tenMon || ''} ${l.giangVien?.hoTen || ''} ${l.phongHoc || ''}`.toLowerCase();
+                if (!searchStr.includes(keyword)) return false;
+            }
+            return true;
+        });
+
+        // Sắp xếp ưu tiên: Lớp thuộc Học kỳ hiện tại + Đang mở nhập điểm lên đầu
+        filteredLHP.sort((a, b) => {
+            const aIsCurrentHK = a.maHK === currentActiveMaHK ? 1 : 0;
+            const bIsCurrentHK = b.maHK === currentActiveMaHK ? 1 : 0;
+            if (aIsCurrentHK !== bIsCurrentHK) return bIsCurrentHK - aIsCurrentHK;
+
+            const aIsOpen = isStatusOpen(a.trangThaiNhapDiem) ? 1 : 0;
+            const bIsOpen = isStatusOpen(b.trangThaiNhapDiem) ? 1 : 0;
+            if (aIsOpen !== bIsOpen) return bIsOpen - aIsOpen;
+
+            if ((b.maHK || '') !== (a.maHK || '')) return (b.maHK || '').localeCompare(a.maHK || '');
+            return (a.maLHP || '').localeCompare(b.maLHP || '');
+        });
+
+        updateOverviewStats();
+        renderCardsGrid();
+    }
+
+    function updateOverviewStats() {
+        document.getElementById('stat-total-lhp').textContent = filteredLHP.length;
+        document.getElementById('stat-open-lhp').textContent = filteredLHP.filter(l => isStatusOpen(l.trangThaiNhapDiem)).length;
+        document.getElementById('stat-locked-lhp').textContent = filteredLHP.filter(l => l.trangThaiNhapDiem === 'Đã khóa').length;
+    }
+
+    function renderCardsGrid() {
+        const grid = document.getElementById('lhp-cards-grid');
+        if (!filteredLHP.length) {
+            grid.innerHTML = `
+                <div class="col-span-full card p-12 text-center border border-dashed border-surface-hover">
+                    <div class="w-14 h-14 rounded-2xl bg-surface-hover/60 flex items-center justify-center mx-auto mb-3 text-text-muted">
+                        <i data-lucide="folder-search" class="w-7 h-7"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-text-primary">Không tìm thấy Lớp học phần phù hợp</h3>
+                    <p class="text-xs text-text-muted mt-1">Hãy thử chọn "Tất cả Học kỳ" hoặc đặt lại bộ lọc tìm kiếm.</p>
+                    <button type="button" onclick="resetCardFilters()" class="btn bg-primary/15 hover:bg-primary/25 text-primary text-xs mt-4 px-4 py-2">
+                        Hiển thị tất cả Lớp học phần
+                    </button>
+                </div>`;
+            if (window.lucide) lucide.createIcons();
+            return;
         }
 
-        async function loadBangDiem() {
-            const maLHP = document.getElementById('ds-lhp').value;
-            if (!maLHP) return;
+        grid.innerHTML = filteredLHP.map(l => {
+            const st = l.trangThaiNhapDiem || 'Đang nhập';
+            let statusBadge = '';
+            let cardAccent = 'hover:border-primary/60 hover:shadow-primary/10';
 
-            const res = await apiFetch(`/api/diem/lophocphan/${maLHP}`);
-            currentLhpInfo = res.data.thongTinLHP;
-            cauHinhCols = currentLhpInfo.CauHinhDiem || [
-                { id: 'col_cc', name: 'Chuyên cần', weight: 25 },
-                { id: 'col_gk', name: 'Giữa kỳ', weight: 75 }
-            ];
-            rowsData = (res.data.danhSachDiem || []).map(r => ({
-                ...r,
-                ChiTietDiemQT: r.ChiTietDiemQT || {}
-            }));
-
-            updateLockUI();
-            renderTableHeader();
-            renderGradeRows();
-        }
-
-        function updateLockUI() {
-            const st = currentLhpInfo?.TrangThaiNhapDiem || 'Đang nhập';
-            const badge = document.getElementById('ds-status-badge');
-            badge.textContent = st;
-            badge.className = st === 'Đã khóa' ? 'text-xs font-bold text-[#ef4444]' : st === 'Chờ mở khóa' ? 'text-xs font-bold text-amber-400' : 'text-xs font-bold text-[#10B981]';
-
-            const btnText = document.getElementById('lock-action-text');
-            if (USER_ROLE === 'Admin') {
-                btnText.textContent = st === 'Đã khóa' || st === 'Chờ mở khóa' ? 'Phê duyệt Mở khóa' : 'Khóa sổ điểm';
+            if (st === 'Đã khóa') {
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3"></i> Đã khóa sổ
+                </span>`;
+                cardAccent = 'hover:border-amber-500/60 hover:shadow-amber-500/10';
+            } else if (st === 'Chờ mở khóa') {
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1">
+                    <i data-lucide="clock" class="w-3 h-3"></i> Chờ mở khóa
+                </span>`;
             } else {
-                btnText.textContent = st === 'Đã khóa' ? 'Xin mở khóa điểm' : st === 'Chờ mở khóa' ? 'Đang chờ Admin mở khóa' : 'Chốt sổ điểm';
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Đang nhập
+                </span>`;
             }
-        }
 
-        function renderTableHeader() {
-            const colHeaders = cauHinhCols.map(c => `
-                <th class="px-3 py-3 text-center">${c.name}<br/><span class="text-[10px] text-primary">(${c.weight}% QT)</span></th>
-            `).join('');
+            const tenMon = l.monHoc?.tenMon || l.tenLopHP || l.maLHP;
+            const tenLop = l.tenLopHP || tenMon;
+            const nmh = l.nmh || '01';
+            const stc = l.stc || l.monHoc?.soTinChi || 3;
+            const hkText = l.hocKy ? `${l.hocKy.tenHK} (${l.hocKy.namHocBatDau}-${l.hocKy.namHocKetThuc})` : (l.maHK || '---');
+            const gvText = l.giangVien?.hoTen || l.maGV || 'Chưa phân công';
+            const khoaText = l.monHoc?.khoa?.tenKhoa || '';
 
-            document.getElementById('ds-thead').innerHTML = `
-                <tr>
-                    <th class="px-4 py-3 text-center w-12">STT</th>
-                    <th class="px-4 py-3">Mã SV</th>
-                    <th class="px-4 py-3">Họ và Tên</th>
-                    ${colHeaders}
-                    <th class="px-3 py-3 text-center bg-primary/5">Điểm QT Tổng<br/><span class="text-[10px] text-primary">(40%)</span></th>
-                    <th class="px-3 py-3 text-center">Thi Lần 1<br/><span class="text-[10px] text-text-muted">(60%)</span></th>
-                    <th class="px-3 py-3 text-center">Thi Lần 2<br/><span class="text-[10px] text-amber-400">(QC 6.0)</span></th>
-                    <th class="px-3 py-3 text-center">Tổng Kết</th>
-                    <th class="px-3 py-3 text-center">Điểm Chữ</th>
-                    <th class="px-4 py-3 text-center">Ghi Chú</th>
-                </tr>
+            const siSo = l.siSoHienTai ?? 0;
+            const daNhap = l.soSVDaNhapDiem ?? 0;
+            const progressPct = siSo > 0 ? Math.round((daNhap / siSo) * 100) : 0;
+
+            const tyLeQT = l.tyLeQuaTrinh ?? 40;
+            const tyLeThi = l.tyLeThiKetThuc ?? 60;
+            const tyLeBadgeText = tyLeThi === 0
+                ? `100% QT (Không thi CK)`
+                : `QT ${tyLeQT}% - Thi ${tyLeThi}%`;
+
+            return `
+                <div onclick="openGradebookDetail('${l.maLHP}')"
+                     class="group card p-5 bg-surface border border-surface-hover rounded-2xl ${cardAccent} hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer flex flex-col justify-between relative overflow-hidden">
+
+                    <!-- Header Card -->
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-3">
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary group-hover:text-white transition-colors">
+                                ${l.maLHP}
+                            </span>
+                            ${statusBadge}
+                        </div>
+
+                        <!-- Body Card: Tên lớp học phần / Môn học -->
+                        <h3 class="text-base font-bold text-text-primary group-hover:text-primary transition-colors line-clamp-2 min-h-[2.75rem]" title="${tenLop}">
+                            ${tenLop}
+                        </h3>
+                        <p class="text-xs text-text-muted mt-0.5 truncate" title="${tenMon}">
+                            ${l.maMon ? `<span class="font-mono text-text-primary/80">${l.maMon}</span> • ` : ''}${tenMon}
+                        </p>
+
+                        <!-- Badges: Nhóm, Tín chỉ, Tỷ lệ -->
+                        <div class="flex flex-wrap items-center gap-1.5 mt-3">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-canvas text-text-muted border border-surface-hover">
+                                Nhóm ${nmh}
+                            </span>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                ${stc} STC
+                            </span>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                ${tyLeBadgeText}
+                            </span>
+                        </div>
+
+                        <!-- Thông tin Học kỳ & Giảng viên -->
+                        <div class="mt-3.5 pt-3 border-t border-surface-hover/80 space-y-1.5 text-xs text-text-muted">
+                            <div class="flex items-center gap-2 truncate">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-primary shrink-0"></i>
+                                <span class="truncate">${hkText}</span>
+                            </div>
+                            <div class="flex items-center gap-2 truncate">
+                                <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+                                <span class="text-text-primary font-medium truncate">${gvText}</span>
+                            </div>
+                            ${khoaText ? `
+                            <div class="flex items-center gap-2 truncate">
+                                <i data-lucide="building-2" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
+                                <span class="truncate">${khoaText}</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Thông số & Tiến độ nhập điểm + Footer -->
+                    <div class="mt-4 pt-3 border-t border-surface-hover space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center text-xs mb-1.5">
+                                <span class="text-text-muted flex items-center gap-1">
+                                    <i data-lucide="users" class="w-3.5 h-3.5 text-primary"></i>
+                                    Sĩ số: <strong class="text-text-primary">${siSo} SV</strong>
+                                </span>
+                                <span class="text-[11px] font-semibold ${progressPct === 100 && siSo > 0 ? 'text-emerald-400' : 'text-text-muted'}">
+                                    Đã có điểm: ${daNhap}/${siSo} (${progressPct}%)
+                                </span>
+                            </div>
+                            <div class="w-full h-1.5 bg-canvas rounded-full overflow-hidden">
+                                <div class="h-full ${progressPct === 100 && siSo > 0 ? 'bg-emerald-400' : 'bg-primary'} transition-all duration-300"
+                                     style="width: ${progressPct}%"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-[11px] text-text-muted font-mono">
+                                ${l.phongHoc ? `Phòng: ${l.phongHoc}` : 'Sổ điểm điện tử'}
+                            </span>
+                            <span class="text-xs font-bold text-primary group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                                Mở sổ điểm <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             `;
-        }
+        }).join('');
 
-        function recalcRow(row) {
-            const hasAllQt = cauHinhCols.every(c => row.ChiTietDiemQT[c.id] !== undefined && row.ChiTietDiemQT[c.id] !== null && row.ChiTietDiemQT[c.id] !== '');
-            if (hasAllQt) {
-                const sumQt = cauHinhCols.reduce((acc, c) => acc + Number(row.ChiTietDiemQT[c.id]) * (c.weight / 100.0), 0);
-                row.DiemCK = Math.round(sumQt * 10) / 10;
-            }
+        if (window.lucide) lucide.createIcons();
+    }
 
-            if (row.DiemCK != null && row.DiemThiLan1 != null && row.DiemThiLan1 !== '') {
-                const qt = Number(row.DiemCK);
-                const t1 = Number(row.DiemThiLan1);
-                const tk1 = Math.round((qt * 0.4 + t1 * 0.6) * 10) / 10;
+    // =========================================================================
+    // PHẦN 2: CHUYỂN BƯỚC 1 <-> BƯỚC 2 (MÀN HÌNH CHI TIẾT SỔ ĐIỂM)
+    // =========================================================================
+    async function openGradebookDetail(maLHP) {
+        if (!maLHP || maLHP === 'undefined') return;
+        document.getElementById('step-overview-cards').classList.add('hidden');
+        document.getElementById('step-detail-gradebook').classList.remove('hidden');
+        document.getElementById('detail-student-search').value = '';
+        await onChangeLHP(maLHP);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
-                if (row.DiemThiLan2 != null && row.DiemThiLan2 !== '') {
-                    const t2 = Number(row.DiemThiLan2);
-                    const tk2Raw = Math.round((qt * 0.4 + t2 * 0.6) * 10) / 10;
-                    if (tk1 < 4.0) {
-                        row.DiemTongKet = Math.min(tk2Raw, 6.0);
-                        row.GhiChu = row.DiemTongKet >= 4.0 ? 'Đạt (Thi lại)' : 'Học lại';
-                    } else {
-                        const capped = tk1 < 6.0 ? Math.min(tk2Raw, 6.0) : tk2Raw;
-                        row.DiemTongKet = Math.max(tk1, capped);
-                        row.GhiChu = row.DiemTongKet >= 4.0 ? 'Đạt' : 'Học lại';
-                    }
-                } else {
-                    row.DiemTongKet = tk1;
-                    row.GhiChu = tk1 >= 4.0 ? 'Đạt' : 'Học lại';
-                }
+    function backToCardOverview() {
+        document.getElementById('step-detail-gradebook').classList.add('hidden');
+        document.getElementById('step-overview-cards').classList.remove('hidden');
+        applyCardFilters();
+        if (window.lucide) lucide.createIcons();
+    }
 
-                const tk = row.DiemTongKet;
-                row.DiemChu = tk >= 9.0 ? 'A+' : tk >= 8.5 ? 'A' : tk >= 8.0 ? 'B+' : tk >= 7.0 ? 'B' : tk >= 6.5 ? 'C+' : tk >= 5.5 ? 'C' : tk >= 5.0 ? 'D+' : tk >= 4.0 ? 'D' : 'F';
-            }
-        }
-
-        function renderGradeRows() {
-            const q = document.getElementById('ds-search').value.toLowerCase().trim();
-            const isLocked = currentLhpInfo?.TrangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi';
-
-            const filtered = rowsData.filter(r => !q || (r.MaSV || '').toLowerCase().includes(q) || (r.SinhVien?.HoTen || '').toLowerCase().includes(q));
-            const tbody = document.getElementById('ds-tbody');
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${cauHinhCols.length + 8}" class="p-8 text-center text-text-muted">Chưa có sinh viên trong lớp học phần này</td></tr>`;
+    async function onChangeLHP(maLHP) {
+        if (!maLHP || maLHP === 'undefined') return;
+        currentMaLHP = maLHP;
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(maLHP)}`);
+            const json = await res.json();
+            if (json.status !== 'success') {
+                showToast(json.message || 'Lỗi tải bảng điểm', 'error');
                 return;
             }
 
-            tbody.innerHTML = filtered.map((r, idx) => {
-                const qtInputs = cauHinhCols.map(c => {
-                    const val = r.ChiTietDiemQT[c.id] ?? '';
-                    return `
-                        <td class="px-2 py-2.5 text-center">
-                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
-                                   value="${val}"
-                                   oninput="onQtColChange('${r.MaSV}', '${c.id}', this.value)"
-                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-text-primary focus:border-primary outline-none disabled:opacity-50" />
-                        </td>
-                    `;
-                }).join('');
+            const rawInfo = json.data?.thongTinLHP ?? json.data?.ThongTinLHP;
+            const rawList = json.data?.danhSachDiem ?? json.data?.DanhSachDiem ?? [];
 
-                return `
-                    <tr class="hover:bg-surface-hover/40" id="row-${r.MaSV}">
-                        <td class="px-4 py-2.5 text-center text-text-muted">${idx + 1}</td>
-                        <td class="px-4 py-2.5 font-bold text-primary">${r.MaSV}</td>
-                        <td class="px-4 py-2.5 font-medium text-text-primary">${r.SinhVien?.HoTen || ''}</td>
-                        ${qtInputs}
-                        <td class="px-3 py-2.5 text-center font-bold text-primary bg-primary/5" id="cell-qt-${r.MaSV}">${r.DiemCK ?? '-'}</td>
-                        <td class="px-2 py-2.5 text-center">
-                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
-                                   value="${r.DiemThiLan1 ?? ''}"
-                                   oninput="onExamColChange('${r.MaSV}', 'DiemThiLan1', this.value)"
-                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-text-primary focus:border-primary outline-none disabled:opacity-50" />
-                        </td>
-                        <td class="px-2 py-2.5 text-center">
-                            <input type="number" step="0.1" min="0" max="10" ${isLocked ? 'disabled' : ''}
-                                   value="${r.DiemThiLan2 ?? ''}"
-                                   oninput="onExamColChange('${r.MaSV}', 'DiemThiLan2', this.value)"
-                                   class="w-16 bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-center text-sm text-amber-400 focus:border-amber-400 outline-none disabled:opacity-50" />
-                        </td>
-                        <td class="px-3 py-2.5 text-center font-extrabold text-text-primary" id="cell-tk-${r.MaSV}">${r.DiemTongKet ?? '-'}</td>
-                        <td class="px-3 py-2.5 text-center font-bold" id="cell-dc-${r.MaSV}">${r.DiemChu ?? '-'}</td>
-                        <td class="px-4 py-2.5 text-center text-xs" id="cell-gc-${r.MaSV}">${r.GhiChu ?? ''}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
+            currentLHPInfo = normLHP(rawInfo);
+            const rawCauHinh = rawInfo?.CauHinhDiem ?? rawInfo?.cauHinhDiem;
+            currentCauHinh = Array.isArray(rawCauHinh) && rawCauHinh.length
+                ? rawCauHinh.map(c => ({
+                    id: c.id ?? c.Id ?? 'col_qt',
+                    name: c.name ?? c.Name ?? 'Cột điểm',
+                    weight: Number(c.weight ?? c.Weight ?? 0)
+                }))
+                : [
+                    { id: 'col_cc', name: 'Chuyên cần', weight: 25 },
+                    { id: 'col_gk', name: 'Giữa kỳ', weight: 75 }
+                ];
 
-        function onQtColChange(maSV, colId, val) {
-            const row = rowsData.find(x => x.MaSV === maSV);
-            if (!row) return;
-            row.ChiTietDiemQT[colId] = val === '' ? null : Number(val);
-            recalcRow(row);
-            updateRowSummaryDOM(row);
-        }
+            currentTyLeQT = currentLHPInfo.tyLeQuaTrinh ?? 40;
+            currentTyLeThi = currentLHPInfo.tyLeThiKetThuc ?? 60;
+            currentRows = rawList.map(normDiemRow);
 
-        function onExamColChange(maSV, field, val) {
-            const row = rowsData.find(x => x.MaSV === maSV);
-            if (!row) return;
-            row[field] = val === '' ? null : Number(val);
-            recalcRow(row);
-            updateRowSummaryDOM(row);
-        }
-
-        function updateRowSummaryDOM(row) {
-            document.getElementById(`cell-qt-${row.MaSV}`).textContent = row.DiemCK ?? '-';
-            document.getElementById(`cell-tk-${row.MaSV}`).textContent = row.DiemTongKet ?? '-';
-            document.getElementById(`cell-dc-${row.MaSV}`).textContent = row.DiemChu ?? '-';
-            document.getElementById(`cell-gc-${row.MaSV}`).textContent = row.GhiChu ?? '';
-        }
-
-        function openPasswordConfirmModal() {
-            document.getElementById('confirm-pwd').value = '';
-            document.getElementById('pwd-modal').classList.remove('hidden');
-        }
-
-        async function confirmSaveBangDiem(e) {
-            e.preventDefault();
-            const maLHP = document.getElementById('ds-lhp').value;
-            const password = document.getElementById('confirm-pwd').value;
-
-            try {
-                const payload = {
-                    password,
-                    danhSachDiem: rowsData.map(r => ({
-                        MaSV: r.MaSV,
-                        DiemCK: r.DiemCK,
-                        DiemThiLan1: r.DiemThiLan1,
-                        DiemThiLan2: r.DiemThiLan2,
-                        ChiTietDiemQT: r.ChiTietDiemQT
-                    }))
-                };
-                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/hang-loat`, {
-                    method: 'PUT',
-                    body: JSON.stringify(payload)
-                });
-                showToast(res.message);
-                document.getElementById('pwd-modal').classList.add('hidden');
-                await loadBangDiem();
-            } catch (err) {
-                showToast(err.message, 'error');
+            // Đồng bộ lại thông tin vào danh sách Card ở Bước 1
+            const cardIdx = allLHP.findIndex(x => x.maLHP === maLHP);
+            if (cardIdx !== -1) {
+                allLHP[cardIdx].trangThaiNhapDiem = currentLHPInfo.trangThaiNhapDiem;
+                allLHP[cardIdx].tyLeQuaTrinh = currentTyLeQT;
+                allLHP[cardIdx].tyLeThiKetThuc = currentTyLeThi;
+                allLHP[cardIdx].siSoHienTai = currentRows.length;
+                allLHP[cardIdx].soSVDaNhapDiem = currentRows.filter(r => r.diemTongKet != null).length;
             }
+
+            renderDetailHeaderAndFormula();
+            renderLockControls();
+            renderGradeTable();
+        } catch (err) {
+            showToast('Lỗi kết nối khi tải bảng điểm', 'error');
+        }
+    }
+
+    function renderDetailHeaderAndFormula() {
+        if (!currentLHPInfo) return;
+        document.getElementById('detail-badge-malhp').textContent = currentLHPInfo.maLHP;
+        document.getElementById('detail-title-tenlhp').textContent =
+            currentLHPInfo.tenLopHP || currentLHPInfo.monHoc?.tenMon || currentLHPInfo.maLHP;
+        document.getElementById('detail-badge-nmh').textContent = `Nhóm ${currentLHPInfo.nmh || '01'}`;
+        document.getElementById('detail-badge-stc').textContent = `${currentLHPInfo.stc || currentLHPInfo.monHoc?.soTinChi || 3} TC`;
+
+        const hk = currentLHPInfo.hocKy;
+        document.getElementById('detail-info-hk').textContent = hk && hk.tenHK
+            ? `${hk.tenHK} (${hk.namHocBatDau}-${hk.namHocKetThuc})`
+            : (currentLHPInfo.maHK || '---');
+        document.getElementById('detail-info-gv').textContent =
+            currentLHPInfo.giangVien?.hoTen || currentLHPInfo.maGV || 'Chưa phân công';
+
+        const tyLeText = currentTyLeThi === 0
+            ? `100% QT - 0% Thi (Không thi CK)`
+            : `QT ${currentTyLeQT}% - Thi ${currentTyLeThi}%`;
+        document.getElementById('detail-info-tyle').textContent = tyLeText;
+
+        // Cập nhật dòng mô tả công thức động dưới tiêu đề
+        const subtitleEl = document.getElementById('detail-formula-subtitle');
+        if (currentTyLeThi === 0) {
+            subtitleEl.innerHTML = `
+                <i data-lucide="calculator" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span>Công thức chuẩn: Tổng kết = Điểm Quá trình (<strong class="text-emerald-400">${currentTyLeQT}%</strong>) + Điểm Thi Kết thúc (<strong class="text-text-muted">0% - Không thi cuối kỳ</strong>) • Tổng kết lấy bằng Điểm QT Tổng</span>
+            `;
+        } else {
+            subtitleEl.innerHTML = `
+                <i data-lucide="calculator" class="w-4 h-4 text-primary shrink-0"></i>
+                <span>Công thức chuẩn: Tổng kết = Điểm Quá trình (<strong class="text-primary">${currentTyLeQT}%</strong>) + Điểm Thi Kết thúc (<strong class="text-amber-400">${currentTyLeThi}%</strong>) • Quy chế thi lại Lần 2 tối đa 6.0 điểm (QC 6.0)</span>
+            `;
         }
 
-        async function handleStatusTransition() {
-            const maLHP = document.getElementById('ds-lhp').value;
-            if (!maLHP || !currentLhpInfo) return;
-            const st = currentLhpInfo.TrangThaiNhapDiem;
-            let nextStatus = 'Đã khóa';
+        if (window.lucide) lucide.createIcons();
+    }
 
-            if (USER_ROLE === 'Admin') {
-                nextStatus = (st === 'Đã khóa' || st === 'Chờ mở khóa') ? 'Đang nhập' : 'Đã khóa';
+    function renderLockControls() {
+        const badge = document.getElementById('lhp-status-badge');
+        const container = document.getElementById('lock-actions-container');
+        const st = currentLHPInfo?.trangThaiNhapDiem || 'Đang nhập';
+
+        if (st === 'Đã khóa') {
+            badge.className = 'badge badge-warning';
+            badge.innerHTML = '<i data-lucide="lock" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: Đã khóa';
+        } else if (st === 'Chờ mở khóa') {
+            badge.className = 'badge badge-danger';
+            badge.innerHTML = '<i data-lucide="clock" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: Chờ mở khóa';
+        } else {
+            badge.className = 'badge badge-success';
+            badge.innerHTML = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: ' + st;
+        }
+
+        let btns = '';
+        if (st !== 'Đã khóa') {
+            btns += `<button type="button" onclick="updateTrangThai('Đã khóa')" class="btn bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                <i data-lucide="lock" class="w-4 h-4"></i> <span>Khóa sổ điểm</span>
+            </button>`;
+        } else {
+            if (USER_ROLE === 'Admin' || USER_ROLE === 'KhaoThi') {
+                btns += `<button type="button" onclick="updateTrangThai('Đang nhập')" class="btn bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="unlock" class="w-4 h-4"></i> <span>Mở khóa sổ</span>
+                </button>`;
             } else {
-                if (st === 'Đã khóa') nextStatus = 'Chờ mở khóa';
-                else if (st === 'Chờ mở khóa') return showToast('Yêu cầu mở khóa đang chờ Quản trị viên phê duyệt!', 'warning');
-                else nextStatus = 'Đã khóa';
+                btns += `<button type="button" onclick="updateTrangThai('Chờ mở khóa')" class="btn bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="key" class="w-4 h-4"></i> <span>Xin mở khóa</span>
+                </button>`;
+            }
+        }
+        container.innerHTML = btns;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function renderGradeTable() {
+        const theadRow = document.getElementById('grade-thead-row');
+        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi';
+        const isNoExam = currentTyLeThi === 0;
+
+        let colsHtml = `
+            <th class="p-3.5 w-12 text-center">STT</th>
+            <th class="p-3.5">Mã SV</th>
+            <th class="p-3.5">Họ và Tên</th>
+            <th class="p-3.5">Lớp HC</th>
+        `;
+
+        currentCauHinh.forEach(c => {
+            colsHtml += `<th class="p-3.5 text-center text-sky-400">${c.name} (${c.weight}%)</th>`;
+        });
+
+        colsHtml += `
+            <th class="p-3.5 text-center text-primary">ĐIỂM QT TỔNG (${currentTyLeQT}%)</th>
+            <th class="p-3.5 text-center ${isNoExam ? 'text-text-muted/40 line-through' : 'text-amber-400'}">
+                THI LẦN 1 (${currentTyLeThi}%)
+            </th>
+            <th class="p-3.5 text-center ${isNoExam ? 'text-text-muted/40 line-through' : 'text-purple-400'}">
+                THI LẦN 2 (QC 6.0)
+            </th>
+            <th class="p-3.5 text-center">TỔNG KẾT</th>
+            <th class="p-3.5 text-center">ĐIỂM CHỮ</th>
+            <th class="p-3.5 text-center">ĐÁNH GIÁ</th>
+        `;
+        theadRow.innerHTML = colsHtml;
+
+        const tbody = document.getElementById('grade-tbody');
+        document.getElementById('detail-student-count').textContent = `${currentRows.length} SV`;
+
+        if (!currentRows.length) {
+            tbody.innerHTML = `<tr><td colspan="${10 + currentCauHinh.length}" class="p-8 text-center text-text-muted">Lớp học phần này chưa có sinh viên đăng ký</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = currentRows.map((r, idx) => {
+            const chiTiet = r.chiTietDiemQT || {};
+            const dynamicInputs = currentCauHinh.map(c => {
+                const val = chiTiet[c.id] !== undefined && chiTiet[c.id] !== null ? chiTiet[c.id] : '';
+                return `<td class="p-2.5 text-center">
+                    <input type="number" step="0.1" min="0" max="10" value="${val}"
+                        data-idx="${idx}" data-col="${c.id}"
+                        oninput="onScoreInput(${idx})"
+                        ${isLocked ? 'disabled' : ''}
+                        class="w-20 text-center bg-canvas border border-surface-hover rounded-lg px-2 py-1.5 text-text-primary focus:outline-none focus:border-primary disabled:opacity-50" />
+                </td>`;
+            }).join('');
+
+            const examDisabledAttr = (isLocked || isNoExam) ? 'disabled' : '';
+            const examDisabledClass = isNoExam
+                ? 'opacity-35 cursor-not-allowed bg-canvas/40 border-surface-hover/50 text-text-muted'
+                : 'bg-canvas border-surface-hover text-text-primary focus:border-amber-400 disabled:opacity-50';
+
+            const searchKey = `${r.maSV || ''} ${r.sinhVien?.hoTen || ''} ${r.sinhVien?.maLop || ''}`.toLowerCase();
+
+            return `
+                <tr class="hover:bg-surface-hover/30 transition-colors student-grade-row" id="row-${idx}" data-search="${searchKey}">
+                    <td class="p-3.5 text-center text-text-muted row-stt">${idx + 1}</td>
+                    <td class="p-3.5 font-mono font-semibold text-primary">${r.maSV}</td>
+                    <td class="p-3.5 font-medium text-text-primary">${r.sinhVien?.hoTen || '---'}</td>
+                    <td class="p-3.5 text-text-muted">${r.sinhVien?.maLop || '---'}</td>
+                    ${dynamicInputs}
+                    <td class="p-3.5 text-center font-bold text-primary" id="qt-${idx}">${r.diemCK ?? '-'}</td>
+                    <td class="p-2.5 text-center">
+                        <input type="number" step="0.1" min="0" max="10" value="${r.diemThiLan1 ?? ''}"
+                            id="thi1-${idx}" oninput="onScoreInput(${idx})" ${examDisabledAttr}
+                            placeholder="${isNoExam ? 'Không thi' : ''}"
+                            class="w-20 text-center border rounded-lg px-2 py-1.5 focus:outline-none ${examDisabledClass}" />
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <input type="number" step="0.1" min="0" max="10" value="${r.diemThiLan2 ?? ''}"
+                            id="thi2-${idx}" oninput="onScoreInput(${idx})" ${examDisabledAttr}
+                            placeholder="${isNoExam ? 'Không thi' : ''}"
+                            class="w-20 text-center border rounded-lg px-2 py-1.5 focus:outline-none ${examDisabledClass}" />
+                    </td>
+                    <td class="p-3.5 text-center font-bold text-lg" id="tk-${idx}">${r.diemTongKet ?? '-'}</td>
+                    <td class="p-3.5 text-center font-semibold" id="dc-${idx}">${r.diemChu ?? '-'}</td>
+                    <td class="p-3.5 text-center" id="gc-${idx}">
+                        ${renderGhiChuBadge(r.ghiChu)}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Tính nhẩm lại ngay lập tức theo cấu hình hiện tại
+        currentRows.forEach((_, idx) => onScoreInput(idx));
+        filterStudentRows();
+    }
+
+    function filterStudentRows() {
+        const q = (document.getElementById('detail-student-search')?.value || '').trim().toLowerCase();
+        const rows = document.querySelectorAll('#grade-tbody .student-grade-row');
+        let visibleCount = 0;
+
+        rows.forEach(tr => {
+            const key = tr.getAttribute('data-search') || '';
+            const match = !q || key.includes(q);
+            tr.classList.toggle('hidden', !match);
+            if (match) visibleCount++;
+        });
+
+        const countEl = document.getElementById('detail-student-count');
+        if (countEl) {
+            countEl.textContent = q ? `${visibleCount}/${currentRows.length} SV` : `${currentRows.length} SV`;
+        }
+    }
+
+    function renderGhiChuBadge(gc) {
+        if (!gc) return '<span class="text-text-muted text-xs">-</span>';
+        if (gc.includes('Đạt')) return `<span class="badge badge-success">${gc}</span>`;
+        return `<span class="badge badge-danger">${gc}</span>`;
+    }
+
+    function quyDoiChu(tk) {
+        if (tk >= 9.0) return 'A+';
+        if (tk >= 8.5) return 'A';
+        if (tk >= 8.0) return 'B+';
+        if (tk >= 7.0) return 'B';
+        if (tk >= 6.5) return 'C+';
+        if (tk >= 5.5) return 'C';
+        if (tk >= 5.0) return 'D+';
+        if (tk >= 4.0) return 'D';
+        return 'F';
+    }
+
+    // =========================================================================
+    // TÍNH ĐIỂM REALTIME THEO TỶ LỆ ĐỘNG (TyLeQuaTrinh% - TyLeThiKetThuc%)
+    // =========================================================================
+    function onScoreInput(idx) {
+        const row = currentRows[idx];
+        if (!row) return;
+        if (!row.chiTietDiemQT) row.chiTietDiemQT = {};
+
+        let hasAllQT = true;
+        let qtSum = 0;
+
+        currentCauHinh.forEach(c => {
+            const input = document.querySelector(`input[data-idx="${idx}"][data-col="${c.id}"]`);
+            const raw = input ? input.value.trim() : '';
+            if (raw === '') {
+                row.chiTietDiemQT[c.id] = null;
+                hasAllQT = false;
+            } else {
+                let num = parseFloat(raw);
+                if (num < 0) { num = 0; if (input) input.value = 0; }
+                if (num > 10) { num = 10; if (input) input.value = 10; }
+                row.chiTietDiemQT[c.id] = num;
+                qtSum += num * (c.weight / 100.0);
+            }
+        });
+
+        const qtEl = document.getElementById(`qt-${idx}`);
+        if (hasAllQT && currentCauHinh.length > 0) {
+            row.diemCK = Math.round(qtSum * 10) / 10;
+            if (qtEl) qtEl.textContent = row.diemCK.toFixed(1);
+        } else {
+            row.diemCK = null;
+            if (qtEl) qtEl.textContent = '-';
+        }
+
+        const t1El = document.getElementById(`thi1-${idx}`);
+        const t2El = document.getElementById(`thi2-${idx}`);
+        let t1 = t1El && t1El.value.trim() !== '' ? parseFloat(t1El.value) : null;
+        let t2 = t2El && t2El.value.trim() !== '' ? parseFloat(t2El.value) : null;
+
+        if (t1 !== null) {
+            if (t1 < 0) { t1 = 0; t1El.value = 0; }
+            if (t1 > 10) { t1 = 10; t1El.value = 10; }
+        }
+        if (t2 !== null) {
+            if (t2 < 0) { t2 = 0; t2El.value = 0; }
+            if (t2 > 10) { t2 = 10; t2El.value = 10; }
+        }
+
+        row.diemThiLan1 = t1;
+        row.diemThiLan2 = t2;
+
+        const tkEl = document.getElementById(`tk-${idx}`);
+        const dcEl = document.getElementById(`dc-${idx}`);
+        const gcEl = document.getElementById(`gc-${idx}`);
+
+        const wQt = currentTyLeQT / 100.0;
+        const wThi = currentTyLeThi / 100.0;
+
+        // Trường hợp 1: Môn 100% Quá trình - 0% Thi kết thúc (Không thi cuối kỳ)
+        if (currentTyLeThi === 0) {
+            if (row.diemCK !== null) {
+                const finalTK = Math.round((row.diemCK * wQt) * 10) / 10;
+                const dc = quyDoiChu(finalTK);
+                const gc = finalTK >= 4.0 ? 'Đạt' : 'Học lại';
+
+                row.diemTongKet = finalTK;
+                row.diemChu = dc;
+                row.ghiChu = gc;
+
+                if (tkEl) tkEl.textContent = finalTK.toFixed(1);
+                if (dcEl) dcEl.textContent = dc;
+                if (gcEl) gcEl.innerHTML = renderGhiChuBadge(gc);
+            } else {
+                row.diemTongKet = null;
+                row.diemChu = null;
+                row.ghiChu = null;
+                if (tkEl) tkEl.textContent = '-';
+                if (dcEl) dcEl.textContent = '-';
+                if (gcEl) gcEl.innerHTML = renderGhiChuBadge(null);
+            }
+            return;
+        }
+
+        // Trường hợp 2: Có thi kết thúc học phần (currentTyLeThi > 0)
+        if (row.diemCK !== null && t1 !== null) {
+            const tk1 = Math.round(((row.diemCK * wQt) + (t1 * wThi)) * 10) / 10;
+            let finalTK = tk1;
+            let gc = tk1 >= 4.0 ? 'Đạt' : 'Học lại';
+
+            if (t2 !== null) {
+                const tk2Raw = Math.round(((row.diemCK * wQt) + (t2 * wThi)) * 10) / 10;
+                if (tk1 < 4.0) {
+                    finalTK = Math.min(tk2Raw, 6.0);
+                    gc = finalTK >= 4.0 ? 'Đạt (Thi lại)' : 'Học lại';
+                } else {
+                    const cappedTk2 = tk1 < 6.0 ? Math.min(tk2Raw, 6.0) : tk2Raw;
+                    finalTK = Math.max(tk1, cappedTk2);
+                    gc = finalTK >= 4.0 ? 'Đạt' : 'Học lại';
+                }
             }
 
-            try {
-                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/trang-thai`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ TrangThaiNhapDiem: nextStatus })
-                });
-                showToast(res.message);
-                await loadBangDiem();
-            } catch (err) { showToast(err.message, 'error'); }
+            const dc = quyDoiChu(finalTK);
+            row.diemTongKet = finalTK;
+            row.diemChu = dc;
+            row.ghiChu = gc;
+
+            if (tkEl) tkEl.textContent = finalTK.toFixed(1);
+            if (dcEl) dcEl.textContent = dc;
+            if (gcEl) gcEl.innerHTML = renderGhiChuBadge(gc);
+        } else {
+            row.diemTongKet = null;
+            row.diemChu = null;
+            row.ghiChu = null;
+            if (tkEl) tkEl.textContent = '-';
+            if (dcEl) dcEl.textContent = '-';
+            if (gcEl) gcEl.innerHTML = renderGhiChuBadge(null);
+        }
+    }
+
+    // =========================================================================
+    // MODAL CẤU HÌNH TỶ LỆ ĐIỂM HỌC PHẦN (QT % / THI %)
+    // =========================================================================
+    function openTyLeModal() {
+        if (!currentMaLHP) {
+            showToast('Vui lòng chọn Lớp học phần trước', 'info');
+            return;
+        }
+        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
+            showToast('Bảng điểm đã khóa, không thể thay đổi tỷ lệ điểm học phần!', 'error');
+            return;
         }
 
-        function openCauHinhModal() {
-            editingColsTemp = JSON.parse(JSON.stringify(cauHinhCols));
-            renderColConfigItems();
-            document.getElementById('col-modal').classList.remove('hidden');
+        document.getElementById('input-tyle-qt').value = currentTyLeQT;
+        document.getElementById('input-tyle-thi').value = currentTyLeThi;
+        updateTyLeModalVisuals(currentTyLeQT, currentTyLeThi);
+        document.getElementById('tyle-modal').classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function closeTyLeModal() {
+        document.getElementById('tyle-modal').classList.add('hidden');
+    }
+
+    function selectTyLePreset(qt, thi) {
+        document.getElementById('input-tyle-qt').value = qt;
+        document.getElementById('input-tyle-thi').value = thi;
+        updateTyLeModalVisuals(qt, thi);
+    }
+
+    function onTyLeInputChanged(changedField) {
+        const qtInput = document.getElementById('input-tyle-qt');
+        const thiInput = document.getElementById('input-tyle-thi');
+
+        if (changedField === 'qt') {
+            let qtVal = parseInt(qtInput.value, 10);
+            if (isNaN(qtVal)) qtVal = 0;
+            if (qtVal < 0) qtVal = 0;
+            if (qtVal > 100) qtVal = 100;
+            qtInput.value = qtVal;
+            thiInput.value = 100 - qtVal;
+        } else {
+            let thiVal = parseInt(thiInput.value, 10);
+            if (isNaN(thiVal)) thiVal = 0;
+            if (thiVal < 0) thiVal = 0;
+            if (thiVal > 100) thiVal = 100;
+            thiInput.value = thiVal;
+            qtInput.value = 100 - thiVal;
         }
 
-        function renderColConfigItems() {
-            document.getElementById('col-list').innerHTML = editingColsTemp.map((c, idx) => `
-                <div class="flex items-center gap-2">
-                    <input value="${c.name}" oninput="editingColsTemp[${idx}].name=this.value" placeholder="Tên cột..."
-                           class="flex-1 bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-xs text-text-primary" />
-                    <input type="number" value="${c.weight}" oninput="editingColsTemp[${idx}].weight=Number(this.value)"
-                           class="w-20 bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-xs text-center text-primary font-bold" />
+        const qt = parseInt(qtInput.value, 10) || 0;
+        const thi = parseInt(thiInput.value, 10) || 0;
+        updateTyLeModalVisuals(qt, thi);
+    }
+
+    function updateTyLeModalVisuals(qt, thi) {
+        document.getElementById('tyle-visual-bar-qt').style.width = `${qt}%`;
+        document.getElementById('tyle-visual-bar-thi').style.width = `${thi}%`;
+
+        const previewEl = document.getElementById('tyle-preview-text');
+        if (thi === 0) {
+            previewEl.innerHTML = `Tổng kết = <strong class="text-emerald-400">100% Điểm Quá trình</strong> (Không thi cuối kỳ)`;
+        } else {
+            previewEl.innerHTML = `Tổng kết = <strong class="text-primary">QT × ${qt}%</strong> + <strong class="text-amber-400">Thi × ${thi}%</strong>`;
+        }
+
+        const sum = qt + thi;
+        const sumBadge = document.getElementById('tyle-sum-badge');
+        sumBadge.textContent = `Tổng: ${sum}%`;
+        sumBadge.className = sum === 100 ? 'font-bold text-emerald-400' : 'font-bold text-red-400';
+
+        document.querySelectorAll('.tyle-preset-btn').forEach(btn => {
+            btn.classList.remove('border-primary', 'bg-primary/10');
+        });
+        const activePreset = document.getElementById(`preset-btn-${qt}-${thi}`);
+        if (activePreset) {
+            activePreset.classList.add('border-primary', 'bg-primary/10');
+        }
+    }
+
+    async function saveTyLeHocPhan() {
+        const qt = parseInt(document.getElementById('input-tyle-qt').value, 10);
+        const thi = parseInt(document.getElementById('input-tyle-thi').value, 10);
+
+        if (isNaN(qt) || isNaN(thi) || qt < 0 || thi < 0 || (qt + thi) !== 100) {
+            showToast('Tổng tỷ lệ Điểm Quá trình và Điểm Thi Kết thúc phải bằng 100%!', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(currentMaLHP)}/ty-le`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tyLeQuaTrinh: qt, tyLeThiKetThuc: thi })
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                currentTyLeQT = qt;
+                currentTyLeThi = thi;
+                if (currentLHPInfo) {
+                    currentLHPInfo.tyLeQuaTrinh = qt;
+                    currentLHPInfo.tyLeThiKetThuc = thi;
+                }
+                closeTyLeModal();
+                renderDetailHeaderAndFormula();
+                renderGradeTable();
+
+                const cardIdx = allLHP.findIndex(x => x.maLHP === currentMaLHP);
+                if (cardIdx !== -1) {
+                    allLHP[cardIdx].tyLeQuaTrinh = qt;
+                    allLHP[cardIdx].tyLeThiKetThuc = thi;
+                }
+            } else {
+                showToast(json.message || 'Lỗi lưu cấu hình tỷ lệ điểm học phần', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
+        }
+    }
+
+    // =========================================================================
+    // XÁC THỰC MẬT KHẨU KHI LƯU BẢNG ĐIỂM / KHÓA SỔ ĐIỂM / MỞ KHÓA SỔ ĐIỂM
+    // =========================================================================
+    function openPasswordModal(actionType, targetStatus = null) {
+        pendingPwdAction = actionType;
+        pendingTargetStatus = targetStatus;
+
+        const titleEl = document.getElementById('pwd-modal-title');
+        const descEl = document.getElementById('pwd-modal-desc');
+        const inputEl = document.getElementById('confirm-pwd-input');
+        inputEl.value = '';
+
+        if (actionType === 'SAVE_GRADES') {
+            titleEl.innerHTML = `<i data-lucide="save" class="w-5 h-5 text-primary"></i> <span>Xác Nhận Lưu Bảng Điểm</span>`;
+            descEl.innerHTML = `Vui lòng nhập mật khẩu tài khoản của bạn để xác nhận <strong class="text-primary">Lưu Bảng Điểm</strong> cho lớp học phần <strong class="text-text-primary">${currentMaLHP}</strong>:`;
+        } else if (actionType === 'CHANGE_STATUS' && targetStatus === 'Đã khóa') {
+            titleEl.innerHTML = `<i data-lucide="lock" class="w-5 h-5 text-amber-400"></i> <span>Xác Nhận Khóa Sổ Điểm</span>`;
+            descEl.innerHTML = `Sau khi khóa sổ, giảng viên sẽ không thể tự ý chỉnh sửa điểm. Vui lòng nhập mật khẩu để xác nhận <strong class="text-amber-400">Khóa Sổ Điểm</strong> lớp <strong class="text-text-primary">${currentMaLHP}</strong>:`;
+        } else if (actionType === 'CHANGE_STATUS' && targetStatus === 'Đang nhập') {
+            titleEl.innerHTML = `<i data-lucide="unlock" class="w-5 h-5 text-emerald-400"></i> <span>Xác Nhận Mở Khóa Sổ Điểm</span>`;
+            descEl.innerHTML = `Vui lòng nhập mật khẩu Quản trị viên để xác nhận <strong class="text-emerald-400">Mở Khóa Sổ Điểm</strong> cho lớp <strong class="text-text-primary">${currentMaLHP}</strong>:`;
+        }
+
+        document.getElementById('pwd-modal').classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => inputEl.focus(), 50);
+    }
+
+    function closePwdModal() {
+        document.getElementById('pwd-modal').classList.add('hidden');
+        pendingPwdAction = null;
+        pendingTargetStatus = null;
+    }
+
+    function handleSaveClick() {
+        if (!currentMaLHP) return;
+        const st = currentLHPInfo?.trangThaiNhapDiem;
+        if (st === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
+            showToast('Bảng điểm đã khóa! Vui lòng nhấn "Xin mở khóa".', 'error');
+            return;
+        }
+        // Luôn yêu cầu nhập mật khẩu khi nhấn Lưu Bảng Điểm
+        openPasswordModal('SAVE_GRADES');
+    }
+
+    async function confirmPasswordAction() {
+        const pwd = document.getElementById('confirm-pwd-input').value;
+        if (!pwd) {
+            showToast('Vui lòng nhập mật khẩu xác nhận!', 'error');
+            return;
+        }
+
+        const action = pendingPwdAction;
+        const status = pendingTargetStatus;
+        closePwdModal();
+
+        if (action === 'SAVE_GRADES') {
+            await submitSaveGrades(pwd);
+        } else if (action === 'CHANGE_STATUS' && status) {
+            await submitStatusUpdate(status, pwd);
+        }
+    }
+
+    async function submitSaveGrades(password) {
+        const payload = {
+            password: password,
+            tyLeQuaTrinh: currentTyLeQT,
+            tyLeThiKetThuc: currentTyLeThi,
+            danhSachDiem: currentRows.map(r => ({
+                maSV: r.maSV,
+                diemCK: r.diemCK,
+                diemThiLan1: r.diemThiLan1,
+                diemThiLan2: r.diemThiLan2,
+                chiTietDiemQT: r.chiTietDiemQT
+            }))
+        };
+
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(currentMaLHP)}/hang-loat`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                await onChangeLHP(currentMaLHP);
+            } else {
+                showToast(json.message || 'Lỗi lưu bảng điểm', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
+        }
+    }
+
+    async function updateTrangThai(newStatus) {
+        if (!currentMaLHP) return;
+
+        // Nếu là Khóa sổ điểm hoặc Admin Mở khóa sổ điểm thì yêu cầu xác thực mật khẩu qua Modal
+        if (newStatus === 'Đã khóa' || newStatus === 'Đang nhập') {
+            openPasswordModal('CHANGE_STATUS', newStatus);
+            return;
+        }
+
+        // Trường hợp Giảng viên gửi yêu cầu "Chờ mở khóa"
+        if (!confirm(`Gửi yêu cầu xin mở khóa sổ điểm lớp ${currentMaLHP} tới Quản trị viên?`)) return;
+        await submitStatusUpdate(newStatus, null);
+    }
+
+    async function submitStatusUpdate(newStatus, password) {
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(currentMaLHP)}/trang-thai`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    trangThaiNhapDiem: newStatus,
+                    password: password
+                })
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                await onChangeLHP(currentMaLHP);
+            } else {
+                showToast(json.message || 'Lỗi cập nhật trạng thái', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
+        }
+    }
+
+    // =========================================================================
+    // MODAL CẤU HÌNH CỘT ĐIỂM QUÁ TRÌNH THÀNH PHẦN (100% CỦA QT)
+    // =========================================================================
+    function openConfigModal() {
+        if (!currentMaLHP) {
+            showToast('Vui lòng chọn Lớp học phần trước', 'info');
+            return;
+        }
+        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
+            showToast('Bảng điểm đã khóa, không thể thay đổi cấu hình cột điểm!', 'error');
+            return;
+        }
+        tempConfigCols = JSON.parse(JSON.stringify(currentCauHinh));
+        renderConfigColsList();
+        document.getElementById('config-modal').classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function closeConfigModal() {
+        document.getElementById('config-modal').classList.add('hidden');
+    }
+
+    function renderConfigColsList() {
+        const list = document.getElementById('config-cols-list');
+        list.innerHTML = tempConfigCols.map((c, i) => `
+            <div class="flex items-center gap-2">
+                <input type="text" value="${c.name}" oninput="tempConfigCols[${i}].name = this.value"
+                    class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-3 py-1.5 text-sm flex-1" placeholder="Tên cột điểm..." />
+                <div class="flex items-center gap-1 w-28">
+                    <input type="number" value="${c.weight}" min="1" max="100"
+                        oninput="tempConfigCols[${i}].weight = parseFloat(this.value) || 0; updateTotalWeightLabel();"
+                        class="input-field bg-canvas text-text-primary border border-surface-hover rounded-xl px-2 py-1.5 text-sm text-center w-full" />
                     <span class="text-xs text-text-muted">%</span>
-                    <button onclick="editingColsTemp.splice(${idx},1);renderColConfigItems()" class="text-[#ef4444] p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>
-            `).join('');
-            lucide.createIcons();
+                ${tempConfigCols.length > 1 ? `
+                    <button type="button" onclick="removeConfigCol(${i})" class="p-1.5 text-red-400 hover:bg-red-500/10 rounded">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                ` : ''}
+            </div>
+        `).join('');
+        updateTotalWeightLabel();
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function updateTotalWeightLabel() {
+        const sum = tempConfigCols.reduce((acc, c) => acc + (parseFloat(c.weight) || 0), 0);
+        const el = document.getElementById('config-total-weight');
+        el.textContent = sum + '%';
+        el.className = Math.abs(sum - 100) < 0.01 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold';
+    }
+
+    function addConfigCol() {
+        tempConfigCols.push({
+            id: 'col_' + Date.now(),
+            name: 'Cột điểm mới',
+            weight: 0
+        });
+        renderConfigColsList();
+    }
+
+    function removeConfigCol(idx) {
+        tempConfigCols.splice(idx, 1);
+        renderConfigColsList();
+    }
+
+    async function saveConfigCols() {
+        const sum = tempConfigCols.reduce((acc, c) => acc + (parseFloat(c.weight) || 0), 0);
+        if (Math.abs(sum - 100) > 0.01) {
+            showToast(`Tổng trọng số phải bằng 100% (Hiện tại: ${sum}%)`, 'error');
+            return;
         }
 
-        function addColItem() {
-            editingColsTemp.push({ id: 'col_' + Date.now(), name: 'Cột điểm mới', weight: 0 });
-            renderColConfigItems();
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(currentMaLHP)}/cau-hinh`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cauHinhDiem: tempConfigCols })
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                closeConfigModal();
+                await onChangeLHP(currentMaLHP);
+            } else {
+                showToast(json.message || 'Lỗi lưu cấu hình', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
         }
+    }
 
-        async function saveCauHinhCols() {
-            const maLHP = document.getElementById('ds-lhp').value;
-            try {
-                const res = await apiFetch(`/api/diem/lophocphan/${maLHP}/cau-hinh`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ cauHinhDiem: editingColsTemp })
-                });
-                showToast(res.message);
-                document.getElementById('col-modal').classList.add('hidden');
-                await loadBangDiem();
-            } catch (err) { showToast(err.message, 'error'); }
+    function exportBangDiemExcel() {
+        if (!currentRows.length) {
+            showToast('Không có dữ liệu điểm để xuất', 'info');
+            return;
         }
+        const data = currentRows.map((r, idx) => {
+            const obj = {
+                'STT': idx + 1,
+                'Mã SV': r.maSV,
+                'Họ và Tên': r.sinhVien?.hoTen || '',
+                'Lớp': r.sinhVien?.maLop || ''
+            };
+            currentCauHinh.forEach(c => {
+                obj[`${c.name} (${c.weight}%)`] = r.chiTietDiemQT?.[c.id] ?? '';
+            });
+            obj[`Điểm QT Tổng (${currentTyLeQT}%)`] = r.diemCK ?? '';
+            obj[`Thi Lần 1 (${currentTyLeThi}%)`] = r.diemThiLan1 ?? '';
+            obj['Thi Lần 2'] = r.diemThiLan2 ?? '';
+            obj['Điểm Tổng Kết'] = r.diemTongKet ?? '';
+            obj['Điểm Chữ'] = r.diemChu ?? '';
+            obj['Đánh Giá'] = r.ghiChu ?? '';
+            return obj;
+        });
 
-        function exportBangDiemExcel() {
-            const rows = rowsData.map((r, i) => ({
-                'STT': i + 1,
-                'Mã SV': r.MaSV,
-                'Họ Tên': r.SinhVien?.HoTen || '',
-                'Điểm Quá Trình (40%)': r.DiemCK ?? '',
-                'Thi Lần 1 (60%)': r.DiemThiLan1 ?? '',
-                'Thi Lần 2': r.DiemThiLan2 ?? '',
-                'Tổng Kết': r.DiemTongKet ?? '',
-                'Điểm Chữ': r.DiemChu ?? '',
-                'Kết Quả': r.GhiChu ?? ''
-            }));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'BangDiem');
-            XLSX.writeFile(wb, `BangDiem_${document.getElementById('ds-lhp').value}.xlsx`);
-        }
-
-        initPage();
-    </script>
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'BangDiem');
+        XLSX.writeFile(wb, `BangDiem_${currentMaLHP}.xlsx`);
+    }
+</script>
 }

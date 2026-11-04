@@ -1,0 +1,16 @@
+@model QL_DiemSV.ViewModels.CurriculumCatalogViewModel
+@{Layout="_PortalLayout";ViewData["Title"]="Chương trình đào tạo";}
+<link rel="stylesheet" href="~/css/curriculum.css" asp-append-version="true" />
+<div class="portal-breadcrumb"><a href="/portal">Trang chủ</a> / Chương trình đào tạo</div><h1>Chương trình đào tạo</h1><p>Chọn khoá trong từng hệ để xem các chương trình áp dụng.</p>
+@foreach(var system in Model.All.Select(x=>x.HeDaoTao).Distinct()){
+ var all=Model.All.Where(x=>x.HeDaoTao==system).ToList();var year=Model.System==system&&Model.Year.HasValue?Model.Year.Value:all.Max(x=>x.KhoaHoc);
+ var cohort=all.Where(x=>x.KhoaHoc==year).ToList();var selectedProgram=Model.System==system?Model.Program:null;var search=Model.System==system?Model.Search:null;
+ var visible=cohort.Where(x=>(selectedProgram==null||x.TenChuongTrinh==selectedProgram)&&(string.IsNullOrWhiteSpace(search)||(x.NganhHoc?.TenNganh??"").Contains(search,StringComparison.OrdinalIgnoreCase))).ToList();
+ <details class="portal-panel curriculum-system" open><summary><strong>HỆ @system.ToUpper()</strong><span>@all.Count CTĐT <i>⌄</i></span></summary>
+ <nav class="curriculum-pills" aria-label="Khóa học">@foreach(var y in all.Select(x=>x.KhoaHoc).Distinct().Take(6)){<a class="@(y==year?"selected":"")" href="@Url.Action("Curriculums",new{system,year=y})">@y (@all.Count(x=>x.KhoaHoc==y))</a>}@if(all.Select(x=>x.KhoaHoc).Distinct().Count()>6){<details><summary>Cũ hơn ⌄</summary>@foreach(var y in all.Select(x=>x.KhoaHoc).Distinct().Skip(6)){<a href="@Url.Action("Curriculums",new{system,year=y})">@y</a>}</details>}</nav>
+ <nav class="curriculum-pills"><a class="@(selectedProgram==null?"selected":"")" href="@Url.Action("Curriculums",new{system,year})">Tất cả (@cohort.Count)</a>@foreach(var program in cohort.GroupBy(x=>x.TenChuongTrinh)){<a class="@(selectedProgram==program.Key?"selected":"")" href="@Url.Action("Curriculums",new{system,year,program=program.Key,search})">@program.Key (@program.Count())</a>}</nav>
+ <div class="curriculum-stats"><form method="get"><input type="hidden" name="system" value="@system" /><input type="hidden" name="year" value="@year" /><input type="hidden" name="program" value="@selectedProgram" /><input name="search" value="@search" placeholder="Tìm ngành..." /><button>Tìm</button></form><span>🎓 @visible.Select(x=>x.NganhHocId).Distinct().Count() ngành · 📖 @visible.Count chương trình đào tạo</span></div>
+ <div class="curriculum-major-grid">@foreach(var group in visible.GroupBy(x=>x.NganhHocId)){<article class="curriculum-major"><h3>@group.First().NganhHoc?.TenNganh</h3><div class="curriculum-pills">@foreach(var c in group){<a href="/Portal/CurriculumDetail/@c.Id">@c.TenChuongTrinh ›</a>}</div></article>}</div>@if(visible.Count==0){<p class="portal-empty">Không có chương trình phù hợp.</p>}
+ </details>
+}
+@if(Model.All.Count==0){<section class="portal-panel">Chương trình đào tạo đang được cập nhật.</section>}

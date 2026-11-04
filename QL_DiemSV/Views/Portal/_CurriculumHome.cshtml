@@ -1,0 +1,7 @@
+@model List<QL_DiemSV.Models.Curriculum>
+@{var programs=Model;}
+<link rel="stylesheet" href="~/css/curriculum.css" asp-append-version="true" />
+<section class="portal-panel" id="curriculum"><div class="portal-heading"><h2>🎓 CHƯƠNG TRÌNH ĐÀO TẠO</h2><a href="/Portal/Curriculums">Xem tất cả →</a></div>
+@foreach(var system in programs.GroupBy(x=>x.HeDaoTao)){var year=system.Max(x=>x.KhoaHoc);var current=system.Where(x=>x.KhoaHoc==year).ToList();<h3 class="program-group">HỆ @system.Key.ToUpper() (CTĐT khóa @year (@current.Select(x=>x.NganhHocId).Distinct().Count() ngành) ›)</h3><div class="program-grid">@foreach(var major in current.GroupBy(x=>x.NganhHocId)){<article class="program-card"><strong>@major.First().NganhHoc?.TenNganh</strong>@if(major.Count()==1){var c=major.First();<a href="/Portal/CurriculumDetail/@c.Id">@c.TenChuongTrinh ›</a>}else{<details class="curriculum-popover"><summary>@major.Count() chương trình ⌄</summary><nav>@foreach(var c in major){<a href="/Portal/CurriculumDetail/@c.Id">@c.TenChuongTrinh ›</a>}</nav></details>}</article>}</div>}
+@if(programs.Count==0){<p class="portal-empty">Chương trình đào tạo đang được cập nhật.</p>}
+</section>

@@ -33,6 +33,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<ThongBao> ThongBaos { get; set; }
     public DbSet<NhatKyHoatDong> NhatKyHoatDongs { get; set; }
 
+    public DbSet<Curriculum> Curriculums => Set<Curriculum>();
+    public DbSet<CurriculumSection> CurriculumSections => Set<CurriculumSection>();
     public DbSet<Article> Articles => Set<Article>();
     public DbSet<PortalDocument> PortalDocuments => Set<PortalDocument>();
     public DbSet<ClassSchedule> ClassSchedules => Set<ClassSchedule>();
@@ -41,6 +43,10 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<Curriculum>().HasOne(x=>x.NganhHoc).WithMany().HasForeignKey(x=>x.NganhHocId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Curriculum>().HasIndex(x=>new{x.HeDaoTao,x.KhoaHoc,x.NganhHocId,x.TenChuongTrinh}).IsUnique();
+        modelBuilder.Entity<CurriculumSection>().HasIndex(x=>new{x.CurriculumId,x.ThuTu}).IsUnique();
+        modelBuilder.Entity<CurriculumSection>().HasOne(x=>x.Curriculum).WithMany(x=>x.Sections).HasForeignKey(x=>x.CurriculumId).OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<ClassSchedule>().Property(x=>x.TuanBaoNghi).IsRequired();
         modelBuilder.Entity<ClassSchedule>().HasOne(x => x.LopHocPhan).WithMany(x => x.LichHocs).HasForeignKey(x => x.MaLHP).OnDelete(DeleteBehavior.Cascade);

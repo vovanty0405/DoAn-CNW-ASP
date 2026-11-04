@@ -44,6 +44,12 @@ public class LopHocPhan
     [MaxLength(50)]
     public string? TrangThaiNhapDiem { get; set; } = "Vui lòng nhập điểm";
 
+    [Range(0, 100)]
+    public int TyLeQuaTrinh { get; set; } = 40;
+
+    [Range(0, 100)]
+    public int TyLeThiKetThuc { get; set; } = 60;
+
     [ForeignKey("MaMon")]
     public virtual MonHoc? MonHoc { get; set; }
 

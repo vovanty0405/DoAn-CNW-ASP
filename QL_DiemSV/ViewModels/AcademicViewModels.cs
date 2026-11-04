@@ -17,15 +17,22 @@ public class TimetableViewModel
 {
     public List<HocKy> HocKys { get; set; } = new();
     public HocKy? HocKy { get; set; }
-    public int Week { get; set; }
+    public int Week { get; set; } = 1;
     public string Mode { get; set; } = "week";
     public List<ClassSchedule> Schedules { get; set; } = new();
     public List<PhongHoc> Rooms { get; set; } = new();
+    public List<LopHocPhan> Sections { get; set; } = new();
+    public List<GiangVien> Teachers { get; set; } = new();
+    public string? SelectedMaLHP { get; set; }
+    public string? SelectedMaGV { get; set; }
+    public string? SelectedPhong { get; set; }
     public int Day { get; set; } = 2;
 }
 public class ScheduleEditorViewModel
 {
     public List<LopHanhChinh> AdministrativeClasses { get; set; } = new();
+    public List<Khoa> Faculties { get; set; } = new();
+    public List<string> Cohorts { get; set; } = new();
     public List<LopHocPhan> Sections { get; set; } = new();
     public List<HocKy> Terms { get; set; } = new();
     public HocKy? ConfigurationTerm { get; set; }
@@ -41,7 +48,7 @@ public class RegistrationRequest
 
 public class RoomMatrixViewModel : TimetableViewModel
 {
-    public string ViewMode { get; set; } = "day";
+    public string ViewMode { get; set; } = "week";
     public string ScheduleType { get; set; } = "all";
     public string Building { get; set; } = "all";
     public DateTime? Date { get; set; }

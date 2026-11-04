@@ -40,3 +40,80 @@ main:has(.matrix-page){padding:16px;min-width:0}
 @media(max-width:1000px){main:has(.matrix-page){padding:10px}.academic.matrix-page .panel{padding:10px}.academic.matrix-page h1{font-size:22px}.academic.matrix-page .room-matrix th,.academic.matrix-page .room-matrix td{padding:5px 2px}.academic.matrix-page .booking-card{padding:5px 3px}.academic.matrix-page .room-matrix th small{font-size:9px}.academic.matrix-page .toolbar label{max-width:100%}.academic.matrix-page .toolbar select{max-width:100%}}
 
 .academic .article-textarea,.academic .rich-editor{width:100%;box-sizing:border-box;background:var(--color-canvas);color:var(--color-text-primary);border:1px solid var(--color-surface-hover);border-radius:10px;padding:14px;font-size:14px;line-height:1.7}.academic .rich-editor{min-height:320px;margin-bottom:12px}.academic .rich-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.academic .rich-editor ul{list-style:disc;padding-left:24px}.academic .rich-editor ol{list-style:decimal;padding-left:24px}.academic .rich-editor a{color:var(--color-primary);text-decoration:underline}.academic .rich-editor:focus{outline:2px solid var(--color-primary)}
+
+/* ========================================================================= */
+/* LỚP CHUẨN: .article-rich-text (ADMIN MODAL & PORTAL)                      */
+/* ========================================================================= */
+.article-rich-text {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    word-break: break-word;
+    color: #cbd5e1 !important;
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.article-rich-text p,
+.article-rich-text span,
+.article-rich-text div,
+.article-rich-text li {
+    color: #cbd5e1 !important;
+    background-color: transparent !important;
+}
+
+.article-rich-text strong,
+.article-rich-text b {
+    color: #f8fafc !important;
+    font-weight: 600;
+}
+
+.article-rich-text a {
+    color: #38bdf8 !important;
+    text-decoration: underline;
+}
+
+.article-rich-text img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+    margin: 16px auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    object-fit: contain;
+}
+
+.article-rich-text table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    background-color: rgba(30, 41, 59, 0.4) !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    margin: 16px 0 !important;
+}
+
+.article-rich-text table td,
+.article-rich-text table th {
+    padding: 10px 16px !important;
+    border: 1px solid #334155 !important;
+    background-color: transparent !important;
+}
+
+.article-rich-text table tr td:first-child,
+.article-rich-text table tr th:first-child {
+    width: 28% !important;
+    color: #94a3b8 !important;
+    font-weight: 500 !important;
+    background-color: rgba(15, 23, 42, 0.3) !important;
+}
+
+.article-rich-text table tr td:last-child,
+.article-rich-text table tr th:last-child {
+    color: #f1f5f9 !important;
+    font-weight: 600 !important;
+}
+
+/* Semester configuration uses the same panel, toolbar and grid as the room catalogue. */
+.academic .term-toolbar{gap:12px;align-items:end}.academic .term-toolbar label{flex:1 1 165px;min-width:0}.academic .term-toolbar .term-picker{flex:1.4 1 230px}.academic .term-toolbar .term-weeks{flex:0 1 90px}.academic .term-toolbar .term-price{flex:1 1 155px}.academic .term-toolbar input,.academic .term-toolbar select{width:100%;box-sizing:border-box;min-height:40px}.academic .term-form-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}.academic #term-table .row-actions button{border:1px solid var(--color-surface-hover)}.academic #term-table .row-actions .secondary:hover{background:color-mix(in srgb,var(--color-text-primary) 10%,var(--color-surface-hover));border-color:var(--color-text-muted)}.academic #term-table .row-actions .danger{border-color:#fb718530}.academic #term-table .row-actions .danger:hover{background:#fb718530}.academic #term-table .term-money{white-space:nowrap}.academic .term-selected-row td{background:color-mix(in srgb,var(--color-primary) 7%,var(--color-surface))}.academic .badge.upcoming{color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-surface))}.academic .badge.ended{color:var(--color-text-muted);background:var(--color-surface-hover)}@media(max-width:700px){.academic .term-toolbar label,.academic .term-toolbar .term-picker,.academic .term-toolbar .term-price{flex:1 1 100%}.academic .term-toolbar .term-weeks{flex:1 1 100%}.academic .term-form-actions{width:100%;margin-left:0}}

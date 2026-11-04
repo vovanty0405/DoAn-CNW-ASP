@@ -3,65 +3,163 @@
 }
 
 <div class="max-w-[1600px] mx-auto space-y-6">
-    <!-- Header -->
+    <!-- Đầu trang: Tiêu đề & Chọn Ngành Đào Tạo -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Chuẩn đầu ra & Tín chỉ</div>
-            <h1 class="text-2xl font-bold text-text-primary">Khung Chương Trình Đào Tạo & Quy Định Tốt Nghiệp</h1>
+            <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Chuẩn đầu ra &amp; Tín chỉ</div>
+            <h1 class="text-2xl font-bold text-text-primary">Khung Chương Trình Đào Tạo &amp; Quy Định Tốt Nghiệp</h1>
         </div>
-        <div class="flex items-center gap-3">
-            <label class="text-sm font-semibold text-text-muted">Chọn Ngành Đào Tạo:</label>
-            <select id="kdt-nganh" onchange="loadCurriculum()" class="bg-surface border border-primary rounded-xl px-4 py-2 text-sm font-bold text-primary outline-none"></select>
+        <div class="flex flex-wrap items-center gap-3 bg-surface border border-surface-hover rounded-2xl px-4 py-2.5 shadow-sm">
+            <div class="flex items-center gap-2">
+                <i data-lucide="graduation-cap" class="w-4 h-4 text-primary"></i>
+                <label for="kdt-nganh" class="text-xs font-semibold text-text-muted uppercase tracking-wider">Ngành Đào Tạo:</label>
+            </div>
+            <select id="kdt-nganh" onchange="onNganhChanged()" class="bg-canvas border border-primary/50 focus:border-primary rounded-xl px-3.5 py-2 text-sm font-bold text-primary outline-none transition-colors"></select>
+            <span id="kdt-nganh-khoa-badge" class="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-xs font-semibold text-primary hidden sm:inline-flex items-center gap-1.5"></span>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Left: Quy định tốt nghiệp -->
-        <div class="lg:col-span-4 space-y-6">
-            <div class="bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
-                <h3 class="font-bold text-text-primary flex items-center gap-2">
-                    <i data-lucide="award" class="w-5 h-5 text-[#10B981]"></i> Chuẩn Đầu Ra & Điều Kiện Tốt Nghiệp
-                </h3>
-                <p class="text-xs text-text-muted">Thông số này dùng để xét điều kiện tốt nghiệp tự động tại trang Tra cứu điểm.</p>
-                <form onsubmit="saveQuyDinh(event)" class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-text-muted mb-1">Tổng Tín Chỉ Yêu Cầu</label>
-                        <input id="qd-tong" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary font-bold" />
+    <!-- KHU VỰC 1: Chuẩn Đầu Ra & Điều Kiện Tốt Nghiệp (Horizontal Bar) -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-5 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-surface-hover">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-[#10B981]/15 border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-text-primary">Chuẩn Đầu Ra &amp; Điều Kiện Tốt Nghiệp</h2>
+                    <p class="text-[11px] text-text-muted">Thông số dùng để đối chiếu tiến độ học tập và xét điều kiện tốt nghiệp tự động</p>
+                </div>
+            </div>
+            <!-- Thống kê thực tế trong khung hiện tại -->
+            <div id="kdt-summary-stats" class="flex flex-wrap items-center gap-2 text-xs"></div>
+        </div>
+
+        <form onsubmit="saveQuyDinh(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Tổng Tín Chỉ Yêu Cầu</label>
+                <div class="relative">
+                    <input id="qd-tong" type="number" min="1" required class="w-full bg-canvas border border-surface-hover focus:border-[#10B981] rounded-xl px-3.5 py-2 text-sm text-text-primary font-bold outline-none transition-colors" />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted font-semibold">TC</span>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Tín Chỉ Bắt Buộc</label>
+                <div class="relative">
+                    <input id="qd-bb" type="number" min="0" required class="w-full bg-canvas border border-surface-hover focus:border-[#10B981] rounded-xl px-3.5 py-2 text-sm text-text-primary font-semibold outline-none transition-colors" />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">TC</span>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Tín Chỉ Tự Chọn</label>
+                <div class="relative">
+                    <input id="qd-tc" type="number" min="0" required class="w-full bg-canvas border border-surface-hover focus:border-[#10B981] rounded-xl px-3.5 py-2 text-sm text-text-primary font-semibold outline-none transition-colors" />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">TC</span>
+                </div>
+            </div>
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">GPA Hệ 4 Tối Thiểu</label>
+                <div class="relative">
+                    <input id="qd-gpa" type="number" step="0.05" min="1" max="4" required class="w-full bg-canvas border border-surface-hover focus:border-[#10B981] rounded-xl px-3.5 py-2 text-sm text-text-primary font-bold outline-none transition-colors" />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">/ 4.0</span>
+                </div>
+            </div>
+            <div class="lg:col-span-3">
+                <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-[#10B981] hover:bg-[#10B981]/90 text-white text-sm font-bold shadow-lg shadow-[#10B981]/20 flex items-center justify-center gap-2 transition-all">
+                    <i data-lucide="save" class="w-4 h-4"></i> Lưu Quy Định Tốt Nghiệp
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- KHU VỰC 2: Thêm Môn Vào Khung Đào Tạo (Batch Selection 3 bước) -->
+    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <!-- Header Khu vực 2 -->
+        <div class="px-6 py-4 bg-surface-header border-b border-surface-hover flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-text-primary">Thêm Môn Vào Khung Đào Tạo (Chọn Nhiều Môn Cùng Lúc)</h2>
+                    <p class="text-[11px] text-text-muted">Lọc theo khoa, tìm kiếm nhanh và tích chọn nhiều môn học để gán hàng loạt vào học kỳ</p>
+                </div>
+            </div>
+            <span id="available-subjects-counter" class="text-xs font-semibold text-text-muted bg-canvas px-3 py-1 rounded-lg border border-surface-hover">
+                Đang tải danh sách môn...
+            </span>
+        </div>
+
+        <div class="p-5 space-y-4">
+            <!-- BƯỚC 1: Thanh Bộ lọc & Tìm kiếm môn học -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-canvas/60 p-3.5 rounded-xl border border-surface-hover">
+                <div class="md:col-span-4">
+                    <label class="block text-[11px] font-semibold text-text-muted mb-1">1. Lọc theo Khoa phụ trách</label>
+                    <select id="filter-khoa" onchange="renderSubjectSelectionTable()" class="w-full bg-surface border border-surface-hover focus:border-primary rounded-lg px-3 py-2 text-xs text-text-primary font-medium outline-none transition-colors">
+                        <option value="">Tất cả các Khoa (Bao gồm môn Đại cương / Liên ngành)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-5">
+                    <label class="block text-[11px] font-semibold text-text-muted mb-1">2. Tìm kiếm nhanh môn học</label>
+                    <div class="relative">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input id="filter-search" oninput="renderSubjectSelectionTable()" type="text" placeholder="Nhập Mã môn hoặc Tên môn học để lọc tức thì..."
+                               class="w-full bg-surface border border-surface-hover focus:border-primary rounded-lg pl-9 pr-8 py-2 text-xs text-text-primary outline-none transition-colors" />
+                        <button type="button" onclick="clearSubjectSearch()" id="btn-clear-search" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs text-text-muted mb-1">Tín Chỉ Bắt Buộc</label>
-                            <input id="qd-bb" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-text-muted mb-1">Tín Chỉ Tự Chọn</label>
-                            <input id="qd-tc" type="number" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-text-muted mb-1">GPA Hệ 4 Tối Thiểu</label>
-                        <input id="qd-gpa" type="number" step="0.1" min="1" max="4" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
-                    </div>
-                    <button type="submit" class="w-full py-2.5 rounded-xl bg-[#10B981] text-white text-sm font-bold hover:bg-[#10B981]/90 transition-all">
-                        Lưu Quy Định Tốt Nghiệp
-                    </button>
-                </form>
+                </div>
+                <div class="md:col-span-3 flex items-center md:pt-4">
+                    <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-surface transition-colors w-full">
+                        <input id="filter-hide-existing" type="checkbox" checked onchange="renderSubjectSelectionTable()" class="w-4 h-4 rounded accent-primary cursor-pointer" />
+                        <span class="text-xs font-semibold text-text-primary">Ẩn các môn đã có trong khung</span>
+                    </label>
+                </div>
             </div>
 
-            <!-- Form Thêm Môn vào Khung -->
-            <div class="bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
-                <h3 class="font-bold text-text-primary flex items-center gap-2">
-                    <i data-lucide="plus-circle" class="w-5 h-5 text-primary"></i> Thêm Môn Vào Khung Đào Tạo
-                </h3>
-                <form onsubmit="addMonToKhung(event)" class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-text-muted mb-1">Môn Học</label>
-                        <select id="add-mamon" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+            <!-- BƯỚC 2: Bảng chọn nhiều môn học (Multi-select Subject List) -->
+            <div class="border border-surface-hover rounded-xl overflow-hidden bg-canvas/30">
+                <div class="max-h-72 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-10 bg-surface-header border-b border-surface-hover text-[11px] text-text-muted uppercase tracking-wider shadow-sm">
+                            <tr>
+                                <th class="px-4 py-3 w-12 text-center">
+                                    <input id="select-all-checkbox" type="checkbox" onchange="toggleSelectAllVisible(this.checked)" title="Chọn / Bỏ chọn tất cả các môn hiển thị" class="w-4 h-4 rounded accent-primary cursor-pointer" />
+                                </th>
+                                <th class="px-4 py-3 font-semibold">Mã Môn</th>
+                                <th class="px-4 py-3 font-semibold">Tên Môn Học</th>
+                                <th class="px-4 py-3 font-semibold text-center">Số TC &amp; Tiết (LT/TH)</th>
+                                <th class="px-4 py-3 font-semibold">Khoa Phụ Trách</th>
+                                <th class="px-4 py-3 font-semibold text-right">Trạng Thái / Loại HP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batch-subject-tbody" class="divide-y divide-surface-hover/60 text-sm">
+                            <!-- Render bằng JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BƯỚC 3: Thanh Thiết lập Học kỳ & Loại học phần (Action Bar) -->
+            <div id="batch-action-bar" class="rounded-xl border border-surface-hover bg-canvas/50 p-4 transition-all duration-200">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <!-- Thống kê số môn & tín chỉ đang chọn -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div id="batch-selection-indicator" class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-surface border border-surface-hover text-xs">
+                            <span class="w-2.5 h-2.5 rounded-full bg-text-muted" id="batch-status-dot"></span>
+                            <span id="batch-selection-text" class="font-semibold text-text-muted">Chưa chọn môn học nào (Hãy tích chọn các môn ở bảng trên)</span>
+                        </div>
+                        <button type="button" id="btn-clear-selected" onclick="clearAllSelectedMon()" class="hidden px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs font-semibold transition-colors flex items-center gap-1.5">
+                            <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> Bỏ chọn tất cả
+                        </button>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs text-text-muted mb-1">Học Kỳ Dự Kiến</label>
-                            <select id="add-hk" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+
+                    <!-- Điều khiển Học kỳ, Loại học phần & Nút Thêm hàng loạt -->
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <label for="batch-hk" class="text-xs font-semibold text-text-muted whitespace-nowrap">Học Kỳ Dự Kiến:</label>
+                            <select id="batch-hk" class="bg-surface border border-surface-hover focus:border-primary rounded-xl px-3 py-2 text-xs font-bold text-text-primary outline-none">
                                 <option value="1">Học kỳ 1</option>
                                 <option value="2">Học kỳ 2</option>
                                 <option value="3">Học kỳ 3</option>
@@ -70,39 +168,102 @@
                                 <option value="6">Học kỳ 6</option>
                                 <option value="7">Học kỳ 7</option>
                                 <option value="8">Học kỳ 8</option>
+                                <option value="9">Học kỳ 9</option>
+                                <option value="10">Học kỳ 10</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-xs text-text-muted mb-1">Loại Học Phần</label>
-                            <select id="add-loai" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <label for="batch-loai" class="text-xs font-semibold text-text-muted whitespace-nowrap">Loại Học Phần:</label>
+                            <select id="batch-loai" onchange="onBatchLoaiChanged(this.value)" class="bg-surface border border-surface-hover focus:border-primary rounded-xl px-3 py-2 text-xs font-bold text-text-primary outline-none">
                                 <option value="Bắt buộc">Bắt buộc</option>
                                 <option value="Tự chọn">Tự chọn</option>
                             </select>
                         </div>
+
+                        <button type="button" id="btn-submit-batch" onclick="submitBatchAddMon()" disabled
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all whitespace-nowrap">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            <span id="btn-submit-batch-label">Thêm 0 môn vào Khung Chương Trình</span>
+                        </button>
                     </div>
-                    <button type="submit" class="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90">
-                        Thêm Vào Khung Chương Trình
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Right: Danh sách môn theo từng học kỳ -->
-        <div class="lg:col-span-8 space-y-4" id="kdt-semesters"></div>
+    <!-- KHU VỰC 3: Danh sách các môn theo từng Học kỳ (Lưới 2 cột) -->
+    <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="book-open-check" class="w-5 h-5 text-primary"></i>
+                <h2 class="text-lg font-bold text-text-primary">Cấu Trúc Khung Chương Trình Theo Học Kỳ</h2>
+            </div>
+            <span class="text-xs text-text-muted">💡 Mẹo: Click trực tiếp vào nhãn <strong class="text-primary">Bắt buộc</strong> / <strong class="text-amber-400">Tự chọn</strong> trong bảng học kỳ để đổi nhanh loại học phần.</span>
+        </div>
+
+        <div id="kdt-semesters" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Render các khối Học kỳ bằng JS -->
+        </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
-        let nganhs = [], monHocs = [];
+        let nganhs = [], khoas = [], monHocs = [];
+        let currentKhungList = []; // Danh sách các môn đã nằm trong khung của ngành đang chọn
+        // Map lưu các môn đang được tích chọn: key = MaMon, value = { maMon, soTC, loaiMon }
+        let selectedMonMap = new Map();
 
         async function initPage() {
-            const [resNganh, resMh] = await Promise.all([apiFetch('/api/nganh'), apiFetch('/api/monhoc')]);
-            nganhs = resNganh.data || [];
-            monHocs = resMh.data || [];
+            try {
+                const [resNganh, resKhoa, resMh] = await Promise.all([
+                    apiFetch('/api/nganh'),
+                    apiFetch('/api/khoa'),
+                    apiFetch('/api/monhoc')
+                ]);
+                nganhs = resNganh.data || [];
+                khoas = resKhoa.data || [];
+                monHocs = resMh.data || [];
 
-            document.getElementById('kdt-nganh').innerHTML = nganhs.map(n => `<option value="${n.MaNganh}">${n.MaNganh} - ${n.TenNganh}</option>`).join('');
-            document.getElementById('add-mamon').innerHTML = monHocs.map(m => `<option value="${m.MaMon}">${m.MaMon} - ${m.TenMon} (${m.SoTinChi} TC)</option>`).join('');
+                // Đổ dữ liệu Dropdown Ngành đào tạo
+                document.getElementById('kdt-nganh').innerHTML = nganhs
+                    .map(n => `<option value="${n.MaNganh}">${n.MaNganh} - ${n.TenNganh}</option>`)
+                    .join('');
+
+                // Đổ dữ liệu Dropdown Khoa phụ trách ở Bước 1
+                document.getElementById('filter-khoa').innerHTML =
+                    '<option value="">Tất cả các Khoa (Bao gồm môn Đại cương / Liên ngành)</option>' +
+                    khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa} (${k.MaKhoa})</option>`).join('');
+
+                await onNganhChanged();
+            } catch (err) {
+                showToast('Lỗi khởi tạo trang: ' + err.message, 'error');
+            }
+        }
+
+        async function onNganhChanged() {
+            const maNganh = document.getElementById('kdt-nganh').value;
+            if (!maNganh) return;
+
+            // Xóa các môn đang chọn tạm khi chuyển sang ngành khác
+            selectedMonMap.clear();
+
+            // Tự động lọc theo Khoa của Ngành đào tạo đang chọn
+            const nganhObj = nganhs.find(n => n.MaNganh === maNganh);
+            const filterKhoaEl = document.getElementById('filter-khoa');
+            const khoaBadgeEl = document.getElementById('kdt-nganh-khoa-badge');
+
+            if (nganhObj && nganhObj.MaKhoa) {
+                filterKhoaEl.value = nganhObj.MaKhoa;
+                const tenKhoa = nganhObj.Khoa?.TenKhoa || khoas.find(k => k.MaKhoa === nganhObj.MaKhoa)?.TenKhoa || nganhObj.MaKhoa;
+                if (khoaBadgeEl) {
+                    khoaBadgeEl.innerHTML = `<i data-lucide="building-2" class="w-3.5 h-3.5"></i> ${tenKhoa}`;
+                }
+            } else {
+                filterKhoaEl.value = '';
+                if (khoaBadgeEl) khoaBadgeEl.textContent = '';
+            }
 
             await loadCurriculum();
         }
@@ -113,15 +274,328 @@
 
             const res = await apiFetch(`/api/khungchuongtrinh/${maNganh}`);
             const qd = res.data.quyDinh;
-            const list = res.data.danhSachMon || [];
+            currentKhungList = res.data.danhSachMon || [];
 
             document.getElementById('qd-tong').value = qd.TongTTC;
             document.getElementById('qd-bb').value = qd.TCBatBuoc;
             document.getElementById('qd-tc').value = qd.TCTuChon;
             document.getElementById('qd-gpa').value = qd.MinGPA;
 
+            renderSummaryStats(qd);
+            renderSubjectSelectionTable();
+            updateBatchActionBar();
+            renderSemesterBlocks();
+            lucide.createIcons();
+        }
+
+        function renderSummaryStats(qd) {
+            const statsEl = document.getElementById('kdt-summary-stats');
+            if (!statsEl) return;
+
+            const totalMon = currentKhungList.length;
+            const totalTC = currentKhungList.reduce((s, x) => s + (x.MonHoc?.SoTinChi || 0), 0);
+            const bbTC = currentKhungList.filter(x => x.LoaiMon === 'Bắt buộc').reduce((s, x) => s + (x.MonHoc?.SoTinChi || 0), 0);
+            const tcTC = currentKhungList.filter(x => x.LoaiMon !== 'Bắt buộc').reduce((s, x) => s + (x.MonHoc?.SoTinChi || 0), 0);
+
+            statsEl.innerHTML = `
+                <span class="px-2.5 py-1 rounded-lg bg-canvas border border-surface-hover text-text-muted font-medium">
+                    Đã phân bổ: <strong class="text-text-primary">${totalMon} môn</strong>
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary font-semibold">
+                    Tổng khung: ${totalTC} / ${qd.TongTTC} TC
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
+                    Bắt buộc: ${bbTC} / ${qd.TCBatBuoc} TC
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold">
+                    Tự chọn: ${tcTC} / ${qd.TCTuChon} TC
+                </span>
+            `;
+        }
+
+        // =======================================================
+        // KHU VỰC 2: LỌC, TÌM KIẾM & CHỌN NHIỀU MÔN HỌC HÀNG LOẠT
+        // =======================================================
+
+        function getFilteredSubjectsForSelection() {
+            const maKhoa = document.getElementById('filter-khoa').value;
+            const q = document.getElementById('filter-search').value.toLowerCase().trim();
+            const hideExisting = document.getElementById('filter-hide-existing').checked;
+
+            const clearBtn = document.getElementById('btn-clear-search');
+            if (clearBtn) {
+                if (q.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
+            const existingMap = new Map();
+            currentKhungList.forEach(item => {
+                existingMap.set(item.MaMon.toUpperCase(), item.HocKyDuKien);
+            });
+
+            return monHocs.filter(m => {
+                const isExisting = existingMap.has(m.MaMon.toUpperCase());
+                if (hideExisting && isExisting) return false;
+
+                const matchKhoa = !maKhoa || m.MaKhoa === maKhoa;
+                const matchSearch = !q || m.MaMon.toLowerCase().includes(q) || m.TenMon.toLowerCase().includes(q);
+                return matchKhoa && matchSearch;
+            });
+        }
+
+        function clearSubjectSearch() {
+            document.getElementById('filter-search').value = '';
+            renderSubjectSelectionTable();
+        }
+
+        function renderSubjectSelectionTable() {
+            const tbody = document.getElementById('batch-subject-tbody');
+            const counterEl = document.getElementById('available-subjects-counter');
+            const selectAllCb = document.getElementById('select-all-checkbox');
+
+            const existingMap = new Map();
+            currentKhungList.forEach(item => {
+                existingMap.set(item.MaMon.toUpperCase(), item.HocKyDuKien);
+            });
+
+            const filtered = getFilteredSubjectsForSelection();
+            const selectableList = filtered.filter(m => !existingMap.has(m.MaMon.toUpperCase()));
+
+            if (counterEl) {
+                counterEl.innerHTML = `Hiển thị <strong class="text-primary">${filtered.length}</strong> môn học (${selectableList.length} môn có thể chọn)`;
+            }
+
+            // Cập nhật trạng thái Checkbox "Chọn tất cả"
+            if (selectAllCb) {
+                if (selectableList.length === 0) {
+                    selectAllCb.checked = false;
+                    selectAllCb.disabled = true;
+                } else {
+                    selectAllCb.disabled = false;
+                    const allSelected = selectableList.every(m => selectedMonMap.has(m.MaMon));
+                    selectAllCb.checked = allSelected;
+                }
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-text-muted text-xs">
+                            Không tìm thấy môn học nào khớp với điều kiện lọc hiện tại. Hãy thử đổi Khoa phụ trách sang <strong>"Tất cả các Khoa"</strong> hoặc bỏ tích <em>"Ẩn các môn đã có trong khung"</em>.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(m => {
+                const existingHk = existingMap.get(m.MaMon.toUpperCase());
+                const isExisting = existingHk !== undefined;
+                const isSelected = selectedMonMap.has(m.MaMon);
+                const selectedInfo = selectedMonMap.get(m.MaMon);
+                const tenKhoa = m.Khoa?.TenKhoa || khoas.find(k => k.MaKhoa === m.MaKhoa)?.TenKhoa || m.MaKhoa || 'Chung';
+
+                let statusCell = '';
+                if (isExisting) {
+                    statusCell = `
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-surface border border-surface-hover text-text-muted">
+                            <i data-lucide="check-check" class="w-3 h-3 text-emerald-400"></i> Đã có ở Học kỳ ${existingHk}
+                        </span>
+                    `;
+                } else if (isSelected) {
+                    const currentLoai = selectedInfo?.loaiMon || document.getElementById('batch-loai').value || 'Bắt buộc';
+                    const isBB = currentLoai === 'Bắt buộc';
+                    statusCell = `
+                        <button type="button" onclick="event.stopPropagation(); toggleSingleSelectedLoai('${m.MaMon}')"
+                                title="Click để đổi nhanh Bắt buộc / Tự chọn cho môn này"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                                    isBB
+                                        ? 'bg-primary text-white shadow-sm'
+                                        : 'bg-amber-500 text-slate-950 shadow-sm'
+                                }">
+                            <i data-lucide="repeat" class="w-3 h-3"></i> ${currentLoai}
+                        </button>
+                    `;
+                } else {
+                    statusCell = `<span class="text-xs text-text-muted group-hover:text-primary transition-colors">Chưa gán</span>`;
+                }
+
+                return `
+                    <tr onclick="${isExisting ? '' : `toggleSelectMon('${m.MaMon}', ${m.SoTinChi || 0})`}"
+                        class="group transition-colors ${
+                            isExisting
+                                ? 'opacity-45 bg-canvas/20 cursor-not-allowed select-none'
+                                : isSelected
+                                    ? 'bg-primary/10 hover:bg-primary/15 cursor-pointer'
+                                    : 'hover:bg-surface-hover/50 cursor-pointer'
+                        }">
+                        <td class="px-4 py-2.5 text-center" onclick="event.stopPropagation()">
+                            <input type="checkbox"
+                                   ${isExisting ? 'disabled' : ''}
+                                   ${isSelected ? 'checked' : ''}
+                                   onchange="toggleSelectMon('${m.MaMon}', ${m.SoTinChi || 0})"
+                                   class="w-4 h-4 rounded accent-primary ${isExisting ? 'cursor-not-allowed' : 'cursor-pointer'}" />
+                        </td>
+                        <td class="px-4 py-2.5 font-mono font-bold text-xs ${isSelected ? 'text-primary' : 'text-primary/90'}">${m.MaMon}</td>
+                        <td class="px-4 py-2.5 font-semibold text-xs text-text-primary">${m.TenMon}</td>
+                        <td class="px-4 py-2.5 text-center whitespace-nowrap">
+                            <span class="font-bold text-xs text-amber-400">${m.SoTinChi} TC</span>
+                            <span class="text-[11px] text-text-muted ml-1">(${m.SoTietLyThuyet || 0}LT / ${m.SoTietThucHanh || 0}TH)</span>
+                        </td>
+                        <td class="px-4 py-2.5 text-xs text-text-muted">${tenKhoa}</td>
+                        <td class="px-4 py-2.5 text-right whitespace-nowrap">${statusCell}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function toggleSelectMon(maMon, soTC) {
+            // Không cho chọn nếu môn đã có trong khung
+            const isExisting = currentKhungList.some(x => x.MaMon.toUpperCase() === maMon.toUpperCase());
+            if (isExisting) return;
+
+            if (selectedMonMap.has(maMon)) {
+                selectedMonMap.delete(maMon);
+            } else {
+                const defaultLoai = document.getElementById('batch-loai').value || 'Bắt buộc';
+                selectedMonMap.set(maMon, {
+                    maMon,
+                    soTC: Number(soTC) || 0,
+                    loaiMon: defaultLoai
+                });
+            }
+
+            renderSubjectSelectionTable();
+            updateBatchActionBar();
+        }
+
+        function toggleSelectAllVisible(checked) {
+            const existingSet = new Set(currentKhungList.map(x => x.MaMon.toUpperCase()));
+            const filtered = getFilteredSubjectsForSelection();
+            const defaultLoai = document.getElementById('batch-loai').value || 'Bắt buộc';
+
+            filtered.forEach(m => {
+                if (existingSet.has(m.MaMon.toUpperCase())) return;
+                if (checked) {
+                    if (!selectedMonMap.has(m.MaMon)) {
+                        selectedMonMap.set(m.MaMon, {
+                            maMon: m.MaMon,
+                            soTC: Number(m.SoTinChi) || 0,
+                            loaiMon: defaultLoai
+                        });
+                    }
+                } else {
+                    selectedMonMap.delete(m.MaMon);
+                }
+            });
+
+            renderSubjectSelectionTable();
+            updateBatchActionBar();
+        }
+
+        function toggleSingleSelectedLoai(maMon) {
+            const info = selectedMonMap.get(maMon);
+            if (!info) return;
+            info.loaiMon = info.loaiMon === 'Bắt buộc' ? 'Tự chọn' : 'Bắt buộc';
+            selectedMonMap.set(maMon, info);
+            renderSubjectSelectionTable();
+        }
+
+        function onBatchLoaiChanged(newLoai) {
+            // Đồng bộ loại học phần mặc định cho tất cả các môn đang được tích chọn
+            selectedMonMap.forEach((val, key) => {
+                val.loaiMon = newLoai;
+                selectedMonMap.set(key, val);
+            });
+            renderSubjectSelectionTable();
+        }
+
+        function clearAllSelectedMon() {
+            selectedMonMap.clear();
+            renderSubjectSelectionTable();
+            updateBatchActionBar();
+        }
+
+        function updateBatchActionBar() {
+            const count = selectedMonMap.size;
+            let totalTC = 0;
+            selectedMonMap.forEach(v => { totalTC += (v.soTC || 0); });
+
+            const barEl = document.getElementById('batch-action-bar');
+            const dotEl = document.getElementById('batch-status-dot');
+            const textEl = document.getElementById('batch-selection-text');
+            const clearBtn = document.getElementById('btn-clear-selected');
+            const submitBtn = document.getElementById('btn-submit-batch');
+            const submitLabel = document.getElementById('btn-submit-batch-label');
+
+            if (count > 0) {
+                barEl.className = 'rounded-xl border border-primary/50 bg-primary/5 p-4 transition-all duration-200 shadow-sm';
+                dotEl.className = 'w-2.5 h-2.5 rounded-full bg-primary animate-pulse';
+                textEl.className = 'font-bold text-text-primary';
+                textEl.innerHTML = `Đang chọn: <span class="text-primary">${count} môn học</span> (Tổng: <span class="text-amber-400">${totalTC} tín chỉ</span>)`;
+                clearBtn.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitLabel.textContent = `Thêm ${count} môn vào Khung Chương Trình`;
+            } else {
+                barEl.className = 'rounded-xl border border-surface-hover bg-canvas/50 p-4 transition-all duration-200';
+                dotEl.className = 'w-2.5 h-2.5 rounded-full bg-text-muted';
+                textEl.className = 'font-semibold text-text-muted';
+                textEl.textContent = 'Chưa chọn môn học nào (Hãy tích chọn các môn ở bảng trên)';
+                clearBtn.classList.add('hidden');
+                submitBtn.disabled = true;
+                submitLabel.textContent = 'Thêm 0 môn vào Khung Chương Trình';
+            }
+        }
+
+        async function submitBatchAddMon() {
+            const maNganh = document.getElementById('kdt-nganh').value;
+            const hocKy = Number(document.getElementById('batch-hk').value) || 1;
+            const loaiHocPhan = document.getElementById('batch-loai').value || 'Bắt buộc';
+
+            if (!maNganh) {
+                showToast('Vui lòng chọn Ngành đào tạo!', 'error');
+                return;
+            }
+            if (selectedMonMap.size === 0) {
+                showToast('Vui lòng tích chọn ít nhất 1 môn học!', 'error');
+                return;
+            }
+
+            const maMonList = Array.from(selectedMonMap.keys());
+            const items = Array.from(selectedMonMap.values()).map(x => ({
+                MaMon: x.maMon,
+                LoaiMon: x.loaiMon || loaiHocPhan
+            }));
+
+            try {
+                const res = await apiFetch('/api/khungchuongtrinh/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        MaNganh: maNganh,
+                        HocKy: hocKy,
+                        LoaiHocPhan: loaiHocPhan,
+                        MaMonList: maMonList,
+                        Items: items
+                    })
+                });
+
+                showToast(res.message || `Đã thêm thành công ${maMonList.length} môn học vào Học kỳ ${hocKy}!`);
+                selectedMonMap.clear();
+                await loadCurriculum();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // =======================================================
+        // KHU VỰC 3: HIỂN THỊ CÁC KHỐI HỌC KỲ (LƯỚI 2 CỘT)
+        // =======================================================
+
+        function renderSemesterBlocks() {
             const byHk = {};
-            list.forEach(item => {
+            currentKhungList.forEach(item => {
                 byHk[item.HocKyDuKien] = byHk[item.HocKyDuKien] || [];
                 byHk[item.HocKyDuKien].push(item);
             });
@@ -130,7 +604,11 @@
             const keys = Object.keys(byHk).sort((a, b) => Number(a) - Number(b));
 
             if (keys.length === 0) {
-                container.innerHTML = `<div class="bg-surface border border-surface-hover rounded-2xl p-10 text-center text-text-muted">Chưa có môn học nào trong khung đào tạo của ngành này.</div>`;
+                container.innerHTML = `
+                    <div class="lg:col-span-2 bg-surface border border-surface-hover rounded-2xl p-12 text-center text-text-muted">
+                        Chưa có môn học nào trong khung đào tạo của ngành này. Hãy tích chọn các môn ở khu vực trên để thêm vào học kỳ.
+                    </div>
+                `;
                 return;
             }
 
@@ -138,40 +616,78 @@
                 const items = byHk[hk];
                 const totalTC = items.reduce((s, x) => s + (x.MonHoc?.SoTinChi || 0), 0);
                 return `
-                    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden">
+                    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm flex flex-col">
                         <div class="px-5 py-3.5 bg-surface-header border-b border-surface-hover flex justify-between items-center">
-                            <span class="font-bold text-sm text-primary">Học Kỳ ${hk}</span>
-                            <span class="text-xs text-text-muted font-semibold">Tổng: ${totalTC} Tín chỉ (${items.length} môn)</span>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-primary"></span>
+                                <span class="font-bold text-sm text-primary">Học Kỳ ${hk}</span>
+                            </div>
+                            <span class="text-xs text-text-muted font-semibold bg-canvas px-2.5 py-1 rounded-lg border border-surface-hover">
+                                Tổng: <strong class="text-amber-400">${totalTC} Tín chỉ</strong> (${items.length} môn)
+                            </span>
                         </div>
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr class="border-b border-surface-hover text-xs text-text-muted uppercase">
-                                    <th class="px-5 py-2.5">Mã Môn</th>
-                                    <th class="px-5 py-2.5">Tên Môn Học</th>
-                                    <th class="px-5 py-2.5 text-center">Số TC</th>
-                                    <th class="px-5 py-2.5 text-center">Loại</th>
-                                    <th class="px-5 py-2.5 text-right">Xóa</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-surface-hover">
-                                ${items.map(x => `
-                                    <tr class="hover:bg-surface-hover/40">
-                                        <td class="px-5 py-3 font-bold text-primary">${x.MaMon}</td>
-                                        <td class="px-5 py-3 font-medium text-text-primary">${x.MonHoc?.TenMon || ''}</td>
-                                        <td class="px-5 py-3 text-center font-bold">${x.MonHoc?.SoTinChi || 0}</td>
-                                        <td class="px-5 py-3 text-center">
-                                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${x.LoaiMon === 'Bắt buộc' ? 'bg-primary/15 text-primary' : 'bg-amber-500/15 text-amber-400'}">${x.LoaiMon}</span>
-                                        </td>
-                                        <td class="px-5 py-3 text-right">
-                                            <button onclick="removeMonFromKhung(${x.ID})" class="text-[#ef4444] hover:underline text-xs">Gỡ bỏ</button>
-                                        </td>
+                        <div class="overflow-x-auto flex-1">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="border-b border-surface-hover text-[11px] text-text-muted uppercase">
+                                        <th class="px-4 py-2.5 font-semibold">Mã Môn</th>
+                                        <th class="px-4 py-2.5 font-semibold">Tên Môn Học</th>
+                                        <th class="px-4 py-2.5 font-semibold text-center">Số TC</th>
+                                        <th class="px-4 py-2.5 font-semibold text-center">Loại</th>
+                                        <th class="px-4 py-2.5 font-semibold text-right">Xóa</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-surface-hover/60">
+                                    ${items.map(x => {
+                                        const isBB = x.LoaiMon === 'Bắt buộc';
+                                        return `
+                                            <tr class="hover:bg-surface-hover/40 transition-colors">
+                                                <td class="px-4 py-3 font-mono font-bold text-xs text-primary whitespace-nowrap">${x.MaMon}</td>
+                                                <td class="px-4 py-3 font-medium text-xs text-text-primary">${x.MonHoc?.TenMon || ''}</td>
+                                                <td class="px-4 py-3 text-center font-bold text-xs text-amber-400">${x.MonHoc?.SoTinChi || 0}</td>
+                                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                                    <button type="button"
+                                                            onclick="toggleLoaiMonInKhung(${x.ID}, '${x.LoaiMon}', ${x.HocKyDuKien})"
+                                                            title="Click để chuyển đổi nhanh giữa Bắt buộc và Tự chọn"
+                                                            class="px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer transition-all hover:scale-105 ${
+                                                                isBB
+                                                                    ? 'bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25'
+                                                                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'
+                                                            }">
+                                                        ${x.LoaiMon}
+                                                    </button>
+                                                </td>
+                                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                                    <button type="button" onclick="removeMonFromKhung(${x.ID})" class="text-[#ef4444] hover:underline text-xs font-semibold">
+                                                        Gỡ bỏ
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        async function toggleLoaiMonInKhung(id, currentLoai, hocKy) {
+            const newLoai = currentLoai === 'Bắt buộc' ? 'Tự chọn' : 'Bắt buộc';
+            try {
+                await apiFetch(`/api/khungchuongtrinh/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        HocKyDuKien: hocKy,
+                        LoaiMon: newLoai
+                    })
+                });
+                showToast(`Đã đổi loại học phần sang "${newLoai}"!`);
+                await loadCurriculum();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
         }
 
         async function saveQuyDinh(e) {
@@ -189,33 +705,21 @@
                     })
                 });
                 showToast('Đã cập nhật quy định tốt nghiệp!');
-            } catch (err) { showToast(err.message, 'error'); }
-        }
-
-        async function addMonToKhung(e) {
-            e.preventDefault();
-            try {
-                await apiFetch('/api/khungchuongtrinh', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        MaNganh: document.getElementById('kdt-nganh').value,
-                        MaMon: document.getElementById('add-mamon').value,
-                        HocKyDuKien: Number(document.getElementById('add-hk').value),
-                        LoaiMon: document.getElementById('add-loai').value
-                    })
-                });
-                showToast('Đã thêm môn vào khung chương trình!');
                 await loadCurriculum();
-            } catch (err) { showToast(err.message, 'error'); }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
         }
 
         async function removeMonFromKhung(id) {
             if (!confirm('Gỡ môn học này khỏi khung đào tạo?')) return;
             try {
                 await apiFetch(`/api/khungchuongtrinh/${id}`, { method: 'DELETE' });
-                showToast('Đã gỡ môn học!');
+                showToast('Đã gỡ môn học khỏi khung chương trình!');
                 await loadCurriculum();
-            } catch (err) { showToast(err.message, 'error'); }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
         }
 
         initPage();
