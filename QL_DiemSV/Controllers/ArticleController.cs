@@ -51,9 +51,19 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         if (!User.IsInRole("Admin"))
             baseQuery = baseQuery.Where(x => x.NguoiDangId == AuthorId);
 
-        int totalPublished = await baseQuery.CountAsync(x => x.TrangThai == "DaXuatBan");
-        int totalDraft = await baseQuery.CountAsync(x => x.TrangThai == "BanNhap");
-        int totalPinned = await baseQuery.CountAsync(x => x.GhimDauTrang);
+        var summaryCounts = await baseQuery
+            .GroupBy(x => 1)
+            .Select(g => new
+            {
+                Published = g.Count(x => x.TrangThai == "DaXuatBan"),
+                Draft = g.Count(x => x.TrangThai == "BanNhap"),
+                Pinned = g.Count(x => x.GhimDauTrang)
+            })
+            .FirstOrDefaultAsync();
+
+        int totalPublished = summaryCounts?.Published ?? 0;
+        int totalDraft = summaryCounts?.Draft ?? 0;
+        int totalPinned = summaryCounts?.Pinned ?? 0;
 
         var q = baseQuery;
         if (!string.IsNullOrWhiteSpace(search))

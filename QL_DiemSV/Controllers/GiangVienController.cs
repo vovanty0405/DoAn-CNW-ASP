@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class GiangVienController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -20,7 +22,7 @@ public class GiangVienController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? sort = null)
     {
-        var query = _db.GiangViens
+        var query = _db.GiangViens.AsNoTracking()
             .Include(g => g.Khoa)
             .AsQueryable();
 
@@ -61,6 +63,7 @@ public class GiangVienController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] GiangVien model)
     {
         if (string.IsNullOrWhiteSpace(model.MaGV) || string.IsNullOrWhiteSpace(model.HoTen))
@@ -98,48 +101,73 @@ public class GiangVienController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<GiangVien> list)
     {
         if (list == null || !list.Any())
             return BadRequest(new { status = "error", message = "Danh sách giảng viên trống" });
 
-        var gvRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleName == "GiangVien");
+        var gvRole = await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.RoleName == "GiangVien");
+        int roleId = gvRole?.RoleID ?? 2;
         string defaultHash = BCrypt.Net.BCrypt.HashPassword("123456");
-        int count = 0;
+
+        var existingGvIds = (await _db.GiangViens.AsNoTracking().Select(g => g.MaGV).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingAccounts = await _db.UserAccounts
+            .ToDictionaryAsync(u => u.Username, StringComparer.OrdinalIgnoreCase);
+
+        var newAccounts = new List<UserAccount>();
+        var pendingLecturers = new List<(GiangVien gv, UserAccount acc)>();
 
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaGV) || await _db.GiangViens.AnyAsync(g => g.MaGV == item.MaGV))
-                continue;
+            if (string.IsNullOrWhiteSpace(item.MaGV)) continue;
+            item.MaGV = item.MaGV.Trim();
+            if (existingGvIds.Contains(item.MaGV)) continue;
 
-            var ua = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Username == item.MaGV);
-            if (ua == null)
+            existingGvIds.Add(item.MaGV);
+            if (!existingAccounts.TryGetValue(item.MaGV, out var ua))
             {
                 ua = new UserAccount
                 {
-                    Username = item.MaGV.Trim(),
+                    Username = item.MaGV,
                     PasswordHash = defaultHash,
-                    RoleID = gvRole?.RoleID ?? 2,
+                    RoleID = roleId,
                     IsActive = true,
-                    MaGV = item.MaGV.Trim(),
+                    MaGV = item.MaGV,
                     NgayTao = DateTime.Now
                 };
-                _db.UserAccounts.Add(ua);
-                await _db.SaveChangesAsync();
+                newAccounts.Add(ua);
+                existingAccounts[item.MaGV] = ua;
             }
 
-            item.UserID = ua.UserID;
             if (string.IsNullOrWhiteSpace(item.MaKhoa)) item.MaKhoa = null;
-            _db.GiangViens.Add(item);
-            count++;
+            pendingLecturers.Add((item, ua));
         }
 
-        await _db.SaveChangesAsync();
+        if (newAccounts.Count > 0)
+        {
+            _db.UserAccounts.AddRange(newAccounts);
+            await _db.SaveChangesAsync();
+        }
+
+        foreach (var (gv, ua) in pendingLecturers)
+        {
+            gv.UserID = ua.UserID;
+            _db.GiangViens.Add(gv);
+        }
+
+        int count = pendingLecturers.Count;
+        if (count > 0)
+        {
+            await _db.SaveChangesAsync();
+        }
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Giảng viên", $"Đã import {count} giảng viên từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} giảng viên" });
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] GiangVien model)
     {
         var existing = await _db.GiangViens.FindAsync(id);
@@ -160,10 +188,16 @@ public class GiangVienController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.GiangViens.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Giảng viên" });
+
+        if (await _db.ClassSchedules.AnyAsync(c => c.MaGV == id))
+        {
+            return BadRequest(new { status = "error", message = $"Không thể xóa giảng viên {id} vì đang có buổi học được phân công trong Thời khóa biểu! Vui lòng đổi giảng viên cho các buổi học đó trước." });
+        }
 
         // Gỡ liên kết lớp học phần và lớp hành chính trước khi xóa
         var lhps = await _db.LopHocPhans.Where(l => l.MaGV == id).ToListAsync();

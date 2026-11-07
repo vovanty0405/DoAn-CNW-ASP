@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -6,6 +7,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin")]
 public class NhatKyHoatDongController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -18,7 +20,7 @@ public class NhatKyHoatDongController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var list = await _db.NhatKyHoatDongs
+        var list = await _db.NhatKyHoatDongs.AsNoTracking()
             .OrderByDescending(l => l.ThoiGian)
             .ThenByDescending(l => l.MaLog)
             .Take(200)

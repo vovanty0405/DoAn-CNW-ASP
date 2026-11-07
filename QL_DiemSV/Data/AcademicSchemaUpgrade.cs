@@ -8,78 +8,238 @@ public static class AcademicSchemaUpgrade
 {
     public static void Apply(ApplicationDbContext db)
     {
-        using (var tx = db.Database.BeginTransaction())
+        try
         {
             db.Database.ExecuteSqlRaw("""
-                EXEC sp_getapplock @Resource=N'AcademicLedger.Schema', @LockMode='Exclusive', @LockOwner='Transaction';
-                IF COL_LENGTH('LopHocPhan','NMH') IS NULL ALTER TABLE LopHocPhan ADD NMH nvarchar(10) NOT NULL CONSTRAINT DF_LHP_NMH DEFAULT '01';
-                IF COL_LENGTH('LopHocPhan','TTH') IS NULL ALTER TABLE LopHocPhan ADD TTH nvarchar(10) NULL;
-                IF COL_LENGTH('LopHocPhan','STC') IS NULL BEGIN
-                    ALTER TABLE LopHocPhan ADD STC int NOT NULL CONSTRAINT DF_LHP_STC DEFAULT 0;
-                    EXEC(N'UPDATE l SET STC = m.SoTinChi FROM LopHocPhan l JOIN MonHoc m ON l.MaMon=m.MaMon');
+                IF EXISTS (SELECT 1 FROM sys.databases WHERE name = DB_NAME() AND is_auto_close_on = 1)
+                    EXEC(N'ALTER DATABASE CURRENT SET AUTO_CLOSE OFF WITH NO_WAIT');
+                """);
+        }
+        catch { }
+
+        bool schemaReady = false;
+        try
+        {
+            schemaReady = db.Database.SqlQueryRaw<int>(
+                "SELECT CASE WHEN OBJECT_ID('CurriculumSections','U') IS NOT NULL AND COL_LENGTH('LopHocPhan','TyLeThiKetThuc') IS NOT NULL AND COL_LENGTH('Article','HeDaoTao') IS NOT NULL THEN 1 ELSE 0 END AS [Value]")
+                .AsEnumerable()
+                .FirstOrDefault() == 1;
+        }
+        catch { }
+
+        if (!schemaReady)
+        {
+            var strategy = db.Database.CreateExecutionStrategy();
+            strategy.Execute(() =>
+            {
+                using var tx = db.Database.BeginTransaction();
+                db.Database.ExecuteSqlRaw("""
+                    EXEC sp_getapplock @Resource=N'AcademicLedger.Schema', @LockMode='Exclusive', @LockOwner='Transaction';
+                    IF COL_LENGTH('LopHocPhan','NMH') IS NULL ALTER TABLE LopHocPhan ADD NMH nvarchar(10) NOT NULL CONSTRAINT DF_LHP_NMH DEFAULT '01';
+                    IF COL_LENGTH('LopHocPhan','TTH') IS NULL ALTER TABLE LopHocPhan ADD TTH nvarchar(10) NULL;
+                    IF COL_LENGTH('LopHocPhan','STC') IS NULL BEGIN
+                        ALTER TABLE LopHocPhan ADD STC int NOT NULL CONSTRAINT DF_LHP_STC DEFAULT 0;
+                        EXEC(N'UPDATE l SET STC = m.SoTinChi FROM LopHocPhan l JOIN MonHoc m ON l.MaMon=m.MaMon');
+                    END;
+                    IF COL_LENGTH('LopHocPhan','STCHP') IS NULL BEGIN
+                        ALTER TABLE LopHocPhan ADD STCHP decimal(8,2) NOT NULL CONSTRAINT DF_LHP_STCHP DEFAULT 0;
+                        EXEC(N'UPDATE LopHocPhan SET STCHP=STC');
+                    END;
+                    IF COL_LENGTH('LopHocPhan','MaLop') IS NULL ALTER TABLE LopHocPhan ADD MaLop nvarchar(20) NULL;
+                    IF COL_LENGTH('HocKy','NgayBatDauTuan1') IS NULL ALTER TABLE HocKy ADD NgayBatDauTuan1 datetime2 NULL;
+                    IF COL_LENGTH('HocKy','BatDauDangKy') IS NULL ALTER TABLE HocKy ADD BatDauDangKy datetime2 NULL;
+                    IF COL_LENGTH('HocKy','KetThucDangKy') IS NULL ALTER TABLE HocKy ADD KetThucDangKy datetime2 NULL;
+                    IF COL_LENGTH('HocKy','SoTuan') IS NULL ALTER TABLE HocKy ADD SoTuan int NOT NULL CONSTRAINT DF_HK_SoTuan DEFAULT 20;
+                    IF COL_LENGTH('HocKy','DonGiaTinChi') IS NULL ALTER TABLE HocKy ADD DonGiaTinChi decimal(18,2) NOT NULL CONSTRAINT DF_HK_DonGia DEFAULT 635000;
+                    IF COL_LENGTH('KetQuaHocTap','HocPhiDangKy') IS NULL ALTER TABLE KetQuaHocTap ADD HocPhiDangKy decimal(18,2) NULL;
+                    IF COL_LENGTH('KetQuaHocTap','MienGiam') IS NULL ALTER TABLE KetQuaHocTap ADD MienGiam decimal(18,2) NOT NULL CONSTRAINT DF_KQ_MienGiam DEFAULT 0;
+                    IF COL_LENGTH('KetQuaHocTap','NgayDangKy') IS NULL ALTER TABLE KetQuaHocTap ADD NgayDangKy datetime2 NULL;
+                    IF OBJECT_ID('PhongHoc','U') IS NULL CREATE TABLE PhongHoc (MaPhong nvarchar(50) NOT NULL PRIMARY KEY, SucChua int NOT NULL CHECK (SucChua > 0));
+                    IF OBJECT_ID('ClassSchedule','U') IS NULL BEGIN
+                        CREATE TABLE ClassSchedule (
+                            Id int IDENTITY PRIMARY KEY, MaLHP nvarchar(20) NOT NULL,
+                            LoaiBuoiHoc bit NOT NULL, Thu int NOT NULL CHECK (Thu BETWEEN 2 AND 8),
+                            TietBatDau int NOT NULL CHECK (TietBatDau BETWEEN 1 AND 12),
+                            SoTiet int NOT NULL CHECK (SoTiet > 0), PhongHoc nvarchar(50) NOT NULL,
+                            MaGV nvarchar(20) NOT NULL, ChuoiTuanHoc nvarchar(200) NOT NULL,
+                            CONSTRAINT CK_Schedule_Periods CHECK (TietBatDau + SoTiet <= 13),
+                            FOREIGN KEY (MaLHP) REFERENCES LopHocPhan(MaLHP) ON DELETE CASCADE,
+                            FOREIGN KEY (MaGV) REFERENCES GiangVien(MaGV),
+                            FOREIGN KEY (PhongHoc) REFERENCES PhongHoc(MaPhong));
+                        CREATE INDEX IX_ClassSchedule_MaLHP ON ClassSchedule(MaLHP);
+                        CREATE INDEX IX_ClassSchedule_MaGV ON ClassSchedule(MaGV);
+                        CREATE INDEX IX_ClassSchedule_PhongHoc ON ClassSchedule(PhongHoc);
+                    END;
+                    IF COL_LENGTH('PhongHoc','ToaNha') IS NULL ALTER TABLE PhongHoc ADD ToaNha nvarchar(30) NOT NULL CONSTRAINT DF_Phong_ToaNha DEFAULT 'Khac';
+                    IF COL_LENGTH('PhongHoc','TrangThai') IS NULL ALTER TABLE PhongHoc ADD TrangThai nvarchar(20) NOT NULL CONSTRAINT DF_Phong_TrangThai DEFAULT 'HoatDong';
+                    IF COL_LENGTH('ClassSchedule','LoaiLich') IS NULL ALTER TABLE ClassSchedule ADD LoaiLich nvarchar(20) NOT NULL CONSTRAINT DF_Schedule_Loai DEFAULT 'LichHoc';
+                    IF COL_LENGTH('Nganh','HeDaoTao') IS NULL ALTER TABLE Nganh ADD HeDaoTao nvarchar(50) NOT NULL CONSTRAINT DF_Nganh_He DEFAULT N'Chính quy';
+                    IF OBJECT_ID('Article','U') IS NULL BEGIN
+                        CREATE TABLE Article (Id int IDENTITY PRIMARY KEY, TieuDe nvarchar(250) NOT NULL, TomTat nvarchar(1000) NOT NULL,
+                            NoiDung nvarchar(max) NOT NULL, DanhMuc nvarchar(40) NOT NULL, DonViDang nvarchar(200) NOT NULL,
+                            NguoiDangId int NOT NULL REFERENCES UserAccounts(UserID), NgayDang datetime2 NOT NULL,
+                            GhimDauTrang bit NOT NULL, FileDinhKemUrl nvarchar(500) NULL, TenFileDinhKem nvarchar(255) NULL,
+                            DungLuongFile bigint NULL, ThumbnailUrl nvarchar(500) NULL, TrangThai nvarchar(20) NOT NULL, XuatBanLuc datetime2 NULL,
+                            HeDaoTao nvarchar(100) NOT NULL CONSTRAINT DF_Article_HeDaoTao DEFAULT N'Đại học chính quy');
+                        CREATE INDEX IX_Article_TrangThai_DanhMuc_NgayDang ON Article(TrangThai,DanhMuc,NgayDang);
+                    END;
+                    IF COL_LENGTH('Article','HeDaoTao') IS NULL ALTER TABLE Article ADD HeDaoTao nvarchar(100) NOT NULL CONSTRAINT DF_Article_HeDaoTao DEFAULT N'Đại học chính quy';
+                    IF OBJECT_ID('PortalDocument','U') IS NULL CREATE TABLE PortalDocument (
+                        Id int IDENTITY PRIMARY KEY,TieuDe nvarchar(250) NOT NULL,Loai nvarchar(30) NOT NULL,
+                        FileUrl nvarchar(500) NOT NULL,DungLuongBytes bigint NOT NULL,HienThi bit NOT NULL);
+                    IF COL_LENGTH('ClassSchedule','TuanBaoNghi') IS NULL ALTER TABLE ClassSchedule ADD TuanBaoNghi nvarchar(200) NOT NULL CONSTRAINT DF_Schedule_TuanBaoNghi DEFAULT '';
+                    IF COL_LENGTH('LopHocPhan','TyLeQuaTrinh') IS NULL ALTER TABLE LopHocPhan ADD TyLeQuaTrinh int NOT NULL CONSTRAINT DF_LHP_TyLeQT DEFAULT 40;
+                    IF COL_LENGTH('LopHocPhan','TyLeThiKetThuc') IS NULL ALTER TABLE LopHocPhan ADD TyLeThiKetThuc int NOT NULL CONSTRAINT DF_LHP_TyLeThi DEFAULT 60;
+                    IF OBJECT_ID('Curriculums','U') IS NULL BEGIN
+                  CREATE TABLE Curriculums(Id int IDENTITY PRIMARY KEY,HeDaoTao nvarchar(80) NOT NULL,KhoaHoc int NOT NULL,NganhHocId nvarchar(20) NOT NULL REFERENCES Nganh(MaNganh),TenChuongTrinh nvarchar(200) NOT NULL,TrangThai bit NOT NULL,NgayTao datetime2 NOT NULL,NgayCapNhat datetime2 NOT NULL);
+                  CREATE UNIQUE INDEX IX_Curriculum_Key ON Curriculums(HeDaoTao,KhoaHoc,NganhHocId,TenChuongTrinh);
                 END;
-                IF COL_LENGTH('LopHocPhan','STCHP') IS NULL BEGIN
-                    ALTER TABLE LopHocPhan ADD STCHP decimal(8,2) NOT NULL CONSTRAINT DF_LHP_STCHP DEFAULT 0;
-                    EXEC(N'UPDATE LopHocPhan SET STCHP=STC');
+                IF OBJECT_ID('CurriculumSections','U') IS NULL BEGIN
+                  CREATE TABLE CurriculumSections(Id int IDENTITY PRIMARY KEY,CurriculumId int NOT NULL REFERENCES Curriculums(Id) ON DELETE CASCADE,ThuTu int NOT NULL CHECK(ThuTu BETWEEN 1 AND 11),TieuDeMuc nvarchar(250) NOT NULL,NoiDung nvarchar(max) NOT NULL);
+                  CREATE UNIQUE INDEX IX_CurriculumSection_Order ON CurriculumSections(CurriculumId,ThuTu);
                 END;
-                IF COL_LENGTH('LopHocPhan','MaLop') IS NULL ALTER TABLE LopHocPhan ADD MaLop nvarchar(20) NULL;
-                IF COL_LENGTH('HocKy','NgayBatDauTuan1') IS NULL ALTER TABLE HocKy ADD NgayBatDauTuan1 datetime2 NULL;
-                IF COL_LENGTH('HocKy','BatDauDangKy') IS NULL ALTER TABLE HocKy ADD BatDauDangKy datetime2 NULL;
-                IF COL_LENGTH('HocKy','KetThucDangKy') IS NULL ALTER TABLE HocKy ADD KetThucDangKy datetime2 NULL;
-                IF COL_LENGTH('HocKy','SoTuan') IS NULL ALTER TABLE HocKy ADD SoTuan int NOT NULL CONSTRAINT DF_HK_SoTuan DEFAULT 20;
-                IF COL_LENGTH('HocKy','DonGiaTinChi') IS NULL ALTER TABLE HocKy ADD DonGiaTinChi decimal(18,2) NOT NULL CONSTRAINT DF_HK_DonGia DEFAULT 635000;
-                IF COL_LENGTH('KetQuaHocTap','HocPhiDangKy') IS NULL ALTER TABLE KetQuaHocTap ADD HocPhiDangKy decimal(18,2) NULL;
-                IF COL_LENGTH('KetQuaHocTap','MienGiam') IS NULL ALTER TABLE KetQuaHocTap ADD MienGiam decimal(18,2) NOT NULL CONSTRAINT DF_KQ_MienGiam DEFAULT 0;
-                IF COL_LENGTH('KetQuaHocTap','NgayDangKy') IS NULL ALTER TABLE KetQuaHocTap ADD NgayDangKy datetime2 NULL;
-                IF OBJECT_ID('PhongHoc','U') IS NULL CREATE TABLE PhongHoc (MaPhong nvarchar(50) NOT NULL PRIMARY KEY, SucChua int NOT NULL CHECK (SucChua > 0));
-                IF OBJECT_ID('ClassSchedule','U') IS NULL BEGIN
-                    CREATE TABLE ClassSchedule (
-                        Id int IDENTITY PRIMARY KEY, MaLHP nvarchar(20) NOT NULL,
-                        LoaiBuoiHoc bit NOT NULL, Thu int NOT NULL CHECK (Thu BETWEEN 2 AND 8),
-                        TietBatDau int NOT NULL CHECK (TietBatDau BETWEEN 1 AND 12),
-                        SoTiet int NOT NULL CHECK (SoTiet > 0), PhongHoc nvarchar(50) NOT NULL,
-                        MaGV nvarchar(20) NOT NULL, ChuoiTuanHoc nvarchar(200) NOT NULL,
-                        CONSTRAINT CK_Schedule_Periods CHECK (TietBatDau + SoTiet <= 13),
-                        FOREIGN KEY (MaLHP) REFERENCES LopHocPhan(MaLHP) ON DELETE CASCADE,
-                        FOREIGN KEY (MaGV) REFERENCES GiangVien(MaGV),
-                        FOREIGN KEY (PhongHoc) REFERENCES PhongHoc(MaPhong));
-                    CREATE INDEX IX_ClassSchedule_MaLHP ON ClassSchedule(MaLHP);
-                    CREATE INDEX IX_ClassSchedule_MaGV ON ClassSchedule(MaGV);
-                    CREATE INDEX IX_ClassSchedule_PhongHoc ON ClassSchedule(PhongHoc);
-                END;
-                IF COL_LENGTH('PhongHoc','ToaNha') IS NULL ALTER TABLE PhongHoc ADD ToaNha nvarchar(30) NOT NULL CONSTRAINT DF_Phong_ToaNha DEFAULT 'Khac';
-                IF COL_LENGTH('PhongHoc','TrangThai') IS NULL ALTER TABLE PhongHoc ADD TrangThai nvarchar(20) NOT NULL CONSTRAINT DF_Phong_TrangThai DEFAULT 'HoatDong';
-                IF COL_LENGTH('ClassSchedule','LoaiLich') IS NULL ALTER TABLE ClassSchedule ADD LoaiLich nvarchar(20) NOT NULL CONSTRAINT DF_Schedule_Loai DEFAULT 'LichHoc';
-                IF COL_LENGTH('Nganh','HeDaoTao') IS NULL ALTER TABLE Nganh ADD HeDaoTao nvarchar(50) NOT NULL CONSTRAINT DF_Nganh_He DEFAULT N'Chính quy';
-                IF OBJECT_ID('Article','U') IS NULL BEGIN
-                    CREATE TABLE Article (Id int IDENTITY PRIMARY KEY, TieuDe nvarchar(250) NOT NULL, TomTat nvarchar(1000) NOT NULL,
-                        NoiDung nvarchar(max) NOT NULL, DanhMuc nvarchar(40) NOT NULL, DonViDang nvarchar(200) NOT NULL,
-                        NguoiDangId int NOT NULL REFERENCES UserAccounts(UserID), NgayDang datetime2 NOT NULL,
-                        GhimDauTrang bit NOT NULL, FileDinhKemUrl nvarchar(500) NULL, TenFileDinhKem nvarchar(255) NULL,
-                        DungLuongFile bigint NULL, ThumbnailUrl nvarchar(500) NULL, TrangThai nvarchar(20) NOT NULL, XuatBanLuc datetime2 NULL,
-                        HeDaoTao nvarchar(100) NOT NULL CONSTRAINT DF_Article_HeDaoTao DEFAULT N'Đại học chính quy');
-                    CREATE INDEX IX_Article_TrangThai_DanhMuc_NgayDang ON Article(TrangThai,DanhMuc,NgayDang);
-                END;
-                IF COL_LENGTH('Article','HeDaoTao') IS NULL ALTER TABLE Article ADD HeDaoTao nvarchar(100) NOT NULL CONSTRAINT DF_Article_HeDaoTao DEFAULT N'Đại học chính quy';
-                IF OBJECT_ID('PortalDocument','U') IS NULL CREATE TABLE PortalDocument (
-                    Id int IDENTITY PRIMARY KEY,TieuDe nvarchar(250) NOT NULL,Loai nvarchar(30) NOT NULL,
-                    FileUrl nvarchar(500) NOT NULL,DungLuongBytes bigint NOT NULL,HienThi bit NOT NULL);
-                IF COL_LENGTH('ClassSchedule','TuanBaoNghi') IS NULL ALTER TABLE ClassSchedule ADD TuanBaoNghi nvarchar(200) NOT NULL CONSTRAINT DF_Schedule_TuanBaoNghi DEFAULT '';
-                IF COL_LENGTH('LopHocPhan','TyLeQuaTrinh') IS NULL ALTER TABLE LopHocPhan ADD TyLeQuaTrinh int NOT NULL CONSTRAINT DF_LHP_TyLeQT DEFAULT 40;
-                IF COL_LENGTH('LopHocPhan','TyLeThiKetThuc') IS NULL ALTER TABLE LopHocPhan ADD TyLeThiKetThuc int NOT NULL CONSTRAINT DF_LHP_TyLeThi DEFAULT 60;
-                IF OBJECT_ID('Curriculums','U') IS NULL BEGIN
-              CREATE TABLE Curriculums(Id int IDENTITY PRIMARY KEY,HeDaoTao nvarchar(80) NOT NULL,KhoaHoc int NOT NULL,NganhHocId nvarchar(20) NOT NULL REFERENCES Nganh(MaNganh),TenChuongTrinh nvarchar(200) NOT NULL,TrangThai bit NOT NULL,NgayTao datetime2 NOT NULL,NgayCapNhat datetime2 NOT NULL);
-              CREATE UNIQUE INDEX IX_Curriculum_Key ON Curriculums(HeDaoTao,KhoaHoc,NganhHocId,TenChuongTrinh);
-            END;
-            IF OBJECT_ID('CurriculumSections','U') IS NULL BEGIN
-              CREATE TABLE CurriculumSections(Id int IDENTITY PRIMARY KEY,CurriculumId int NOT NULL REFERENCES Curriculums(Id) ON DELETE CASCADE,ThuTu int NOT NULL CHECK(ThuTu BETWEEN 1 AND 11),TieuDeMuc nvarchar(250) NOT NULL,NoiDung nvarchar(max) NOT NULL);
-              CREATE UNIQUE INDEX IX_CurriculumSection_Order ON CurriculumSections(CurriculumId,ThuTu);
-            END;
-            """);
-            tx.Commit();
+                """);
+                tx.Commit();
+            });
         }
 
         SeedDefaultArticlesIfEmpty(db);
+        SeedMissingStudentGradesIfAny(db);
+    }
+
+    private static void SeedMissingStudentGradesIfAny(ApplicationDbContext db)
+    {
+        if (!db.KetQuaHocTaps.AsNoTracking().Any(k => k.DiemTongKet == null)) return;
+        var ungradedRecords = db.KetQuaHocTaps
+            .Where(k => k.MaLHP != null && (k.DiemTongKet == null || k.DiemCC == null || k.DiemGK == null || k.DiemCK == null))
+            .ToList()
+            .OrderBy(k => k.MaLHP)
+            .ThenBy(k => k.MaSV)
+            .ToList();
+
+        if (!ungradedRecords.Any()) return;
+
+        var maLhps = ungradedRecords.Select(k => k.MaLHP!).Distinct().ToList();
+        var lhpDict = db.LopHocPhans
+            .Where(l => maLhps.Contains(l.MaLHP))
+            .ToDictionary(l => l.MaLHP, StringComparer.OrdinalIgnoreCase);
+
+        var groupedByLhp = ungradedRecords.GroupBy(k => k.MaLHP!);
+        foreach (var group in groupedByLhp)
+        {
+            if (!lhpDict.TryGetValue(group.Key, out var lhp)) continue;
+            int tyLeQT = (lhp.TyLeQuaTrinh >= 0 && lhp.TyLeThiKetThuc >= 0 && lhp.TyLeQuaTrinh + lhp.TyLeThiKetThuc == 100)
+                ? lhp.TyLeQuaTrinh : 40;
+            int tyLeThi = 100 - tyLeQT;
+
+            var cauHinh = new List<(string id, double weight)>
+            {
+                ("col_cc", 25),
+                ("col_gk", 75)
+            };
+
+            if (!string.IsNullOrWhiteSpace(lhp.CauHinhDiem))
+            {
+                try
+                {
+                    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<Controllers.DiemController.ColConfigItem>>(
+                        lhp.CauHinhDiem,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (parsed != null && parsed.Any())
+                    {
+                        cauHinh = parsed.Select(c => (c.id, c.weight)).ToList();
+                    }
+                }
+                catch { }
+            }
+
+            int idx = 0;
+            foreach (var kq in group)
+            {
+                int hash = Math.Abs(HashCode.Combine(kq.MaSV ?? "", lhp.MaLHP, idx++));
+                var rng = new Random(hash);
+
+                int bucket = hash % 100;
+                double baseMin, baseMax;
+                if (bucket < 18) { baseMin = 8.5; baseMax = 9.8; }
+                else if (bucket < 50) { baseMin = 7.2; baseMax = 8.4; }
+                else if (bucket < 82) { baseMin = 5.8; baseMax = 7.1; }
+                else if (bucket < 92) { baseMin = 4.3; baseMax = 5.7; }
+                else { baseMin = 2.0; baseMax = 3.8; }
+
+                double SampleScore(double min, double max)
+                {
+                    double val = min + rng.NextDouble() * (max - min);
+                    return Math.Clamp(Math.Round(val, 1, MidpointRounding.AwayFromZero), 0.0, 10.0);
+                }
+
+                var chiTiet = new Dictionary<string, double?>();
+                if (!string.IsNullOrWhiteSpace(kq.ChiTietDiemQT))
+                {
+                    try
+                    {
+                        var existing = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, double?>>(kq.ChiTietDiemQT);
+                        if (existing != null) chiTiet = existing;
+                    }
+                    catch { }
+                }
+
+                if (kq.DiemCC != null && !chiTiet.ContainsKey("col_cc")) chiTiet["col_cc"] = kq.DiemCC;
+                if (kq.DiemGK != null && !chiTiet.ContainsKey("col_gk")) chiTiet["col_gk"] = kq.DiemGK;
+
+                foreach (var (id, _) in cauHinh)
+                {
+                    if (!chiTiet.ContainsKey(id) || chiTiet[id] == null)
+                    {
+                        double cMin = id.Contains("cc", StringComparison.OrdinalIgnoreCase) ? Math.Max(6.5, baseMin) : Math.Max(3.5, baseMin - 0.3);
+                        double cMax = id.Contains("cc", StringComparison.OrdinalIgnoreCase) ? Math.Min(10.0, baseMax + 0.5) : Math.Min(10.0, baseMax + 0.4);
+                        chiTiet[id] = SampleScore(cMin, cMax);
+                    }
+                }
+
+                kq.DiemCC ??= chiTiet.TryGetValue("col_cc", out var ccVal) && ccVal != null ? ccVal : SampleScore(Math.Max(6.5, baseMin), Math.Min(10.0, baseMax + 0.5));
+                kq.DiemGK ??= chiTiet.TryGetValue("col_gk", out var gkVal) && gkVal != null ? gkVal : SampleScore(baseMin, baseMax);
+                kq.ChiTietDiemQT = System.Text.Json.JsonSerializer.Serialize(chiTiet);
+
+                double qtSum = cauHinh.Sum(c => (chiTiet[c.id] ?? 0) * (c.weight / 100.0));
+                kq.DiemCK ??= Math.Round(qtSum, 1, MidpointRounding.AwayFromZero);
+
+                if (tyLeThi == 0)
+                {
+                    kq.DiemThiLan1 = null;
+                    kq.DiemThiLan2 = null;
+                }
+                else if (kq.DiemThiLan1 == null)
+                {
+                    kq.DiemThiLan1 = SampleScore(baseMin, baseMax);
+                    double tk1 = Math.Round((kq.DiemCK.Value * (tyLeQT / 100.0)) + (kq.DiemThiLan1.Value * (tyLeThi / 100.0)), 1, MidpointRounding.AwayFromZero);
+
+                    if (tk1 < 4.0)
+                    {
+                        bool passRetake = (hash % 3) != 0;
+                        kq.DiemThiLan2 = passRetake ? SampleScore(5.2, 7.5) : SampleScore(2.5, 3.5);
+                    }
+                    else
+                    {
+                        kq.DiemThiLan2 = null;
+                    }
+                }
+
+                var (tk, dc, gc) = Services.GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, tyLeQT, tyLeThi);
+                kq.DiemTongKet = tk;
+                kq.DiemChu = dc;
+                kq.GhiChu = gc;
+            }
+
+            if (string.IsNullOrWhiteSpace(lhp.TrangThaiNhapDiem) ||
+                lhp.TrangThaiNhapDiem == "Vui lòng nhập điểm" ||
+                lhp.TrangThaiNhapDiem == "Chưa nhập")
+            {
+                lhp.TrangThaiNhapDiem = "Đang nhập";
+            }
+        }
+
+        db.SaveChanges();
     }
 
     private static void SeedDefaultArticlesIfEmpty(ApplicationDbContext db)

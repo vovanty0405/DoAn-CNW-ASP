@@ -370,8 +370,8 @@
                         </td>
                         <td class="px-5 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center justify-end gap-1.5">
-                                <button onclick='openGvModal(${JSON.stringify(g).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                <button onclick="confirmDeleteGv('${g.MaGV}', '${(g.HoTen || '').replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <button onclick="openGvModalById('${g.MaGV.replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="confirmDeleteGv('${g.MaGV.replace(/'/g, "\\'")}', '${(g.HoTen || '').replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -433,6 +433,11 @@
             gvPageSize = parseInt(size, 10);
             gvCurrentPage = 1;
             renderGvTable();
+        }
+
+        function openGvModalById(maGV) {
+            const gv = gvList.find(x => x.MaGV === maGV);
+            openGvModal(gv || null);
         }
 
         function openGvModal(gv = null) {

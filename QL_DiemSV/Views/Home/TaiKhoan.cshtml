@@ -107,6 +107,20 @@
                 <label class="block text-xs text-text-muted mb-1">Nhóm Quyền</label>
                 <select id="u-roleid" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
             </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Loại đối tượng liên kết</label>
+                    <select id="u-reftype" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+                        <option value="">Quản trị / Khác</option>
+                        <option value="Giảng Viên">Giảng Viên</option>
+                        <option value="Sinh Viên">Sinh Viên</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-text-muted mb-1">Mã GV / Mã SV liên kết</label>
+                    <input id="u-refid" placeholder="VD: GV001 hoặc SV001" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary" />
+                </div>
+            </div>
             <div class="flex items-center justify-between pt-2">
                 <span class="text-sm text-text-primary">Kích hoạt tài khoản</span>
                 <input id="u-active" type="checkbox" checked class="w-4 h-4 accent-primary" />
@@ -221,7 +235,7 @@
                         </td>
                         <td class="px-5 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center justify-end gap-1.5">
-                                <button onclick='openAccModal(${JSON.stringify(a).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="openAccModalById(${a.id})" class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
                                 <button onclick="confirmDeleteAcc(${a.id}, '${a.username.replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </td>
@@ -303,12 +317,19 @@
             lucide.createIcons();
         }
 
+        function openAccModalById(id) {
+            const acc = accounts.find(x => x.id === id);
+            openAccModal(acc || null);
+        }
+
         function openAccModal(acc = null) {
             editingAccId = acc ? acc.id : null;
             document.getElementById('acc-modal-title').textContent = acc ? 'Cập Nhật Tài Khoản' : 'Thêm Tài Khoản Mới';
             document.getElementById('u-username').value = acc ? acc.username : '';
             document.getElementById('u-password').value = '';
             document.getElementById('u-roleid').value = acc ? (acc.roleId || roles[0]?.id) : (roles[0]?.id || 1);
+            document.getElementById('u-reftype').value = acc ? (acc.rawRefType || '') : '';
+            document.getElementById('u-refid').value = acc ? (acc.rawRefId || '') : '';
             document.getElementById('u-active').checked = acc ? acc.status : true;
             document.getElementById('acc-modal').classList.remove('hidden');
         }
@@ -319,6 +340,8 @@
                 username: document.getElementById('u-username').value.trim(),
                 password: document.getElementById('u-password').value,
                 roleId: Number(document.getElementById('u-roleid').value),
+                refType: document.getElementById('u-reftype').value,
+                refId: document.getElementById('u-refid').value.trim(),
                 isActive: document.getElementById('u-active').checked
             };
             try {

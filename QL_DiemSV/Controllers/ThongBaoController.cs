@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -6,6 +7,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class ThongBaoController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -18,7 +20,7 @@ public class ThongBaoController : ControllerBase
     [HttpGet("{maNguoiNhan}")]
     public async Task<IActionResult> GetByRecipient(string maNguoiNhan)
     {
-        var query = _db.ThongBaos.AsQueryable();
+        var query = _db.ThongBaos.AsNoTracking().AsQueryable();
         if (maNguoiNhan.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) ||
             maNguoiNhan.Equals("admin", StringComparison.OrdinalIgnoreCase))
         {

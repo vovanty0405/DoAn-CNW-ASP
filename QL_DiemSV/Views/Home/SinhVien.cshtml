@@ -177,6 +177,42 @@
     </div>
 </div>
 
+<!-- Modal Xác Thực Mật Khẩu Khi Xóa -->
+<div id="pwd-confirm-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div class="p-5 border-b border-surface-hover bg-surface-header flex justify-between items-center">
+            <h3 class="text-base font-bold text-text-primary flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-5 h-5 text-[#ef4444]"></i> Xác Thực Mật Khẩu Xóa
+            </h3>
+            <button onclick="closePwdConfirmModal()" class="text-text-muted hover:text-[#ef4444] transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <form onsubmit="handlePwdConfirmSubmit(event)" class="p-6 space-y-4">
+            <p class="text-xs text-text-muted leading-relaxed">
+                Hành động này mang tính chất quan trọng và không thể hoàn tác. Để tiếp tục xóa <span id="pwd-confirm-item-name" class="font-bold text-text-primary"></span>, vui lòng nhập mật khẩu tài khoản của bạn để xác thực:
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-text-muted mb-1.5">Mật khẩu tài khoản *</label>
+                <div class="relative">
+                    <i data-lucide="lock" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input id="pwd-confirm-input" type="password" required placeholder="Nhập mật khẩu của bạn..."
+                           class="w-full bg-canvas border border-surface-hover rounded-xl pl-9 pr-3 py-2.5 text-sm text-text-primary focus:border-[#ef4444] focus:outline-none transition-colors" />
+                </div>
+                <p id="pwd-confirm-error" class="hidden text-xs text-[#ef4444] font-medium mt-1.5 flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span id="pwd-confirm-error-msg">Mật khẩu xác thực không chính xác!</span>
+                </p>
+            </div>
+            <div class="pt-2 border-t border-surface-hover flex justify-end gap-3">
+                <button type="button" onclick="closePwdConfirmModal()" class="px-4 py-2 rounded-xl border border-surface-hover text-xs font-semibold text-text-muted hover:bg-surface-hover transition-colors">Hủy bỏ</button>
+                <button type="submit" id="btn-pwd-confirm-submit" class="px-5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white text-xs font-bold shadow-lg shadow-[#ef4444]/20 flex items-center gap-1.5 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Xác nhận xóa
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         let svList = [], khoas = [], nganhs = [], lops = [];
@@ -318,9 +354,9 @@
                             </td>
                             <td class="px-5 py-3.5 text-right whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-1.5">
-                                    <a href="/tra-cuu-diem?maSV=${s.MaSV}" title="Xem bảng điểm" class="p-1.5 rounded-lg text-text-muted hover:text-[#10B981] hover:bg-[#10B981]/10 transition-colors"><i data-lucide="award" class="w-4 h-4"></i></a>
-                                    <button onclick='openSvModal(${JSON.stringify(s).replace(/'/g, "&apos;")})' class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                    <button onclick="deleteSv('${s.MaSV}')" class="p-1.5 rounded-lg text-text-muted hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    <a href="/tra-cuu-diem?maSV=${encodeURIComponent(s.MaSV)}" title="Xem bảng điểm" class="p-1.5 rounded-lg text-text-muted hover:text-[#10B981] hover:bg-[#10B981]/10 transition-colors"><i data-lucide="award" class="w-4 h-4"></i></a>
+                                    <button onclick="openSvModalById('${s.MaSV.replace(/'/g, "\\'")}')" class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                    <button onclick="deleteSv('${s.MaSV.replace(/'/g, "\\'")}')" class="p-1.5 rounded-lg text-text-muted hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -385,6 +421,11 @@
             renderSvTable();
         }
 
+        function openSvModalById(maSV) {
+            const sv = svList.find(x => x.MaSV === maSV);
+            openSvModal(sv || null);
+        }
+
         function openSvModal(sv = null) {
             editingMaSV = sv ? sv.MaSV : null;
             document.getElementById('sv-modal-title').textContent = sv ? 'Cập Nhật Hồ Sơ Sinh Viên' : 'Thêm Sinh Viên Mới';
@@ -437,14 +478,63 @@
             }
         }
 
-        async function deleteSv(maSV) {
-            if (!confirm(`Bạn có chắc chắn muốn xóa sinh viên ${maSV}?`)) return;
-            try {
-                await apiFetch(`/api/sinhvien/${maSV}`, { method: 'DELETE' });
+        let pendingDeleteAction = null;
+
+        function deleteSv(maSV) {
+            const sv = svList.find(x => x.MaSV === maSV);
+            const label = sv ? `Sinh viên "${sv.MaSV} - ${sv.HoTen}"` : `Sinh viên "${maSV}"`;
+            requestSecureDelete(label, async () => {
+                await apiFetch(`/api/sinhvien/${encodeURIComponent(maSV)}`, { method: 'DELETE' });
                 showToast('Đã xóa sinh viên!');
                 await loadData();
+            });
+        }
+
+        function requestSecureDelete(itemName, callback) {
+            pendingDeleteAction = callback;
+            document.getElementById('pwd-confirm-item-name').textContent = itemName;
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+            document.getElementById('pwd-confirm-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pwd-confirm-input').focus(), 100);
+            lucide.createIcons();
+        }
+
+        function closePwdConfirmModal() {
+            pendingDeleteAction = null;
+            document.getElementById('pwd-confirm-modal').classList.add('hidden');
+            document.getElementById('pwd-confirm-input').value = '';
+            document.getElementById('pwd-confirm-error').classList.add('hidden');
+        }
+
+        async function handlePwdConfirmSubmit(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('pwd-confirm-input').value;
+            const errBox = document.getElementById('pwd-confirm-error');
+            const errMsg = document.getElementById('pwd-confirm-error-msg');
+            const btnSubmit = document.getElementById('btn-pwd-confirm-submit');
+
+            errBox.classList.add('hidden');
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70');
+
+            try {
+                await apiFetch('/api/auth/verify-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ Password: pwd })
+                });
+
+                if (typeof pendingDeleteAction === 'function') {
+                    await pendingDeleteAction();
+                }
+                closePwdConfirmModal();
             } catch (err) {
-                showToast(err.message, 'error');
+                errBox.classList.remove('hidden');
+                errMsg.textContent = err.message || 'Mật khẩu xác thực không chính xác!';
+                lucide.createIcons();
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70');
             }
         }
 

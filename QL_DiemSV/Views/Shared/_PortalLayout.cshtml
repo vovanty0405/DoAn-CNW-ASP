@@ -3,6 +3,11 @@
 @{
     var logged = User.Identity?.IsAuthenticated == true;
     var canWrite = User.IsInRole("Admin") || User.IsInRole("GiangVien");
+    var tkbPortalUrl = User.IsInRole("SinhVien")
+        ? $"/portal/tra-cuu-tkb?code={Uri.EscapeDataString(User.FindFirst("MaSV")?.Value ?? User.Identity?.Name ?? "")}&kind=student"
+        : User.IsInRole("GiangVien")
+            ? $"/portal/tra-cuu-tkb?code={Uri.EscapeDataString(User.FindFirst("MaGV")?.Value ?? User.Identity?.Name ?? "")}&kind=lecturer"
+            : "/portal/tra-cuu-tkb";
 }
 <!DOCTYPE html>
 <html lang="vi" class="light">
@@ -45,21 +50,40 @@
             <button type="button" class="theme-toggle" id="portal-theme" aria-label="Chuyển giao diện Sáng/Tối">◐</button>
             @if (logged)
             {
+                <div class="portal-notif-wrapper" id="portal-notif-wrapper">
+                    <button type="button" class="portal-notif-btn" id="portal-notif-btn" aria-label="Thông báo" title="Thông báo">
+                        <span aria-hidden="true">🔔</span>
+                        <span class="portal-notif-badge" id="portal-notif-badge" hidden>0</span>
+                    </button>
+                    <div class="portal-notif-dropdown" id="portal-notif-dropdown" hidden>
+                        <div class="portal-notif-header">
+                            <strong>Thông báo</strong>
+                            <button type="button" class="portal-notif-readall" id="portal-notif-readall">Đánh dấu tất cả đã đọc</button>
+                        </div>
+                        <div class="portal-notif-list" id="portal-notif-list">
+                            <div class="portal-notif-empty">Đang tải thông báo...</div>
+                        </div>
+                    </div>
+                </div>
                 <details class="user-menu">
                     <summary>@(User.FindFirst("HoTen")?.Value ?? User.Identity?.Name) ▾</summary>
                     <div>
-                        <a href="/thoi-khoa-bieu">Thời khóa biểu cá nhân</a>
                         @if (User.IsInRole("SinhVien"))
                         {
-                            <a href="/dang-ky-hoc-phan">Đăng ký học phần</a>
+                            <a href="/Portal/KetQuaHocTap">📊 Kết quả học tập &amp; Tốt nghiệp</a>
+                            <a href="/Portal/KetQuaHocTap?tab=ho-so">👤 Hồ sơ sinh viên &amp; Đổi mật khẩu</a>
+                            <a href="/Portal/KetQuaHocTap?tab=khieu-nai">📝 Lịch sử khiếu nại điểm</a>
+                            <a href="/dang-ky-hoc-phan">📚 Đăng ký học phần</a>
                         }
+                        <a href="@tkbPortalUrl">🗓️ Thời khóa biểu cá nhân</a>
                         @if (canWrite)
                         {
-                            <a href="/bai-viet">Quản lý bài viết</a>
+                            <a href="/bai-viet">📰 Quản lý bài viết</a>
                         }
-                        @if (User.IsInRole("Admin"))
+                        @if (User.IsInRole("Admin") || User.IsInRole("GiangVien") || User.IsInRole("KhaoThi"))
                         {
-                            <a href="/">Khu vực quản trị</a>
+                            <a href="/Portal/KetQuaHocTap">📊 Tra cứu KQHT &amp; Tốt nghiệp</a>
+                            <a href="/">⚙️ Khu vực quản trị</a>
                         }
                         <button id="portal-logout" type="button">Đăng xuất</button>
                     </div>
@@ -104,6 +128,15 @@
             <a href="#top" class="back-top">↑ Về đầu trang</a>
         </div>
     </footer>
+    <script>
+        window.PORTAL_USER = {
+            isAuthenticated: @(logged ? "true" : "false"),
+            username: '@Html.Raw(User.Identity?.Name ?? "")',
+            role: '@Html.Raw(User.FindFirst(ClaimTypes.Role)?.Value ?? "")',
+            maSV: '@Html.Raw(User.FindFirst("MaSV")?.Value ?? "")',
+            maGV: '@Html.Raw(User.FindFirst("MaGV")?.Value ?? "")'
+        };
+    </script>
     <script src="~/js/portal.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

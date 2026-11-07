@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class KhoaController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -20,7 +22,7 @@ public class KhoaController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var data = await _db.Khoas.OrderBy(k => k.MaKhoa).ToListAsync();
+        var data = await _db.Khoas.AsNoTracking().OrderBy(k => k.MaKhoa).ToListAsync();
         return Ok(new { status = "success", data });
     }
 
@@ -33,6 +35,7 @@ public class KhoaController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] Khoa model)
     {
         if (string.IsNullOrWhiteSpace(model.MaKhoa) || string.IsNullOrWhiteSpace(model.TenKhoa))
@@ -48,6 +51,7 @@ public class KhoaController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] Khoa model)
     {
         var existing = await _db.Khoas.FindAsync(id);
@@ -63,6 +67,7 @@ public class KhoaController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.Khoas.FindAsync(id);

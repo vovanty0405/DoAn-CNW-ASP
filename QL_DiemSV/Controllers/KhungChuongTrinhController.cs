@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class KhungChuongTrinhController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -22,19 +24,6 @@ public class KhungChuongTrinhController : ControllerBase
     [HttpGet("{maNganh}")]
     public async Task<IActionResult> GetByNganh(string maNganh, [FromQuery] string? sort = null)
     {
-        var quyDinh = await _db.QuyDinhTotNghieps.FindAsync(maNganh);
-        if (quyDinh == null)
-        {
-            quyDinh = new QuyDinhTotNghiep
-            {
-                MaNganh = maNganh,
-                TongTTC = 130,
-                TCBatBuoc = 100,
-                TCTuChon = 30,
-                MinGPA = 2.0
-            };
-        }
-
         var subjects = (await _catalog.GetAsync()).ToDictionary(m => m.MaMon);
         var query = _db.KhungChuongTrinhs.AsNoTracking().Where(k => k.MaNganh == maNganh);
         query = (sort?.Trim().ToLowerInvariant()) switch
@@ -55,6 +44,23 @@ public class KhungChuongTrinhController : ControllerBase
             .ToListAsync();
         foreach (var row in danhSachMon) row.MonHoc = subjects.GetValueOrDefault(row.MaMon);
 
+        var quyDinh = await _db.QuyDinhTotNghieps.AsNoTracking().FirstOrDefaultAsync(q => q.MaNganh == maNganh);
+        if (quyDinh == null)
+        {
+            int sumBB = danhSachMon.Where(k => k.LoaiMon != "Tự chọn").Sum(k => k.MonHoc?.SoTinChi ?? 0);
+            int sumTC = danhSachMon.Where(k => k.LoaiMon == "Tự chọn").Sum(k => k.MonHoc?.SoTinChi ?? 0);
+            int tcBB = sumBB > 0 ? sumBB : 100;
+            int tcTC = sumTC > 0 ? sumTC : 30;
+            quyDinh = new QuyDinhTotNghiep
+            {
+                MaNganh = maNganh,
+                TongTTC = (sumBB + sumTC) > 0 ? (sumBB + sumTC) : 130,
+                TCBatBuoc = tcBB,
+                TCTuChon = tcTC,
+                MinGPA = 2.0
+            };
+        }
+
         return Ok(new
         {
             status = "success",
@@ -67,6 +73,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpPut("{maNganh}/quydinh")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateQuyDinh(string maNganh, [FromBody] QuyDinhTotNghiep req)
     {
         var existing = await _db.QuyDinhTotNghieps.FindAsync(maNganh);
@@ -96,6 +103,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddSubject([FromBody] KhungChuongTrinh req)
     {
         if (string.IsNullOrWhiteSpace(req.MaNganh) || string.IsNullOrWhiteSpace(req.MaMon))
@@ -119,6 +127,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpPost("batch")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddSubjectsBatch([FromBody] BatchAddKhungDto req)
     {
         if (req == null || string.IsNullOrWhiteSpace(req.MaNganh))
@@ -210,6 +219,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateSubject(int id, [FromBody] UpdateKhungSubjectDto req)
     {
         var existing = await _db.KhungChuongTrinhs.FindAsync(id);
@@ -227,6 +237,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RemoveSubject(int id)
     {
         var existing = await _db.KhungChuongTrinhs.FindAsync(id);

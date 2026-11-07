@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -7,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class TraCuuDiemController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -19,6 +22,16 @@ public class TraCuuDiemController : ControllerBase
     [HttpGet("{maSV}")]
     public async Task<IActionResult> TraCuuTheoMaSV(string maSV)
     {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? "";
+        if (role == "SinhVien")
+        {
+            var myMaSV = User.FindFirstValue("MaSV") ?? User.Identity?.Name ?? "";
+            if (!string.Equals(myMaSV, maSV, StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(403, new { status = "error", message = "Sinh viên chỉ được phép tra cứu bảng điểm của chính mình!" });
+            }
+        }
+
         var sv = await _db.SinhViens.AsNoTracking()
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
@@ -34,15 +47,28 @@ public class TraCuuDiemController : ControllerBase
         }
 
         var maNganh = sv.LopHanhChinh?.MaNganh ?? "CNPM";
-        var quyDinh = sv.LopHanhChinh?.Nganh?.QuyDinhTotNghiep ?? await _db.QuyDinhTotNghieps.FindAsync(maNganh);
-        int reqTongTC = quyDinh?.TongTTC ?? 130;
-        int reqTCBatBuoc = quyDinh?.TCBatBuoc ?? 100;
-        int reqTCTuChon = quyDinh?.TCTuChon ?? 30;
-        double reqMinGPA = quyDinh?.MinGPA ?? 2.0;
-
-        var khungCT = await _db.KhungChuongTrinhs.AsNoTracking()
+        var khungRows = await _db.KhungChuongTrinhs.AsNoTracking()
+            .Include(k => k.MonHoc)
             .Where(k => k.MaNganh == maNganh)
-            .ToDictionaryAsync(k => k.MaMon, k => k.LoaiMon);
+            .ToListAsync();
+
+        var khungCT = khungRows
+            .GroupBy(k => k.MaMon, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().LoaiMon, StringComparer.OrdinalIgnoreCase);
+
+        var quyDinh = sv.LopHanhChinh?.Nganh?.QuyDinhTotNghiep
+            ?? await _db.QuyDinhTotNghieps.AsNoTracking().FirstOrDefaultAsync(q => q.MaNganh == maNganh);
+
+        // Lấy chuẩn tín chỉ bắt buộc & tự chọn đã cấu hình ở trang Quản lý Khung đào tạo;
+        // nếu ngành chưa lưu bản ghi QuyDinhTotNghiep thì cộng động từ danh sách môn trong Khung đào tạo của ngành đó
+        int fallbackBatBuoc = khungRows.Where(k => k.LoaiMon != "Tự chọn").Sum(k => k.MonHoc?.SoTinChi ?? 0);
+        int fallbackTuChon = khungRows.Where(k => k.LoaiMon == "Tự chọn").Sum(k => k.MonHoc?.SoTinChi ?? 0);
+        int fallbackTong = fallbackBatBuoc + fallbackTuChon;
+
+        int reqTCBatBuoc = quyDinh != null ? quyDinh.TCBatBuoc : (fallbackBatBuoc > 0 ? fallbackBatBuoc : 100);
+        int reqTCTuChon = quyDinh != null ? quyDinh.TCTuChon : (fallbackTuChon > 0 ? fallbackTuChon : 30);
+        int reqTongTC = quyDinh != null ? quyDinh.TongTTC : (fallbackTong > 0 ? fallbackTong : (reqTCBatBuoc + reqTCTuChon));
+        double reqMinGPA = quyDinh?.MinGPA ?? 2.0;
 
         var ketQuas = await _db.KetQuaHocTaps.AsNoTracking()
             .Include(k => k.LopHocPhan)
@@ -65,7 +91,7 @@ public class TraCuuDiemController : ControllerBase
                 var danhSachMon = g.Select(k =>
                 {
                     var mh = k.LopHocPhan!.MonHoc!;
-                    string loaiMon = khungCT.ContainsKey(mh.MaMon) ? khungCT[mh.MaMon] : "Bắt buộc";
+                    string loaiMon = khungCT.TryGetValue(mh.MaMon, out var loai) ? loai : "Tự chọn";
                     double? diemHe4 = k.DiemTongKet != null ? GradeHelper.QuyDoiHe4(k.DiemTongKet.Value) : null;
                     bool quaMon = k.DiemTongKet != null && k.DiemTongKet.Value >= 4.0;
 
@@ -115,7 +141,7 @@ public class TraCuuDiemController : ControllerBase
         // Tính tích lũy toàn khóa (lấy điểm cao nhất cho mỗi môn học)
         var bestByCourse = ketQuas
             .Where(k => k.DiemTongKet != null && k.LopHocPhan?.MonHoc != null)
-            .GroupBy(k => k.LopHocPhan!.MaMon!)
+            .GroupBy(k => k.LopHocPhan!.MaMon!, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.OrderByDescending(x => x.DiemTongKet).First())
             .ToList();
 
@@ -124,20 +150,16 @@ public class TraCuuDiemController : ControllerBase
         int tcTuChonDat = 0;
         int soMonNo = 0;
         int tcNo = 0;
-
-        double weightedSum4 = 0;
         int totalAttemptedCredits = 0;
 
         foreach (var item in bestByCourse)
         {
             int tc = item.LopHocPhan!.MonHoc!.SoTinChi;
             double tk = item.DiemTongKet!.Value;
-            double he4 = GradeHelper.QuyDoiHe4(tk);
             string maMon = item.LopHocPhan.MaMon!;
-            string loaiMon = khungCT.ContainsKey(maMon) ? khungCT[maMon] : "Bắt buộc";
+            string loaiMon = khungCT.TryGetValue(maMon, out var loai) ? loai : "Tự chọn";
 
             totalAttemptedCredits += tc;
-            weightedSum4 += he4 * tc;
 
             if (tk >= 4.0)
             {
@@ -152,16 +174,15 @@ public class TraCuuDiemController : ControllerBase
             }
         }
 
-        double gpaToanKhoa4 = totalAttemptedCredits > 0 ? Math.Round(weightedSum4 / totalAttemptedCredits, 2) : 0;
-
         var overallTotals = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
+        double gpaToanKhoa4 = overallTotals.GPAHe4 ?? 0;
         string xepLoai = overallTotals.XepLoai;
 
         var lyDoKhongDat = new List<string>();
         if (tcTichLuy < reqTongTC) lyDoKhongDat.Add($"Thiếu {reqTongTC - tcTichLuy} tín chỉ tích lũy ({tcTichLuy}/{reqTongTC} TC)");
         if (tcBatBuocDat < reqTCBatBuoc) lyDoKhongDat.Add($"Thiếu {reqTCBatBuoc - tcBatBuocDat} tín chỉ bắt buộc ({tcBatBuocDat}/{reqTCBatBuoc} TC)");
         if (tcTuChonDat < reqTCTuChon) lyDoKhongDat.Add($"Thiếu {reqTCTuChon - tcTuChonDat} tín chỉ tự chọn ({tcTuChonDat}/{reqTCTuChon} TC)");
-        if (gpaToanKhoa4 < reqMinGPA) lyDoKhongDat.Add($"GPA tích lũy hệ 4 ({gpaToanKhoa4}) thấp hơn mức tối thiểu ({reqMinGPA})");
+        if (gpaToanKhoa4 < reqMinGPA) lyDoKhongDat.Add($"GPA tích lũy hệ 4 ({gpaToanKhoa4:0.00}) thấp hơn mức tối thiểu ({reqMinGPA:0.00})");
         if (soMonNo > 0) lyDoKhongDat.Add($"Còn nợ {soMonNo} môn học ({tcNo} tín chỉ)");
 
         bool duDieuKienTotNghiep = lyDoKhongDat.Count == 0 && totalAttemptedCredits > 0;

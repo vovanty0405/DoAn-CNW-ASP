@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
 using QL_DiemSV.Models;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin")]
 public class TaiKhoanController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -20,7 +22,7 @@ public class TaiKhoanController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? role, [FromQuery] string? status)
     {
-        var query = _db.UserAccounts
+        var query = _db.UserAccounts.AsNoTracking()
             .Include(u => u.Role)
             .Include(u => u.GiangVien)
             .Include(u => u.SinhVien)
@@ -41,9 +43,26 @@ public class TaiKhoanController : ControllerBase
         var data = list.Select(u =>
         {
             string refObj = "Quản trị hệ thống";
-            if (u.GiangVien != null) refObj = $"GV: {u.GiangVien.MaGV} - {u.GiangVien.HoTen}";
-            else if (u.SinhVien != null) refObj = $"SV: {u.SinhVien.MaSV} - {u.SinhVien.HoTen}";
-            else if (!string.IsNullOrEmpty(u.MaGV)) refObj = $"GV: {u.MaGV}";
+            string rawRefType = "";
+            string rawRefId = "";
+            if (u.GiangVien != null)
+            {
+                refObj = $"GV: {u.GiangVien.MaGV} - {u.GiangVien.HoTen}";
+                rawRefType = "Giảng Viên";
+                rawRefId = u.GiangVien.MaGV;
+            }
+            else if (u.SinhVien != null)
+            {
+                refObj = $"SV: {u.SinhVien.MaSV} - {u.SinhVien.HoTen}";
+                rawRefType = "Sinh Viên";
+                rawRefId = u.SinhVien.MaSV;
+            }
+            else if (!string.IsNullOrEmpty(u.MaGV))
+            {
+                refObj = $"GV: {u.MaGV}";
+                rawRefType = "Giảng Viên";
+                rawRefId = u.MaGV;
+            }
 
             return new
             {
@@ -53,6 +72,8 @@ public class TaiKhoanController : ControllerBase
                 roleId = u.RoleID,
                 role = u.Role?.RoleName ?? "Chưa phân quyền",
                 refId = refObj,
+                rawRefType,
+                rawRefId,
                 status = u.IsActive,
                 IsActive = u.IsActive,
                 NgayTao = u.NgayTao
@@ -124,6 +145,32 @@ public class TaiKhoanController : ControllerBase
         if (!string.IsNullOrWhiteSpace(req.password)) ua.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password);
         if (req.roleId != null) ua.RoleID = req.roleId;
         ua.IsActive = req.isActive;
+
+        if (req.refType != null)
+        {
+            var oldGv = await _db.GiangViens.FirstOrDefaultAsync(g => g.UserID == id);
+            if (oldGv != null) oldGv.UserID = null;
+
+            var oldSv = await _db.SinhViens.FirstOrDefaultAsync(s => s.UserID == id);
+            if (oldSv != null) oldSv.UserID = null;
+
+            ua.MaGV = null;
+            if (!string.IsNullOrWhiteSpace(req.refId))
+            {
+                var targetCode = req.refId.Trim();
+                if (req.refType == "Giảng Viên")
+                {
+                    ua.MaGV = targetCode;
+                    var gv = await _db.GiangViens.FindAsync(targetCode);
+                    if (gv != null) gv.UserID = ua.UserID;
+                }
+                else if (req.refType == "Sinh Viên")
+                {
+                    var sv = await _db.SinhViens.FindAsync(targetCode);
+                    if (sv != null) sv.UserID = ua.UserID;
+                }
+            }
+        }
 
         await _db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật tài khoản", $"Đã cập nhật tài khoản #{id} ({ua.Username})");

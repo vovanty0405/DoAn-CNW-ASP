@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin,GiangVien,KhaoThi")]
 public class SinhVienController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -80,6 +82,7 @@ public class SinhVienController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] SinhVien model)
     {
         if (string.IsNullOrWhiteSpace(model.MaSV) || string.IsNullOrWhiteSpace(model.HoTen))
@@ -116,48 +119,73 @@ public class SinhVienController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<SinhVien> list)
     {
         if (list == null || !list.Any())
             return BadRequest(new { status = "error", message = "Danh sách sinh viên trống" });
 
-        var svRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleName == "SinhVien");
+        var svRole = await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.RoleName == "SinhVien");
+        int roleId = svRole?.RoleID ?? 3;
         string defaultHash = BCrypt.Net.BCrypt.HashPassword("123456");
-        int count = 0;
+
+        var existingSvIds = (await _db.SinhViens.AsNoTracking().Select(s => s.MaSV).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingAccounts = await _db.UserAccounts
+            .ToDictionaryAsync(u => u.Username, StringComparer.OrdinalIgnoreCase);
+
+        var newAccounts = new List<UserAccount>();
+        var pendingStudents = new List<(SinhVien sv, UserAccount acc)>();
 
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaSV) || await _db.SinhViens.AnyAsync(s => s.MaSV == item.MaSV))
-                continue;
+            if (string.IsNullOrWhiteSpace(item.MaSV)) continue;
+            item.MaSV = item.MaSV.Trim();
+            if (existingSvIds.Contains(item.MaSV)) continue;
 
-            var ua = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Username == item.MaSV);
-            if (ua == null)
+            existingSvIds.Add(item.MaSV);
+            if (!existingAccounts.TryGetValue(item.MaSV, out var ua))
             {
                 ua = new UserAccount
                 {
-                    Username = item.MaSV.Trim(),
+                    Username = item.MaSV,
                     PasswordHash = defaultHash,
-                    RoleID = svRole?.RoleID ?? 3,
+                    RoleID = roleId,
                     IsActive = true,
                     NgayTao = DateTime.Now
                 };
-                _db.UserAccounts.Add(ua);
-                await _db.SaveChangesAsync();
+                newAccounts.Add(ua);
+                existingAccounts[item.MaSV] = ua;
             }
 
-            item.UserID = ua.UserID;
             if (string.IsNullOrWhiteSpace(item.MaLop)) item.MaLop = null;
             if (string.IsNullOrWhiteSpace(item.TrangThai)) item.TrangThai = "Đang học";
-            _db.SinhViens.Add(item);
-            count++;
+            pendingStudents.Add((item, ua));
         }
 
-        await _db.SaveChangesAsync();
+        if (newAccounts.Count > 0)
+        {
+            _db.UserAccounts.AddRange(newAccounts);
+            await _db.SaveChangesAsync();
+        }
+
+        foreach (var (sv, ua) in pendingStudents)
+        {
+            sv.UserID = ua.UserID;
+            _db.SinhViens.Add(sv);
+        }
+
+        int count = pendingStudents.Count;
+        if (count > 0)
+        {
+            await _db.SaveChangesAsync();
+        }
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Sinh viên", $"Đã import {count} sinh viên từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} sinh viên" });
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] SinhVien model)
     {
         var existing = await _db.SinhViens.FindAsync(id);
@@ -179,10 +207,22 @@ public class SinhVienController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.SinhViens.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Sinh viên" });
+
+        if (await _db.KetQuaHocTaps.AnyAsync(k => k.MaSV == id && (k.DiemTongKet != null || k.DiemCK != null || k.DiemThiLan1 != null)))
+        {
+            return BadRequest(new { status = "error", message = $"Không thể xóa sinh viên {id} vì đã phát sinh kết quả điểm học tập trên hệ thống! Vui lòng chuyển trạng thái sang 'Thôi học' hoặc 'Bảo lưu'." });
+        }
+
+        var emptyEnrollments = await _db.KetQuaHocTaps.Where(k => k.MaSV == id).ToListAsync();
+        if (emptyEnrollments.Count > 0)
+        {
+            _db.KetQuaHocTaps.RemoveRange(emptyEnrollments);
+        }
 
         int? userId = existing.UserID;
         _db.SinhViens.Remove(existing);

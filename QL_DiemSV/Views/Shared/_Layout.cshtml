@@ -450,7 +450,8 @@
                 await fetch(`/api/thongbao/${id}/read`, { method: 'PUT' });
                 await loadNotifications();
                 if (type === 'COMPLAINT_NEW') window.location.href = '/khieu-nai';
-                else if (type === 'COMPLAINT_PROCESSED') window.location.href = '/tra-cuu-diem';
+                else if (type === 'PhucKhaoDiem' || type === 'COMPLAINT_PROCESSED') window.location.href = '/Portal/KetQuaHocTap?tab=khieu-nai';
+                else if (type === 'DiemSo') window.location.href = '/Portal/KetQuaHocTap';
                 else if (type === 'UNLOCK_REQUEST' || type === 'UNLOCK_APPROVED') window.location.href = '/diem-so';
             } catch (e) { }
         }

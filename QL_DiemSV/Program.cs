@@ -7,7 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Add DbContext (SQL Server)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.CommandTimeout(60)));
 
 // 2. Add Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -46,7 +48,13 @@ using (var scope = app.Services.CreateScope())
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Đã xảy ra lỗi khi khởi tạo và seed CSDL.");
+        if (args.Contains("--seed-only")) throw;
     }
+}
+
+if (args.Contains("--seed-only"))
+{
+    return;
 }
 
 if (!app.Environment.IsDevelopment())

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class LopHanhChinhController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -82,6 +84,7 @@ public class LopHanhChinhController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] LopHanhChinh model)
     {
         if (string.IsNullOrWhiteSpace(model.MaLop) || string.IsNullOrWhiteSpace(model.TenLop))
@@ -101,29 +104,41 @@ public class LopHanhChinhController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<LopHanhChinh> list)
     {
         if (list == null || !list.Any())
             return BadRequest(new { status = "error", message = "Danh sách lớp hành chính trống" });
 
+        var existingCodes = (await _db.LopHanhChinhs.AsNoTracking().Select(l => l.MaLop).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         int count = 0;
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaLop) || await _db.LopHanhChinhs.AnyAsync(l => l.MaLop == item.MaLop))
+            if (string.IsNullOrWhiteSpace(item.MaLop))
+                continue;
+            item.MaLop = item.MaLop.Trim();
+            if (existingCodes.Contains(item.MaLop))
                 continue;
 
+            existingCodes.Add(item.MaLop);
             if (string.IsNullOrWhiteSpace(item.MaNganh)) item.MaNganh = null;
             if (string.IsNullOrWhiteSpace(item.MaGVCN)) item.MaGVCN = null;
             _db.LopHanhChinhs.Add(item);
             count++;
         }
 
-        await _db.SaveChangesAsync();
+        if (count > 0)
+        {
+            await _db.SaveChangesAsync();
+        }
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Lớp hành chính", $"Đã import {count} lớp hành chính từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} lớp hành chính" });
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] LopHanhChinh model)
     {
         var existing = await _db.LopHanhChinhs.FindAsync(id);
@@ -140,6 +155,7 @@ public class LopHanhChinhController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.LopHanhChinhs.FindAsync(id);

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class MonHocController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -91,6 +93,7 @@ public class MonHocController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] MonHocDto req)
     {
         if (string.IsNullOrWhiteSpace(req.MaMon) || string.IsNullOrWhiteSpace(req.TenMon))
@@ -133,21 +136,29 @@ public class MonHocController : ControllerBase
     }
 
     [HttpPost("bulk")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<MonHocDto> list)
     {
         if (list == null || !list.Any())
             return BadRequest(new { status = "error", message = "Danh sách môn học trống" });
 
+        var existingCodes = (await _db.MonHocs.AsNoTracking().Select(m => m.MaMon).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         int count = 0;
         foreach (var req in list)
         {
-            if (string.IsNullOrWhiteSpace(req.MaMon) || await _db.MonHocs.AnyAsync(m => m.MaMon == req.MaMon))
+            if (string.IsNullOrWhiteSpace(req.MaMon))
+                continue;
+            var code = req.MaMon.Trim();
+            if (existingCodes.Contains(code))
                 continue;
 
+            existingCodes.Add(code);
             _db.MonHocs.Add(new MonHoc
             {
-                MaMon = req.MaMon.Trim(),
-                TenMon = req.TenMon?.Trim() ?? req.MaMon,
+                MaMon = code,
+                TenMon = req.TenMon?.Trim() ?? code,
                 SoTinChi = req.SoTinChi > 0 ? req.SoTinChi : 3,
                 SoTietLyThuyet = req.SoTietLyThuyet ?? 30,
                 SoTietThucHanh = req.SoTietThucHanh ?? 15,
@@ -155,13 +166,17 @@ public class MonHocController : ControllerBase
             });
             count++;
         }
-        await _db.SaveChangesAsync();
-        _catalog.Invalidate();
+        if (count > 0)
+        {
+            await _db.SaveChangesAsync();
+            _catalog.Invalidate();
+        }
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Môn học", $"Đã import {count} môn học từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} môn học" });
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] MonHocDto req)
     {
         var existing = await _db.MonHocs
@@ -198,6 +213,7 @@ public class MonHocController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.MonHocs.FindAsync(id);

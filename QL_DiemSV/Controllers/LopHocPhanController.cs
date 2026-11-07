@@ -126,7 +126,17 @@ public class LopHocPhanController : ControllerBase
 
         var students = l.KetQuaHocTaps
             .Where(k => k.SinhVien != null)
-            .Select(k => k.SinhVien!)
+            .Select(k => new
+            {
+                k.SinhVien!.MaSV,
+                k.SinhVien.HoTen,
+                k.SinhVien.MaLop,
+                LopHanhChinh = k.SinhVien.LopHanhChinh == null ? null : new
+                {
+                    k.SinhVien.LopHanhChinh.MaLop,
+                    k.SinhVien.LopHanhChinh.TenLop
+                }
+            })
             .OrderBy(s => s.MaSV)
             .ToList();
 
@@ -303,13 +313,26 @@ public class LopHocPhanController : ControllerBase
             return BadRequest(new { status = "error", message = "Danh sách lớp học phần trống" });
 
         string defaultCauHinh = "[{\"id\":\"col_cc\",\"name\":\"Chuyên cần\",\"weight\":25},{\"id\":\"col_gk\",\"name\":\"Giữa kỳ\",\"weight\":75}]";
+        var existingLhpIds = (await _db.LopHocPhans.AsNoTracking().Select(l => l.MaLHP).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var courseMap = await _db.MonHocs.AsNoTracking().ToDictionaryAsync(m => m.MaMon, StringComparer.OrdinalIgnoreCase);
+        var termSet = (await _db.HocKys.AsNoTracking().Select(h => h.MaHK).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         int count = 0;
 
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaLHP) || await _db.LopHocPhans.AnyAsync(l => l.MaLHP == item.MaLHP))
+            if (string.IsNullOrWhiteSpace(item.MaLHP) || string.IsNullOrWhiteSpace(item.MaMon) || string.IsNullOrWhiteSpace(item.MaHK))
                 continue;
 
+            item.MaLHP = item.MaLHP.Trim();
+            if (existingLhpIds.Contains(item.MaLHP))
+                continue;
+            if (!courseMap.TryGetValue(item.MaMon.Trim(), out var course) || !termSet.Contains(item.MaHK.Trim()))
+                continue;
+
+            existingLhpIds.Add(item.MaLHP);
             item.CauHinhDiem ??= defaultCauHinh;
             item.TrangThaiNhapDiem ??= "Vui lòng nhập điểm";
             item.TrangThai ??= "MoDangKy";
@@ -318,14 +341,16 @@ public class LopHocPhanController : ControllerBase
                 item.TyLeQuaTrinh = 40;
                 item.TyLeThiKetThuc = 60;
             }
-            var course = await _db.MonHocs.FindAsync(item.MaMon);
-            if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == item.MaHK)) continue;
-            item.STC = course.SoTinChi; item.STCHP = course.SoTinChi;
+            item.STC = course.SoTinChi;
+            item.STCHP = course.SoTinChi;
             _db.LopHocPhans.Add(item);
             count++;
         }
 
-        await _db.SaveChangesAsync();
+        if (count > 0)
+        {
+            await _db.SaveChangesAsync();
+        }
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Lớp học phần", $"Đã import {count} lớp học phần từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} lớp học phần" });
     }

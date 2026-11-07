@@ -137,19 +137,6 @@ public static class DbInitializer
         context.Nganhs.AddRange(nganhs);
         context.SaveChanges();
 
-        foreach (var n in nganhs)
-        {
-            context.QuyDinhTotNghieps.Add(new QuyDinhTotNghiep
-            {
-                MaNganh = n.MaNganh,
-                TongTTC = 24, // Để dữ liệu mẫu dễ kiểm tra xét tốt nghiệp hoặc hiển thị tiến độ rõ ràng
-                TCBatBuoc = 18,
-                TCTuChon = 6,
-                MinGPA = 2.0
-            });
-        }
-        context.SaveChanges();
-
         // 7. MonHoc & DieuKienMonHoc
         var monHocs = new List<MonHoc>
         {
@@ -194,6 +181,26 @@ public static class DbInitializer
             new KhungChuongTrinh { MaNganh = "HTTT", MaMon = "IT008", HocKyDuKien = 4, LoaiMon = "Tự chọn" }
         };
         context.KhungChuongTrinhs.AddRange(kctList);
+        context.SaveChanges();
+
+        foreach (var n in nganhs)
+        {
+            var khungOfMajor = kctList.Where(k => k.MaNganh == n.MaNganh).ToList();
+            int tcBB = khungOfMajor.Where(k => k.LoaiMon == "Bắt buộc")
+                .Sum(k => monHocs.FirstOrDefault(m => m.MaMon == k.MaMon)?.SoTinChi ?? 0);
+            int tcTC = khungOfMajor.Where(k => k.LoaiMon != "Bắt buộc")
+                .Sum(k => monHocs.FirstOrDefault(m => m.MaMon == k.MaMon)?.SoTinChi ?? 0);
+            int tongTC = tcBB + tcTC;
+
+            context.QuyDinhTotNghieps.Add(new QuyDinhTotNghiep
+            {
+                MaNganh = n.MaNganh,
+                TongTTC = tongTC > 0 ? tongTC : 130,
+                TCBatBuoc = tongTC > 0 ? tcBB : 112,
+                TCTuChon = tongTC > 0 ? tcTC : 18,
+                MinGPA = 2.0
+            });
+        }
         context.SaveChanges();
 
         // 9. HocKy

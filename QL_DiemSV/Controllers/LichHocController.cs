@@ -55,7 +55,7 @@ public class LichHocController(ApplicationDbContext db) : Controller
         var teachers = await db.GiangViens.AsNoTracking().OrderBy(x => x.HoTen)
             .Select(x => new GiangVien { MaGV = x.MaGV, HoTen = x.HoTen }).ToListAsync();
         var teacherMap = teachers.ToDictionary(x => x.MaGV);
-        foreach (var lesson in lessons) lesson.GiangVien = teacherMap.GetValueOrDefault(lesson.MaGV);
+        foreach (var lesson in lessons) lesson.GiangVien = teacherMap.GetValueOrDefault(lesson.MaGV ?? "");
         var lessonsBySection = lessons.ToLookup(x => x.MaLHP);
         foreach (var item in sections)
         {
@@ -123,8 +123,8 @@ public class LichHocController(ApplicationDbContext db) : Controller
         var rooms = await db.PhongHocs.ToListAsync();
         var teachers = await db.GiangViens.Select(x => x.MaGV).ToListAsync();
         var students = section.KetQuaHocTaps.Select(x => x.MaSV).ToList();
-        var studentSections = await db.KetQuaHocTaps
-            .Where(x => students.Contains(x.MaSV) && x.MaLHP != id)
+        var studentSections = await db.KetQuaHocTaps.AsNoTracking()
+            .Where(x => students.Contains(x.MaSV) && x.MaLHP != id && x.LopHocPhan != null && x.LopHocPhan.MaHK == section.MaHK)
             .Select(x => x.MaLHP)
             .Distinct()
             .ToListAsync();
@@ -250,7 +250,7 @@ public class LichHocController(ApplicationDbContext db) : Controller
     {
         maPhong = (maPhong ?? "").Trim();
         originalMaPhong = originalMaPhong?.Trim();
-        IActionResult Back() => RedirectToAction(nameof(Index), new { id, configHK, fragment = "rooms" });
+        IActionResult Back() => RedirectToAction(nameof(Index), null, new { id, configHK }, "rooms");
 
         if (!ModelState.IsValid || maPhong.Length == 0 || maPhong.Length > 50 || sucChua < 1 || sucChua > 10000 || !RoomMatrixRules.Buildings.ContainsKey(toaNha ?? "") || !RoomMatrixRules.Statuses.ContainsKey(trangThai ?? ""))
         {

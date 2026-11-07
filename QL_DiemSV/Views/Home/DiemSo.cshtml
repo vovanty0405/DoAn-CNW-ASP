@@ -26,6 +26,14 @@
 
             <!-- Thống kê nhanh -->
             <div class="flex flex-wrap items-center gap-2.5">
+                @if (userRole == "Admin" || userRole == "KhaoThi")
+                {
+                    <button type="button" onclick="autoSeedAllSections()"
+                            class="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        <span>⚡ Tạo điểm mẫu tự động</span>
+                    </button>
+                }
                 <div class="px-3.5 py-2 rounded-xl bg-surface border border-surface-hover flex items-center gap-2.5">
                     <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
                     <span class="text-xs text-text-muted">Tổng lớp:</span>
@@ -151,6 +159,12 @@
 
             <!-- Cụm nút chức năng góc phải -->
             <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+                <button type="button" id="btn-seed-section" onclick="autoSeedCurrentSection()"
+                        class="btn bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>Tạo điểm mẫu lớp này</span>
+                </button>
+
                 <button type="button" id="btn-config-tyle" onclick="openTyLeModal()"
                         class="btn bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                     <i data-lucide="percent" class="w-4 h-4 text-indigo-400"></i>
@@ -1029,8 +1043,19 @@
 
     function renderGradeTable() {
         const theadRow = document.getElementById('grade-thead-row');
-        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi';
+        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa';
         const isNoExam = currentTyLeThi === 0;
+
+        const btnSave = document.getElementById('btn-save-grades');
+        const btnConfigTyLe = document.getElementById('btn-config-tyle');
+        const btnConfigCols = document.getElementById('btn-config-cols');
+        const btnSeedSection = document.getElementById('btn-seed-section');
+        [btnSave, btnConfigTyLe, btnConfigCols, btnSeedSection].forEach(btn => {
+            if (!btn) return;
+            btn.disabled = isLocked;
+            btn.classList.toggle('opacity-50', isLocked);
+            btn.classList.toggle('cursor-not-allowed', isLocked);
+        });
 
         let colsHtml = `
             <th class="p-3.5 w-12 text-center">STT</th>
@@ -1155,6 +1180,10 @@
         return 'F';
     }
 
+    function round1(val) {
+        return Math.round((Number(val) + 1e-9) * 10) / 10;
+    }
+
     // =========================================================================
     // TÍNH ĐIỂM REALTIME THEO TỶ LỆ ĐỘNG (TyLeQuaTrinh% - TyLeThiKetThuc%)
     // =========================================================================
@@ -1183,7 +1212,7 @@
 
         const qtEl = document.getElementById(`qt-${idx}`);
         if (hasAllQT && currentCauHinh.length > 0) {
-            row.diemCK = Math.round(qtSum * 10) / 10;
+            row.diemCK = round1(qtSum);
             if (qtEl) qtEl.textContent = row.diemCK.toFixed(1);
         } else {
             row.diemCK = null;
@@ -1213,11 +1242,12 @@
 
         const wQt = currentTyLeQT / 100.0;
         const wThi = currentTyLeThi / 100.0;
+        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa';
 
         // Trường hợp 1: Môn 100% Quá trình - 0% Thi kết thúc (Không thi cuối kỳ)
         if (currentTyLeThi === 0) {
             if (row.diemCK !== null) {
-                const finalTK = Math.round((row.diemCK * wQt) * 10) / 10;
+                const finalTK = round1(row.diemCK * wQt);
                 const dc = quyDoiChu(finalTK);
                 const gc = finalTK >= 4.0 ? 'Đạt' : 'Học lại';
 
@@ -1241,12 +1271,19 @@
 
         // Trường hợp 2: Có thi kết thúc học phần (currentTyLeThi > 0)
         if (row.diemCK !== null && t1 !== null) {
-            const tk1 = Math.round(((row.diemCK * wQt) + (t1 * wThi)) * 10) / 10;
+            const tk1 = round1((row.diemCK * wQt) + (t1 * wThi));
             let finalTK = tk1;
             let gc = tk1 >= 4.0 ? 'Đạt' : 'Học lại';
 
+            // Nếu đã qua môn ở lần 1 (tk1 >= 4.0) và chưa nhập điểm thi lần 2 thì khóa ô Thi lần 2 để tránh nhập nhầm
+            if (t2El) {
+                const shouldDisableT2 = isLocked || (tk1 >= 4.0 && t2 === null);
+                t2El.disabled = shouldDisableT2;
+                t2El.title = (tk1 >= 4.0 && t2 === null) ? 'Sinh viên đã qua môn ở lần 1 (TK >= 4.0)' : '';
+            }
+
             if (t2 !== null) {
-                const tk2Raw = Math.round(((row.diemCK * wQt) + (t2 * wThi)) * 10) / 10;
+                const tk2Raw = round1((row.diemCK * wQt) + (t2 * wThi));
                 if (tk1 < 4.0) {
                     finalTK = Math.min(tk2Raw, 6.0);
                     gc = finalTK >= 4.0 ? 'Đạt (Thi lại)' : 'Học lại';
@@ -1266,6 +1303,10 @@
             if (dcEl) dcEl.textContent = dc;
             if (gcEl) gcEl.innerHTML = renderGhiChuBadge(gc);
         } else {
+            if (t2El) {
+                t2El.disabled = isLocked;
+                t2El.title = '';
+            }
             row.diemTongKet = null;
             row.diemChu = null;
             row.ghiChu = null;
@@ -1283,8 +1324,8 @@
             showToast('Vui lòng chọn Lớp học phần trước', 'info');
             return;
         }
-        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
-            showToast('Bảng điểm đã khóa, không thể thay đổi tỷ lệ điểm học phần!', 'error');
+        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+            showToast('Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi tỷ lệ điểm học phần!', 'error');
             return;
         }
 
@@ -1433,8 +1474,8 @@
     function handleSaveClick() {
         if (!currentMaLHP) return;
         const st = currentLHPInfo?.trangThaiNhapDiem;
-        if (st === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
-            showToast('Bảng điểm đã khóa! Vui lòng nhấn "Xin mở khóa".', 'error');
+        if (st === 'Đã khóa') {
+            showToast('Bảng điểm đã khóa! Vui lòng mở khóa sổ trước khi chỉnh sửa.', 'error');
             return;
         }
         // Luôn yêu cầu nhập mật khẩu khi nhấn Lưu Bảng Điểm
@@ -1535,8 +1576,8 @@
             showToast('Vui lòng chọn Lớp học phần trước', 'info');
             return;
         }
-        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa' && USER_ROLE !== 'Admin' && USER_ROLE !== 'KhaoThi') {
-            showToast('Bảng điểm đã khóa, không thể thay đổi cấu hình cột điểm!', 'error');
+        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+            showToast('Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi cấu hình cột điểm!', 'error');
             return;
         }
         tempConfigCols = JSON.parse(JSON.stringify(currentCauHinh));
@@ -1647,6 +1688,59 @@
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'BangDiem');
         XLSX.writeFile(wb, `BangDiem_${currentMaLHP}.xlsx`);
+    }
+
+    async function autoSeedCurrentSection() {
+        if (!currentMaLHP) return;
+        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+            showToast('Bảng điểm đang bị khóa, vui lòng mở khóa sổ trước khi tạo điểm mẫu!', 'error');
+            return;
+        }
+        const hasExisting = currentRows.some(r => r.diemTongKet != null);
+        const overwrite = hasExisting
+            ? confirm(`Lớp ${currentMaLHP} đã có điểm của một số sinh viên. Bạn có muốn GHI ĐÈ (tạo lại toàn bộ điểm mẫu mới) cho tất cả sinh viên trong lớp không?\n(Nhấn Cancel nếu chỉ muốn điền điểm cho các sinh viên chưa có điểm)`)
+            : false;
+
+        try {
+            const res = await fetch(`/api/diem/lophocphan/${encodeURIComponent(currentMaLHP)}/auto-seed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ overwriteExisting: overwrite })
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                await onChangeLHP(currentMaLHP);
+            } else {
+                showToast(json.message || 'Không thể tạo điểm mẫu', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
+        }
+    }
+
+    async function autoSeedAllSections() {
+        const selectedHK = document.getElementById('filter-hk')?.value || '';
+        const hkLabel = selectedHK ? `học kỳ ${selectedHK}` : 'tất cả học kỳ';
+        if (!confirm(`Tự động tạo điểm mẫu hợp lệ (CC, GK, QT, Thi L1, Thi L2, Tổng kết, Điểm chữ) cho các sinh viên chưa có điểm thuộc các lớp đang mở trong ${hkLabel}?`)) {
+            return;
+        }
+        try {
+            const res = await fetch('/api/diem/auto-seed-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ overwriteExisting: false, maHK: selectedHK })
+            });
+            const json = await res.json();
+            if (json.status === 'success') {
+                showToast(json.message, 'success');
+                await applyCardFilters();
+            } else {
+                showToast(json.message || 'Không thể tạo điểm mẫu hàng loạt', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối máy chủ', 'error');
+        }
     }
 </script>
 }

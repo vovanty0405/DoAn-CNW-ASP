@@ -33,6 +33,7 @@ tests/
 tools/
 [Tt]ài [Ll]iệu/
 Tài Liệu/
+temp-ui-skill/
 
 ## Các file tài liệu Markdown và script SQL loại trừ
 *.md

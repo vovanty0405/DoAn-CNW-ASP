@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -7,6 +8,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin,GiangVien,KhaoThi")]
 public class ThongKeController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -25,10 +27,7 @@ public class ThongKeController : ControllerBase
         [FromQuery] string? maMon,
         [FromQuery] string? maLHP)
     {
-        var svQuery = _db.SinhViens
-            .Include(s => s.LopHanhChinh)
-                .ThenInclude(l => l!.Nganh)
-            .AsQueryable();
+        var svQuery = _db.SinhViens.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(maLop))
             svQuery = svQuery.Where(s => s.MaLop == maLop);
@@ -37,64 +36,107 @@ public class ThongKeController : ControllerBase
         else if (!string.IsNullOrWhiteSpace(maKhoa))
             svQuery = svQuery.Where(s => s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null && s.LopHanhChinh.Nganh.MaKhoa == maKhoa);
 
-        var filteredSvIds = await svQuery.Select(s => s.MaSV).ToListAsync();
-        var filteredSvSet = filteredSvIds.ToHashSet();
+        var svList = await svQuery
+            .Select(s => new
+            {
+                s.MaSV,
+                s.HoTen,
+                MaLop = s.MaLop ?? "N/A",
+                TenNganh = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null ? s.LopHanhChinh.Nganh.TenNganh : "N/A",
+                TenKhoa = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null && s.LopHanhChinh.Nganh.Khoa != null ? s.LopHanhChinh.Nganh.Khoa.TenKhoa : "N/A"
+            })
+            .ToListAsync();
 
-        var kqQuery = _db.KetQuaHocTaps
-            .Include(k => k.SinhVien)
-                .ThenInclude(s => s!.LopHanhChinh)
-                    .ThenInclude(l => l!.Nganh)
-                        .ThenInclude(n => n!.Khoa)
-            .Include(k => k.LopHocPhan)
-                .ThenInclude(l => l!.MonHoc)
-            .Include(k => k.LopHocPhan)
-                .ThenInclude(l => l!.HocKy)
-            .Where(k => k.MaSV != null && filteredSvSet.Contains(k.MaSV) && k.DiemTongKet != null)
-            .AsQueryable();
+        int tongSinhVien = svList.Count;
+        var svDict = svList.ToDictionary(s => s.MaSV, StringComparer.OrdinalIgnoreCase);
+
+        var lhpQuery = _db.LopHocPhans.AsNoTracking()
+            .Where(l => l.MonHoc != null && l.HocKy != null);
 
         if (!string.IsNullOrWhiteSpace(maHK))
-            kqQuery = kqQuery.Where(k => k.LopHocPhan != null && k.LopHocPhan.MaHK == maHK);
+            lhpQuery = lhpQuery.Where(l => l.MaHK == maHK);
         if (!string.IsNullOrWhiteSpace(maMon))
-            kqQuery = kqQuery.Where(k => k.LopHocPhan != null && k.LopHocPhan.MaMon == maMon);
+            lhpQuery = lhpQuery.Where(l => l.MaMon == maMon);
+        if (!string.IsNullOrWhiteSpace(maLHP))
+            lhpQuery = lhpQuery.Where(l => l.MaLHP == maLHP);
+
+        var lhpDict = await lhpQuery
+            .Select(l => new
+            {
+                l.MaLHP,
+                l.MaMon,
+                l.MaHK,
+                SoTinChi = l.MonHoc!.SoTinChi,
+                TenHK = l.HocKy!.TenHK,
+                NamHocBatDau = l.HocKy.NamHocBatDau,
+                NamHocKetThuc = l.HocKy.NamHocKetThuc
+            })
+            .ToDictionaryAsync(l => l.MaLHP, StringComparer.OrdinalIgnoreCase);
+
+        var kqQuery = _db.KetQuaHocTaps.AsNoTracking()
+            .Where(k => k.MaSV != null && k.MaLHP != null && k.DiemTongKet != null);
+
         if (!string.IsNullOrWhiteSpace(maLHP))
             kqQuery = kqQuery.Where(k => k.MaLHP == maLHP);
 
-        var kqList = await kqQuery.ToListAsync();
+        var rawKqList = await kqQuery
+            .Select(k => new { k.MaSV, k.MaLHP, DiemTongKet = k.DiemTongKet!.Value })
+            .ToListAsync();
 
-        // Tính GPA cho từng sinh viên dựa trên tập kết quả đã lọc
+        var kqList = rawKqList
+            .Where(k => svDict.ContainsKey(k.MaSV!) && lhpDict.ContainsKey(k.MaLHP!))
+            .Select(k => new
+            {
+                MaSV = k.MaSV!,
+                MaLHP = k.MaLHP!,
+                k.DiemTongKet,
+                SV = svDict[k.MaSV!],
+                LHP = lhpDict[k.MaLHP!]
+            })
+            .ToList();
+
+        // Tính GPA cho từng sinh viên dựa trên tập kết quả đã lọc (khử trùng lặp môn học lại bằng cách lấy điểm cao nhất của mỗi môn)
         var studentSummaries = kqList
-            .Where(k => k.SinhVien != null && k.LopHocPhan?.MonHoc != null)
-            .GroupBy(k => k.MaSV!)
+            .GroupBy(k => k.MaSV, StringComparer.OrdinalIgnoreCase)
             .Select(g =>
             {
-                var sv = g.First().SinhVien!;
-                int totalTC = g.Sum(x => x.LopHocPhan!.MonHoc!.SoTinChi);
-                int tcDat = g.Where(x => x.DiemTongKet >= 4.0).Sum(x => x.LopHocPhan!.MonHoc!.SoTinChi);
-                double gpa10 = totalTC > 0 ? Math.Round(g.Sum(x => x.DiemTongKet!.Value * x.LopHocPhan!.MonHoc!.SoTinChi) / totalTC, 2) : 0;
-                double gpa4 = totalTC > 0 ? Math.Round(g.Sum(x => GradeHelper.QuyDoiHe4(x.DiemTongKet!.Value) * x.LopHocPhan!.MonHoc!.SoTinChi) / totalTC, 2) : 0;
+                var sv = g.First().SV;
+                var bestByCourse = g
+                    .GroupBy(x => x.LHP.MaMon ?? x.MaLHP, StringComparer.OrdinalIgnoreCase)
+                    .Select(cg => cg.OrderByDescending(x => x.DiemTongKet).First())
+                    .ToList();
 
-                string xepLoai = "Yếu";
-                if (gpa4 >= 3.6) xepLoai = "Xuất sắc";
-                else if (gpa4 >= 3.2) xepLoai = "Giỏi";
-                else if (gpa4 >= 2.5) xepLoai = "Khá";
-                else if (gpa4 >= 2.0) xepLoai = "Trung bình";
+                int tinChiDat = bestByCourse.Where(x => x.DiemTongKet >= 4.0).Sum(x => x.LHP.SoTinChi);
+                int tongTinChi = bestByCourse.Sum(x => x.LHP.SoTinChi);
+                double gpa10 = tongTinChi > 0
+                    ? Math.Round(bestByCourse.Sum(x => x.DiemTongKet * x.LHP.SoTinChi) / tongTinChi, 2, MidpointRounding.AwayFromZero)
+                    : 0;
+                double gpa4 = tongTinChi > 0
+                    ? Math.Round(bestByCourse.Sum(x => GradeHelper.QuyDoiHe4(x.DiemTongKet) * x.LHP.SoTinChi) / tongTinChi, 2, MidpointRounding.AwayFromZero)
+                    : 0;
+                string xepLoai = gpa4 switch
+                {
+                    >= 3.6 => "Xuất sắc",
+                    >= 3.2 => "Giỏi",
+                    >= 2.5 => "Khá",
+                    >= 2.0 => "Trung bình",
+                    _ => "Yếu"
+                };
 
                 return new
                 {
                     sv.MaSV,
                     sv.HoTen,
-                    MaLop = sv.MaLop ?? "N/A",
-                    TenNganh = sv.LopHanhChinh?.Nganh?.TenNganh ?? "N/A",
-                    TenKhoa = sv.LopHanhChinh?.Nganh?.Khoa?.TenKhoa ?? "N/A",
-                    TinChiTichLuy = tcDat,
+                    sv.MaLop,
+                    sv.TenNganh,
+                    sv.TenKhoa,
+                    TinChiTichLuy = tinChiDat,
                     GPA_He10 = gpa10,
                     GPA_He4 = gpa4,
                     XepLoai = xepLoai
                 };
             })
             .ToList();
-
-        int tongSinhVien = filteredSvIds.Count;
         double diemTBToanKhoa = studentSummaries.Any()
             ? Math.Round(studentSummaries.Average(s => s.GPA_He10), 2)
             : 0;
@@ -127,18 +169,18 @@ public class ThongKeController : ControllerBase
         };
 
         var xuHuongGPA = kqList
-            .Where(k => k.LopHocPhan?.HocKy != null)
-            .GroupBy(k => k.LopHocPhan!.MaHK!)
+            .Where(k => !string.IsNullOrEmpty(k.LHP.MaHK))
+            .GroupBy(k => k.LHP.MaHK!)
             .Select(g =>
             {
-                var hk = g.First().LopHocPhan!.HocKy!;
-                double avg10 = Math.Round(g.Average(x => x.DiemTongKet!.Value), 2);
-                double avg4 = Math.Round(g.Average(x => GradeHelper.QuyDoiHe4(x.DiemTongKet!.Value)), 2);
+                var lhp = g.First().LHP;
+                double avg10 = Math.Round(g.Average(x => x.DiemTongKet), 2);
+                double avg4 = Math.Round(g.Average(x => GradeHelper.QuyDoiHe4(x.DiemTongKet)), 2);
                 return new
                 {
-                    MaHK = hk.MaHK,
-                    TenHK = $"{hk.TenHK} ({hk.NamHocBatDau}-{hk.NamHocKetThuc})",
-                    NamHocBatDau = hk.NamHocBatDau,
+                    MaHK = lhp.MaHK,
+                    TenHK = $"{lhp.TenHK} ({lhp.NamHocBatDau}-{lhp.NamHocKetThuc})",
+                    NamHocBatDau = lhp.NamHocBatDau,
                     GPA_He10 = avg10,
                     GPA_He4 = avg4
                 };
@@ -158,6 +200,8 @@ public class ThongKeController : ControllerBase
             .OrderBy(s => s.GPA_He4)
             .ToList();
 
+        int soSVCanhBaoCount = sinhVienCanhBao.Count;
+
         return Ok(new
         {
             status = "success",
@@ -170,7 +214,7 @@ public class ThongKeController : ControllerBase
                     gpaHe4TB,
                     tyLeQuaMon,
                     tyLeRotMon,
-                    soSVCanhBao = sinhVienCanhBao.Count
+                    soSVCanhBao = soSVCanhBaoCount
                 },
                 phanBoHocLuc,
                 phoDiem,

@@ -421,10 +421,10 @@
                         </td>
                         <td class="px-5 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
-                                <button onclick="openEnrollModal('${l.MaLHP}')" title="Xếp lớp sinh viên" class="px-2.5 py-1 rounded-lg bg-[#10B981]/15 text-[#10B981] text-xs font-bold hover:bg-[#10B981]/25 flex items-center gap-1 transition-colors">
+                                <button onclick="openEnrollModal('${l.MaLHP.replace(/'/g, "\\'")}')" title="Xếp lớp sinh viên" class="px-2.5 py-1 rounded-lg bg-[#10B981]/15 text-[#10B981] text-xs font-bold hover:bg-[#10B981]/25 flex items-center gap-1 transition-colors">
                                     <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Xếp SV
                                 </button>
-                                <button onclick='openLhpModal(${JSON.stringify(l).replace(/'/g, "&apos;")})' class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                <button onclick="openLhpModalById('${l.MaLHP.replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-primary transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
                                 <button onclick='confirmDeleteLhp("${l.MaLHP}", "${(l.TenLopHP || '').replace(/"/g, '&quot;')}")' class="p-1.5 text-text-muted hover:text-[#ef4444] transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </td>
@@ -551,6 +551,11 @@
                 await refreshEnrollLists();
                 await loadData();
             } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function openLhpModalById(maLHP) {
+            const l = lhpList.find(x => x.MaLHP === maLHP);
+            openLhpModal(l || null);
         }
 
         function openLhpModal(l = null) {

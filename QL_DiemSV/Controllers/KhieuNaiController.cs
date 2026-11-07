@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +11,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class KhieuNaiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -20,18 +24,26 @@ public class KhieuNaiController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maSV, [FromQuery] string? maGV)
     {
-        var query = _db.DonKhieuNais
+        var query = _db.DonKhieuNais.AsNoTracking()
             .Include(d => d.SinhVien)
                 .ThenInclude(s => s!.LopHanhChinh)
             .Include(d => d.LopHocPhan)
                 .ThenInclude(l => l!.MonHoc)
             .AsQueryable();
 
-        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        var currentMaGV = User.FindFirst("MaGV")?.Value;
-        var currentMaSV = User.FindFirst("MaSV")?.Value;
+        var role = User.FindFirstValue(ClaimTypes.Role);
+        var currentMaGV = User.FindFirstValue("MaGV");
+        var currentMaSV = User.FindFirstValue("MaSV") ?? (role == "SinhVien" ? User.Identity?.Name : null);
 
-        if (!string.IsNullOrWhiteSpace(maSV))
+        if (role == "SinhVien" && !string.IsNullOrWhiteSpace(currentMaSV))
+        {
+            query = query.Where(d => d.MaSV == currentMaSV);
+        }
+        else if (role == "GiangVien" && !string.IsNullOrWhiteSpace(currentMaGV))
+        {
+            query = query.Where(d => d.LopHocPhan != null && d.LopHocPhan.MaGV == currentMaGV);
+        }
+        else if (!string.IsNullOrWhiteSpace(maSV))
         {
             query = query.Where(d => d.MaSV == maSV);
         }
@@ -39,21 +51,20 @@ public class KhieuNaiController : ControllerBase
         {
             query = query.Where(d => d.LopHocPhan != null && d.LopHocPhan.MaGV == maGV);
         }
-        else if (role == "GiangVien" && !string.IsNullOrWhiteSpace(currentMaGV))
-        {
-            query = query.Where(d => d.LopHocPhan != null && d.LopHocPhan.MaGV == currentMaGV);
-        }
-        else if (role == "SinhVien" && !string.IsNullOrWhiteSpace(currentMaSV))
-        {
-            query = query.Where(d => d.MaSV == currentMaSV);
-        }
 
         var list = await query.OrderByDescending(d => d.NgayGui).ToListAsync();
-        var kqAll = await _db.KetQuaHocTaps.ToListAsync();
+        var maSVs = list.Select(d => d.MaSV).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
+        var maLHPs = list.Select(d => d.MaLHP).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
+
+        var kqRelevant = (maSVs.Count > 0 && maLHPs.Count > 0)
+            ? await _db.KetQuaHocTaps.AsNoTracking()
+                .Where(k => k.MaSV != null && k.MaLHP != null && maSVs.Contains(k.MaSV) && maLHPs.Contains(k.MaLHP))
+                .ToListAsync()
+            : new List<KetQuaHocTap>();
 
         var data = list.Select(d =>
         {
-            var kq = kqAll.FirstOrDefault(k => k.MaSV == d.MaSV && k.MaLHP == d.MaLHP);
+            var kq = kqRelevant.FirstOrDefault(k => k.MaSV == d.MaSV && k.MaLHP == d.MaLHP);
             return new
             {
                 id = d.MaKN,
@@ -164,6 +175,7 @@ public class KhieuNaiController : ControllerBase
     }
 
     [HttpPut("{id}/process")]
+    [Authorize(Roles = "Admin,GiangVien,KhaoThi")]
     public async Task<IActionResult> ProcessComplaint(int id, [FromBody] ProcessKhieuNaiDto req)
     {
         var don = await _db.DonKhieuNais
@@ -172,6 +184,13 @@ public class KhieuNaiController : ControllerBase
             .FirstOrDefaultAsync(d => d.MaKN == id);
 
         if (don == null) return NotFound(new { status = "error", message = "Không tìm thấy đơn khiếu nại" });
+
+        var role = User.FindFirstValue(ClaimTypes.Role);
+        var currentMaGV = User.FindFirstValue("MaGV");
+        if (role == "GiangVien" && !string.IsNullOrWhiteSpace(currentMaGV) && don.LopHocPhan?.MaGV != currentMaGV)
+        {
+            return StatusCode(403, new { status = "error", message = "Bạn chỉ được xử lý đơn phúc khảo của lớp học phần do mình phụ trách!" });
+        }
 
         if (req.status == "approved")
         {
@@ -183,8 +202,31 @@ public class KhieuNaiController : ControllerBase
             var kq = await _db.KetQuaHocTaps.FirstOrDefaultAsync(k => k.MaSV == don.MaSV && k.MaLHP == don.MaLHP);
             if (kq != null)
             {
-                if (don.LoaiDiem == "quatrinh") kq.DiemCK = req.newGrade;
-                else if (don.LoaiDiem == "thiLan1" || don.LoaiDiem == "cuoiky") kq.DiemThiLan1 = req.newGrade;
+                if (don.LoaiDiem == "quatrinh" || don.LoaiDiem == "DiemQT")
+                {
+                    kq.DiemCK = req.newGrade;
+                    // Đồng bộ lại các cột thành phần trong ChiTietDiemQT để khi mở bảng điểm chi tiết không bị tính đè về điểm cũ
+                    try
+                    {
+                        var chiTiet = !string.IsNullOrWhiteSpace(kq.ChiTietDiemQT)
+                            ? JsonSerializer.Deserialize<Dictionary<string, double?>>(kq.ChiTietDiemQT) ?? new Dictionary<string, double?>()
+                            : new Dictionary<string, double?>();
+                        if (chiTiet.Any())
+                        {
+                            foreach (var k in chiTiet.Keys.ToList()) chiTiet[k] = req.newGrade;
+                        }
+                        else
+                        {
+                            chiTiet["col_cc"] = req.newGrade;
+                            chiTiet["col_gk"] = req.newGrade;
+                        }
+                        kq.DiemCC = req.newGrade;
+                        kq.DiemGK = req.newGrade;
+                        kq.ChiTietDiemQT = JsonSerializer.Serialize(chiTiet);
+                    }
+                    catch { }
+                }
+                else if (don.LoaiDiem == "thiLan1" || don.LoaiDiem == "cuoiky" || don.LoaiDiem == "DiemThi" || don.LoaiDiem == "DiemTK") kq.DiemThiLan1 = req.newGrade;
                 else if (don.LoaiDiem == "thiLan2") kq.DiemThiLan2 = req.newGrade;
 
                 int tyLeQT = (don.LopHocPhan != null && don.LopHocPhan.TyLeQuaTrinh + don.LopHocPhan.TyLeThiKetThuc == 100)
@@ -204,13 +246,15 @@ public class KhieuNaiController : ControllerBase
 
         // Gửi thông báo cho Sinh viên
         string statusText = req.status == "approved" ? "Chấp nhận (Đã cập nhật điểm)" : "Từ chối";
+        string tenMon = don.LopHocPhan?.MonHoc?.TenMon ?? don.MaLHP;
+        string noiDungPhanHoi = !string.IsNullOrWhiteSpace(req.feedback) ? req.feedback.Trim() : statusText;
         _db.ThongBaos.Add(new ThongBao
         {
             MaNguoiGui = don.LopHocPhan?.MaGV ?? User.Identity?.Name ?? "GV",
             MaNguoiNhan = don.MaSV,
-            TieuDe = $"Kết quả phúc khảo môn {don.LopHocPhan?.MonHoc?.TenMon ?? don.MaLHP}",
-            NoiDung = $"Đơn khiếu nại #{don.MaKN} của bạn đã được xử lý: {statusText}. Phản hồi: {req.feedback ?? "Không có"}",
-            LoaiThongBao = "COMPLAINT_PROCESSED",
+            TieuDe = $"Phản hồi đơn khiếu nại điểm môn {tenMon}",
+            NoiDung = $"Giảng viên đã phản hồi đơn khiếu nại của bạn: {noiDungPhanHoi}",
+            LoaiThongBao = "PhucKhaoDiem",
             ThamChieuID = don.MaKN.ToString(),
             NgayGui = DateTime.Now,
             DaDoc = false

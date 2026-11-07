@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
@@ -8,6 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class NganhController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -20,7 +22,7 @@ public class NganhController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? search = null, [FromQuery] string? sort = null)
     {
-        var query = _db.Nganhs
+        var query = _db.Nganhs.AsNoTracking()
             .Include(n => n.Khoa)
             .Include(n => n.QuyDinhTotNghiep)
             .AsQueryable();
@@ -63,6 +65,7 @@ public class NganhController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] Nganh model)
     {
         if (string.IsNullOrWhiteSpace(model.MaNganh) || string.IsNullOrWhiteSpace(model.TenNganh))
@@ -92,6 +95,7 @@ public class NganhController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] Nganh model)
     {
         var existing = await _db.Nganhs.FindAsync(id);
@@ -106,6 +110,7 @@ public class NganhController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.Nganhs.FindAsync(id);

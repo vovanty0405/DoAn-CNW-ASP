@@ -1,0 +1,1528 @@
+@model QL_DiemSV.ViewModels.PortalKetQuaHocTapViewModel
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = "Kết quả học tập & Xét tốt nghiệp";
+}
+
+<style>
+    .kqht-page {
+        padding: 28px 0 64px;
+    }
+    .kqht-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+        margin-bottom: 20px;
+    }
+    .kqht-breadcrumb a {
+        color: var(--color-primary);
+        font-weight: 600;
+    }
+    .kqht-header-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .kqht-title {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 6px;
+        color: var(--color-text-primary);
+    }
+    .kqht-subtitle {
+        font-size: 14px;
+        color: var(--color-text-secondary);
+        margin: 0;
+    }
+    .kqht-header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+    .kqht-btn-outline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 15px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.18s ease;
+    }
+    .kqht-btn-outline:hover {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+        background: var(--color-surface-hover);
+    }
+
+    /* Summary Banner */
+    .kqht-summary-banner {
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 28px;
+        box-shadow: 0 10px 30px -15px rgba(2, 6, 23, 0.35);
+    }
+    .kqht-banner-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        margin-bottom: 22px;
+    }
+    .kqht-student-profile {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .kqht-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 800;
+        flex-shrink: 0;
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+    }
+    .kqht-student-name {
+        font-size: 19px;
+        font-weight: 800;
+        color: var(--color-text-primary);
+        margin: 0 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .kqht-mssv-pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 6px;
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--color-primary);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .kqht-student-meta {
+        font-size: 13px;
+        color: var(--color-text-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+    }
+    .kqht-grad-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 18px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+    .kqht-grad-badge.eligible {
+        background: rgba(16, 185, 129, 0.14);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .kqht-grad-badge.not-eligible {
+        background: rgba(245, 158, 11, 0.14);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    /* Metrics Grid inside Banner */
+    .kqht-metrics-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr;
+        gap: 20px;
+        align-items: stretch;
+    }
+    @@media (max-width: 992px) {
+        .kqht-metrics-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-metric-box {
+        background: var(--color-surface-header);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 14px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kqht-metric-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .kqht-metric-label {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-muted);
+    }
+    .kqht-metric-value-lg {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--color-text-primary);
+    }
+    .kqht-progress-track {
+        width: 100%;
+        height: 12px;
+        background: rgba(148, 163, 184, 0.18);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 10px 0 14px;
+    }
+    .kqht-progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2563eb, #10b981);
+        transition: width 0.5s ease;
+    }
+    .kqht-credit-breakdown {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .kqht-credit-subitem {
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 10px;
+        padding: 9px 12px;
+        font-size: 12.5px;
+    }
+    .kqht-credit-subitem .sub-label {
+        color: var(--color-text-muted);
+        display: block;
+        margin-bottom: 3px;
+    }
+    .kqht-credit-subitem .sub-val {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--color-text-primary);
+    }
+    .kqht-gpa-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 8px 0 12px;
+    }
+    .kqht-gpa-card {
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
+    }
+    .kqht-gpa-card .gpa-num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--color-primary);
+        line-height: 1.15;
+    }
+    .kqht-gpa-card .gpa-scale {
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+    }
+    .kqht-checklist {
+        list-style: none;
+        padding: 0;
+        margin: 6px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        font-size: 12.5px;
+    }
+    .kqht-checklist li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 9px;
+        border-radius: 7px;
+        background: var(--color-surface);
+    }
+    .kqht-checklist li.ok {
+        color: #10b981;
+    }
+    .kqht-checklist li.warn {
+        color: #f59e0b;
+    }
+
+    /* Filter Bar */
+    .kqht-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 14px;
+        padding: 14px 18px;
+        margin-bottom: 22px;
+    }
+    .kqht-filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+    }
+    .kqht-select, .kqht-search-input {
+        background: var(--color-surface-header);
+        color: var(--color-text-primary);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 9px;
+        padding: 8px 13px;
+        font-size: 13.5px;
+        outline: none;
+    }
+    .kqht-select:focus, .kqht-search-input:focus {
+        border-color: var(--color-primary);
+    }
+
+    /* Semester Card & Grade Table */
+    .kqht-semester-card {
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .kqht-semester-header {
+        background: var(--color-surface-header);
+        padding: 14px 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .kqht-semester-title {
+        font-size: 15.5px;
+        font-weight: 800;
+        color: var(--color-text-primary);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+    }
+    .kqht-semester-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 12.5px;
+        color: var(--color-text-secondary);
+    }
+    .kqht-semester-stats strong {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--color-text-primary);
+    }
+    .kqht-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+    .kqht-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+    .kqht-table th {
+        background: rgba(148, 163, 184, 0.06);
+        color: var(--color-text-muted);
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        white-space: nowrap;
+        text-align: left;
+    }
+    .kqht-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        color: var(--color-text-primary);
+        vertical-align: middle;
+    }
+    .kqht-table tbody tr:hover {
+        background: var(--color-surface-hover);
+    }
+    .kqht-table .col-center {
+        text-align: center;
+    }
+    .kqht-table .col-mono {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+    }
+
+    /* Status & Grade Badges */
+    .kqht-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .kqht-badge.pass {
+        background: rgba(16, 185, 129, 0.14);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .kqht-badge.fail {
+        background: rgba(239, 68, 68, 0.14);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .kqht-badge.pending {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .kqht-badge.approved {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .kqht-badge.rejected {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    /* Action Buttons in Table */
+    .kqht-btn-appeal {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        background: rgba(59, 130, 246, 0.12);
+        color: var(--color-primary);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .kqht-btn-appeal:hover {
+        background: var(--color-primary);
+        color: #fff;
+    }
+    .kqht-btn-feedback {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        background: var(--color-surface-header);
+        color: var(--color-text-secondary);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        cursor: pointer;
+    }
+    .kqht-btn-feedback:hover {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+
+    /* Modal Overlay */
+    .kqht-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.72);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .kqht-modal-backdrop.open {
+        display: flex;
+    }
+    .kqht-modal {
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 520px;
+        overflow: hidden;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+    }
+    .kqht-modal-header {
+        padding: 16px 20px;
+        background: var(--color-surface-header);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .kqht-modal-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--color-text-primary);
+    }
+    .kqht-modal-close {
+        background: transparent;
+        border: none;
+        color: var(--color-text-muted);
+        font-size: 20px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .kqht-modal-body {
+        padding: 20px;
+    }
+    .kqht-form-group {
+        margin-bottom: 15px;
+    }
+    .kqht-form-group label {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--color-text-secondary);
+        margin-bottom: 6px;
+    }
+    .kqht-form-control {
+        width: 100%;
+        background: var(--color-surface-header);
+        color: var(--color-text-primary);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 13.5px;
+        outline: none;
+    }
+    .kqht-form-control:focus {
+        border-color: var(--color-primary);
+    }
+    .kqht-modal-footer {
+        padding: 14px 20px;
+        background: var(--color-surface-header);
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    .kqht-btn-primary {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 9px;
+        padding: 9px 18px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .kqht-btn-primary:hover {
+        background: #1d4ed8;
+    }
+
+    /* Tabs Bar */
+    .kqht-tabs-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 24px;
+        padding: 6px;
+        background: var(--color-surface);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 14px;
+    }
+    .kqht-tab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 10px;
+        border: none;
+        background: transparent;
+        color: var(--color-text-secondary);
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.16s ease;
+    }
+    .kqht-tab-btn:hover {
+        color: var(--color-text-primary);
+        background: var(--color-surface-hover);
+    }
+    .kqht-tab-btn.active {
+        background: #2563eb;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
+    }
+    .kqht-tab-pane {
+        display: none;
+    }
+    .kqht-tab-pane.active {
+        display: block;
+    }
+
+    /* Profile & Password Grid */
+    .kqht-profile-grid {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+    @@media (max-width: 960px) {
+        .kqht-profile-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-readonly-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 12px;
+        background: var(--color-surface-header);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        margin-bottom: 20px;
+    }
+    @@media (max-width: 640px) {
+        .kqht-readonly-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-readonly-item span {
+        display: block;
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+        margin-bottom: 2px;
+    }
+    .kqht-readonly-item strong {
+        font-size: 13.5px;
+        color: var(--color-text-primary);
+    }
+    .kqht-form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+    @@media (max-width: 640px) {
+        .kqht-form-row-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-alert-box {
+        display: none;
+        padding: 10px 14px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 12px;
+    }
+    .kqht-alert-box.success {
+        display: block;
+        background: rgba(16, 185, 129, 0.14);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .kqht-alert-box.error {
+        display: block;
+        background: rgba(239, 68, 68, 0.14);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+</style>
+
+<div class="portal-shell kqht-page">
+    <nav class="kqht-breadcrumb" aria-label="Breadcrumb">
+        <a href="/portal">Cổng thông tin</a>
+        <span>/</span>
+        <span>Kết quả học tập, Xét tốt nghiệp &amp; Hồ sơ sinh viên</span>
+    </nav>
+
+    <div class="kqht-header-bar">
+        <div>
+            <h1 class="kqht-title">Cổng Học Vụ Sinh Viên</h1>
+            <p class="kqht-subtitle">Tra cứu bảng điểm học kỳ, theo dõi tiến độ xét tốt nghiệp chuẩn ngành, gửi phúc khảo điểm và quản lý hồ sơ cá nhân.</p>
+        </div>
+        <div class="kqht-header-actions">
+            @if (!User.IsInRole("SinhVien"))
+            {
+                <form method="get" action="/Portal/KetQuaHocTap" style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" name="maSV" value="@Model.MaSV" placeholder="Nhập mã SV..." class="kqht-search-input" style="width:150px;" />
+                    <button type="submit" class="kqht-btn-outline">Xem SV</button>
+                </form>
+            }
+            <a href="/portal/tra-cuu-tkb?code=@Uri.EscapeDataString(Model.MaSV)&kind=student" class="kqht-btn-outline">
+                🗓️ Thời khóa biểu cá nhân
+            </a>
+            <button type="button" onclick="window.print()" class="kqht-btn-outline">
+                🖨️ In bảng điểm
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="kqht-summary-banner" style="border-color: rgba(239,68,68,0.4);">
+            <p style="margin:0; color:#ef4444; font-weight:700;">⚠️ @Model.ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        <!-- 1. THẺ TÓM TẮT TIẾN ĐỘ & ĐIỀU KIỆN TỐT NGHIỆP -->
+        <section class="kqht-summary-banner" aria-label="Tóm tắt tiến độ và điều kiện tốt nghiệp">
+            <div class="kqht-banner-top">
+                <div class="kqht-student-profile">
+                    <div class="kqht-avatar">
+                        @(string.IsNullOrEmpty(Model.HoTen) ? "SV" : Model.HoTen.Trim().Split(' ').Last()[0].ToString().ToUpper())
+                    </div>
+                    <div>
+                        <h2 class="kqht-student-name">
+                            @Model.HoTen
+                            <span class="kqht-mssv-pill">@Model.MaSV</span>
+                        </h2>
+                        <div class="kqht-student-meta">
+                            <span><strong>Lớp:</strong> @Model.TenLop</span>
+                            <span><strong>Ngành:</strong> @Model.TenNganh (@Model.MaNganh)</span>
+                            @if (!string.IsNullOrWhiteSpace(Model.TenKhoa))
+                            {
+                                <span><strong>Khoa:</strong> @Model.TenKhoa</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(Model.KhoaHoc))
+                            {
+                                <span><strong>Khóa:</strong> @Model.KhoaHoc</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    @if (Model.DuDieuKienTotNghiep)
+                    {
+                        <div class="kqht-grad-badge eligible">
+                            <span>🎓</span>
+                            <span>@Model.TrangThaiTotNghiepText</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="kqht-grad-badge not-eligible">
+                            <span>⏳</span>
+                            <span>@Model.TrangThaiTotNghiepText</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="kqht-metrics-grid">
+                <!-- Cột 1: Thanh tiến độ tích lũy tín chỉ động theo QuyDinhTotNghiep -->
+                <div class="kqht-metric-box">
+                    <div>
+                        <div class="kqht-metric-header">
+                            <span class="kqht-metric-label">Tiến độ tích lũy tín chỉ (Chuẩn ngành @Model.MaNganh)</span>
+                            <span class="kqht-metric-value-lg">@Model.TongTinChiTichLuy / @Model.TongTTC <small style="font-size:13px; font-weight:600;">TC</small></span>
+                        </div>
+                        <div class="kqht-progress-track" title="Hoàn thành @Model.PhanTramTichLuy%">
+                            <div class="kqht-progress-fill" style="width: @(Model.PhanTramTichLuy.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                        </div>
+                    </div>
+
+                    <div class="kqht-credit-breakdown">
+                        <div class="kqht-credit-subitem">
+                            <span class="sub-label">Bắt buộc tích lũy</span>
+                            <span class="sub-val">@Model.TCBatBuocDat / @Model.TCBatBuoc TC</span>
+                        </div>
+                        <div class="kqht-credit-subitem">
+                            <span class="sub-label">Tự chọn tích lũy</span>
+                            <span class="sub-val">@Model.TCTuChonDat / @Model.TCTuChon TC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cột 2: Điểm trung bình tích lũy (GPA Hệ 4 & Hệ 10) -->
+                <div class="kqht-metric-box">
+                    <div class="kqht-metric-header">
+                        <span class="kqht-metric-label">Điểm TB tích lũy (GPA)</span>
+                        <span class="kqht-badge @(Model.GPAHe4 >= Model.MinGPA ? "pass" : "pending")">
+                            Xếp loại: @Model.XepLoai
+                        </span>
+                    </div>
+
+                    <div class="kqht-gpa-row">
+                        <div class="kqht-gpa-card">
+                            <div class="gpa-num">@(Model.GPAHe4?.ToString("F2") ?? "0.00")</div>
+                            <div class="gpa-scale">GPA Hệ 4.0 (Chuẩn ≥ @Model.MinGPA.ToString("F2"))</div>
+                        </div>
+                        <div class="kqht-gpa-card">
+                            <div class="gpa-num" style="color: #10b981;">@(Model.GPAHe10?.ToString("F2") ?? "0.00")</div>
+                            <div class="gpa-scale">GPA Hệ 10.0</div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
+                        <span>Tổng TC đã đăng ký: <strong>@Model.TongTinChiDangKy TC</strong></span>
+                        <span>Môn nợ hiện tại: <strong style="color:@(Model.SoMonNo > 0 ? "#ef4444" : "#10b981")">@Model.SoMonNo môn</strong></span>
+                    </div>
+                </div>
+
+                <!-- Cột 3: Checklist điều kiện xét tốt nghiệp tự động -->
+                <div class="kqht-metric-box">
+                    <div class="kqht-metric-header" style="margin-bottom:4px;">
+                        <span class="kqht-metric-label">Chi tiết điều kiện xét tốt nghiệp</span>
+                    </div>
+                    <ul class="kqht-checklist">
+                        @foreach (var item in Model.ChiTietDieuKien)
+                        {
+                            bool isOk = item.StartsWith("✓");
+                            <li class="@(isOk ? "ok" : "warn")">@item</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- THANH CHUYỂN TAB (3 TABS: BẢNG ĐIỂM | LỊCH SỬ KHIẾU NẠI | HỒ SƠ SINH VIÊN) -->
+        <div class="kqht-tabs-bar" role="tablist">
+            <button type="button"
+                    class="kqht-tab-btn @(Model.ActiveTab == "ket-qua" ? "active" : "")"
+                    data-tab-target="ket-qua"
+                    onclick="switchPortalKqhtTab('ket-qua')">
+                📊 Kết quả học tập &amp; Xét tốt nghiệp
+            </button>
+            <button type="button"
+                    class="kqht-tab-btn @(Model.ActiveTab == "khieu-nai" ? "active" : "")"
+                    data-tab-target="khieu-nai"
+                    onclick="switchPortalKqhtTab('khieu-nai')">
+                📝 Lịch sử khiếu nại điểm (@Model.Complaints.Count)
+            </button>
+            <button type="button"
+                    class="kqht-tab-btn @(Model.ActiveTab == "ho-so" ? "active" : "")"
+                    data-tab-target="ho-so"
+                    onclick="switchPortalKqhtTab('ho-so')">
+                👤 Hồ sơ sinh viên &amp; Đổi mật khẩu
+            </button>
+        </div>
+
+        <!-- TAB PANE 1: BẢNG ĐIỂM CHI TIẾT THEO TỪNG HỌC KỲ -->
+        <div id="tab-pane-ket-qua" class="kqht-tab-pane @(Model.ActiveTab == "ket-qua" ? "active" : "")">
+            <div class="kqht-filter-bar">
+                <div class="kqht-filter-group">
+                    <label for="semesterFilter" style="font-size:13px; font-weight:700; color:var(--color-text-secondary);">Học kỳ:</label>
+                    <form id="semesterFilterForm" method="get" action="/Portal/KetQuaHocTap" style="margin:0; display:inline-flex; gap:8px;">
+                        @if (!User.IsInRole("SinhVien") && !string.IsNullOrEmpty(Model.MaSV))
+                        {
+                            <input type="hidden" name="maSV" value="@Model.MaSV" />
+                        }
+                        <select id="semesterFilter" name="hocKy" class="kqht-select" onchange="document.getElementById('semesterFilterForm').submit()">
+                            <option value="all" selected="@(Model.SelectedHocKy == "all")">Tất cả học kỳ (@Model.AvailableSemesters.Count học kỳ)</option>
+                            @foreach (var hk in Model.AvailableSemesters)
+                            {
+                                <option value="@hk.MaHK" selected="@(string.Equals(Model.SelectedHocKy, hk.MaHK, StringComparison.OrdinalIgnoreCase))">
+                                    @hk.TenHK - Năm học @hk.NamHoc (@hk.MaHK)
+                                </option>
+                            }
+                        </select>
+                    </form>
+                </div>
+
+                <div class="kqht-filter-group">
+                    <input type="search" id="courseQuickSearch" class="kqht-search-input" placeholder="Tìm nhanh mã môn, tên môn hoặc giảng viên..." oninput="filterPortalGradeRows(this.value)" style="min-width: 270px;" />
+                </div>
+            </div>
+
+            @if (!Model.Semesters.Any())
+            {
+                <div class="kqht-summary-banner" style="text-align:center; padding:40px 20px;">
+                    <p style="margin:0; color:var(--color-text-muted); font-size:15px;">Chưa có dữ liệu kết quả học tập cho học kỳ được chọn.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var sem in Model.Semesters)
+                {
+                    <section class="kqht-semester-card" data-semester="@sem.MaHK">
+                        <div class="kqht-semester-header">
+                            <h3 class="kqht-semester-title">
+                                <span>📅 @sem.TenHK — Năm học @sem.NamHoc</span>
+                                <span class="kqht-mssv-pill" style="font-weight:600;">@sem.MaHK</span>
+                            </h3>
+                            <div class="kqht-semester-stats">
+                                <span>TC đạt HK: <strong>@sem.TinChiDatHK/@sem.TinChiDangKyHK</strong></span>
+                                <span>GPA HK (Hệ 4): <strong>@(sem.GPAHe4HK?.ToString("F2") ?? "-")</strong></span>
+                                <span>GPA HK (Hệ 10): <strong>@(sem.GPAHe10HK?.ToString("F2") ?? "-")</strong></span>
+                                <span>GPA Tích lũy (Hệ 4): <strong>@(sem.GPAHe4TichLuy?.ToString("F2") ?? "-")</strong></span>
+                                <span>TC Tích lũy: <strong>@sem.TinChiTichLuy TC</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="kqht-table-wrap">
+                            <table class="kqht-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-center" style="width:50px;">STT</th>
+                                        <th style="width:105px;">Mã MH</th>
+                                        <th>Tên môn học &amp; Giảng viên</th>
+                                        <th class="col-center" style="width:70px;">Số TC</th>
+                                        <th class="col-center" style="width:85px;">Điểm QT</th>
+                                        <th class="col-center" style="width:85px;">Thi L1</th>
+                                        <th class="col-center" style="width:85px;">Thi L2</th>
+                                        <th class="col-center" style="width:110px;">Điểm Tổng kết</th>
+                                        <th class="col-center" style="width:85px;">Điểm Chữ</th>
+                                        <th class="col-center" style="width:110px;">Kết quả</th>
+                                        <th class="col-center" style="width:190px;">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in sem.Courses)
+                                    {
+                                        string gvText = string.IsNullOrWhiteSpace(row.MaGV)
+                                            ? row.TenGV
+                                            : $"{row.TenGV} ({row.MaGV})";
+                                        <tr class="kqht-course-row" data-search="@($"{row.MaMon} {row.TenMon} {row.MaLHP} {row.TenGV} {row.MaGV}".ToLowerInvariant())">
+                                            <td class="col-center col-mono">@row.STT</td>
+                                            <td class="col-mono" style="font-weight:700; color:var(--color-primary);">@row.MaMon</td>
+                                            <td>
+                                                <div style="font-weight:600;">@row.TenMon</div>
+                                                <div style="font-size:11.5px; color:var(--color-text-muted); margin-top:2px;">
+                                                    LHP: <span class="col-mono">@row.MaLHP</span> • @(row.BatBuoc ? "Bắt buộc" : "Tự chọn") • <strong>GV:</strong> @gvText
+                                                </div>
+                                            </td>
+                                            <td class="col-center col-mono">@row.SoTC</td>
+                                            <td class="col-center col-mono">@(row.DiemQT?.ToString("F1") ?? "-")</td>
+                                            <td class="col-center col-mono">@(row.DiemThiL1?.ToString("F1") ?? "-")</td>
+                                            <td class="col-center col-mono">@(row.DiemThiL2?.ToString("F1") ?? "-")</td>
+                                            <td class="col-center col-mono" style="font-weight:800;">
+                                                @(row.DiemTongKet?.ToString("F1") ?? "-")
+                                            </td>
+                                            <td class="col-center col-mono" style="font-weight:800; color:@(row.IsPassed ? "#10b981" : (row.DiemTongKet.HasValue ? "#ef4444" : "var(--color-text-muted)"));">
+                                                @row.DiemChu
+                                            </td>
+                                            <td class="col-center">
+                                                @if (!row.DiemTongKet.HasValue)
+                                                {
+                                                    <span class="kqht-badge pending">Chưa có điểm</span>
+                                                }
+                                                else if (row.IsPassed)
+                                                {
+                                                    <span class="kqht-badge pass">✓ Đạt</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="kqht-badge fail">✗ Học lại</span>
+                                                }
+                                            </td>
+                                            <td class="col-center">
+                                                @if (row.LatestComplaint == null)
+                                                {
+                                                    <button type="button"
+                                                            class="kqht-btn-appeal"
+                                                            onclick="openPortalComplaintModal('@Model.MaSV', '@row.MaLHP', '@Html.Raw(row.MaMon.Replace("'", "\\'"))', '@Html.Raw(row.TenMon.Replace("'", "\\'"))', '@Html.Raw(gvText.Replace("'", "\\'"))')">
+                                                        📝 Khiếu nại điểm
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    var cp = row.LatestComplaint;
+                                                    string statusCls = cp.TrangThai?.ToLowerInvariant() switch
+                                                    {
+                                                        "approved" => "approved",
+                                                        "rejected" => "rejected",
+                                                        _ => "pending"
+                                                    };
+                                                    <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                                                        <span class="kqht-badge @statusCls">@cp.TrangThaiLabel</span>
+                                                        <button type="button"
+                                                                class="kqht-btn-feedback"
+                                                                onclick="openPortalFeedbackModal(@cp.Id)"
+                                                                data-cp-id="@cp.Id"
+                                                                data-cp-lhp="@cp.MaLHP"
+                                                                data-cp-mon="@cp.TenMon (@cp.MaMon)"
+                                                                data-cp-gv="@gvText"
+                                                                data-cp-loai="@cp.LoaiDiemLabel"
+                                                                data-cp-ngay="@cp.NgayGui.ToString("dd/MM/yyyy HH:mm")"
+                                                                data-cp-status="@cp.TrangThaiLabel"
+                                                                data-cp-status-raw="@cp.TrangThai"
+                                                                data-cp-lydo="@cp.LyDo"
+                                                                data-cp-phanhoi="@(string.IsNullOrWhiteSpace(cp.PhanHoi) ? "Giảng viên đang tiếp nhận và xem xét đơn khiếu nại của bạn." : cp.PhanHoi)"
+                                                                data-cp-masv="@Model.MaSV"
+                                                                data-cp-mamon="@row.MaMon"
+                                                                data-cp-tenmon="@row.TenMon">
+                                                            💬 Xem phản hồi
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                }
+            }
+        </div>
+
+        <!-- TAB PANE 2: LỊCH SỬ KHIẾU NẠI ĐIỂM CỦA SINH VIÊN -->
+        <div id="tab-pane-khieu-nai" class="kqht-tab-pane @(Model.ActiveTab == "khieu-nai" ? "active" : "")">
+            <section id="lich-su-khieu-nai" class="kqht-semester-card">
+                <div class="kqht-semester-header">
+                    <h3 class="kqht-semester-title">
+                        <span>📝 Lịch sử khiếu nại &amp; phúc khảo điểm</span>
+                        <span class="kqht-mssv-pill">@Model.Complaints.Count đơn</span>
+                    </h3>
+                </div>
+                <div class="kqht-table-wrap">
+                    <table class="kqht-table">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">Mã LHP</th>
+                                <th>Học phần &amp; Giảng viên</th>
+                                <th style="width:135px;">Cột điểm</th>
+                                <th>Lý do khiếu nại</th>
+                                <th style="width:135px;">Ngày gửi</th>
+                                <th class="col-center" style="width:115px;">Trạng thái</th>
+                                <th>Phản hồi của Giảng viên</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!Model.Complaints.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="col-center" style="padding:28px; color:var(--color-text-muted);">
+                                        Bạn chưa gửi đơn khiếu nại điểm nào.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in Model.Complaints)
+                                {
+                                    string badgeCls = item.TrangThai?.ToLowerInvariant() switch
+                                    {
+                                        "approved" => "approved",
+                                        "rejected" => "rejected",
+                                        _ => "pending"
+                                    };
+                                    string gvItemText = string.IsNullOrWhiteSpace(item.MaGV)
+                                        ? item.TenGV
+                                        : $"{item.TenGV} ({item.MaGV})";
+                                    <tr>
+                                        <td class="col-mono" style="font-weight:700; color:var(--color-primary);">@item.MaLHP</td>
+                                        <td>
+                                            <div style="font-weight:600;">@item.TenMon</div>
+                                            <div style="font-size:11.5px; color:var(--color-text-muted);">
+                                                @item.TenHK (@item.NamHoc) • <strong>GV:</strong> @gvItemText
+                                            </div>
+                                        </td>
+                                        <td>@item.LoaiDiemLabel</td>
+                                        <td style="max-width:250px;">@item.LyDo</td>
+                                        <td class="col-mono" style="font-size:12px;">@item.NgayGui.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td class="col-center">
+                                            <span class="kqht-badge @badgeCls">@item.TrangThaiLabel</span>
+                                        </td>
+                                        <td style="max-width:280px;">
+                                            @if (!string.IsNullOrWhiteSpace(item.PhanHoi))
+                                            {
+                                                <div style="font-weight:600; color:var(--color-text-primary);">@item.PhanHoi</div>
+                                            }
+                                            else
+                                            {
+                                                <span style="color:var(--color-text-muted); font-style:italic;">Đang chờ giảng viên (@gvItemText) phản hồi...</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- TAB PANE 3: HỒ SƠ SINH VIÊN & ĐỔI MẬT KHẨU -->
+        <div id="tab-pane-ho-so" class="kqht-tab-pane @(Model.ActiveTab == "ho-so" ? "active" : "")">
+            <div class="kqht-profile-grid">
+                <!-- Cột trái: Thông tin sinh viên & Chỉnh sửa hồ sơ cá nhân -->
+                <section class="kqht-semester-card" style="margin-bottom:0;">
+                    <div class="kqht-semester-header">
+                        <h3 class="kqht-semester-title">
+                            <span>👤 Thông tin Hồ sơ Sinh viên</span>
+                            <span class="kqht-mssv-pill">@Model.MaSV</span>
+                        </h3>
+                    </div>
+                    <div style="padding:20px;">
+                        <div class="kqht-readonly-grid">
+                            <div class="kqht-readonly-item">
+                                <span>Mã sinh viên</span>
+                                <strong class="col-mono">@Model.MaSV</strong>
+                            </div>
+                            <div class="kqht-readonly-item">
+                                <span>Họ và tên</span>
+                                <strong>@Model.HoTen</strong>
+                            </div>
+                            <div class="kqht-readonly-item">
+                                <span>Lớp hành chính</span>
+                                <strong>@Model.TenLop @(string.IsNullOrWhiteSpace(Model.KhoaHoc) ? "" : $"({Model.KhoaHoc})")</strong>
+                            </div>
+                            <div class="kqht-readonly-item">
+                                <span>Ngành đào tạo</span>
+                                <strong>@Model.TenNganh (@Model.MaNganh)</strong>
+                            </div>
+                            <div class="kqht-readonly-item">
+                                <span>Khoa quản lý</span>
+                                <strong>@(string.IsNullOrWhiteSpace(Model.TenKhoa) ? "Đang cập nhật" : Model.TenKhoa)</strong>
+                            </div>
+                            <div class="kqht-readonly-item">
+                                <span>Trạng thái học tập</span>
+                                <strong style="color:#10b981;">@Model.TrangThaiHocTap</strong>
+                            </div>
+                        </div>
+
+                        <form id="portalProfileForm" onsubmit="submitStudentProfileUpdate(event)">
+                            <input type="hidden" id="pfMaSV" value="@Model.MaSV" />
+
+                            <div class="kqht-form-row-2">
+                                <div class="kqht-form-group">
+                                    <label for="pfNgaySinh">Ngày sinh</label>
+                                    <input type="date" id="pfNgaySinh" class="kqht-form-control" value="@(Model.NgaySinh?.ToString("yyyy-MM-dd") ?? "")" />
+                                </div>
+                                <div class="kqht-form-group">
+                                    <label for="pfGioiTinh">Giới tính</label>
+                                    <select id="pfGioiTinh" class="kqht-form-control">
+                                        <option value="Nam" selected="@(Model.GioiTinh == "Nam")">Nam</option>
+                                        <option value="Nữ" selected="@(Model.GioiTinh == "Nữ")">Nữ</option>
+                                        <option value="Khác" selected="@(Model.GioiTinh == "Khác")">Khác</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="kqht-form-row-2">
+                                <div class="kqht-form-group">
+                                    <label for="pfCCCD">Số CCCD / CMND</label>
+                                    <input type="text" id="pfCCCD" class="kqht-form-control" value="@Model.CCCD" placeholder="Nhập số CCCD..." maxlength="20" />
+                                </div>
+                                <div class="kqht-form-group">
+                                    <label for="pfSDT">Số điện thoại liên hệ</label>
+                                    <input type="tel" id="pfSDT" class="kqht-form-control" value="@Model.SDT" placeholder="Nhập số điện thoại..." maxlength="20" />
+                                </div>
+                            </div>
+
+                            <div class="kqht-form-group">
+                                <label for="pfEmail">Email cá nhân / học vụ</label>
+                                <input type="email" id="pfEmail" class="kqht-form-control" value="@Model.Email" placeholder="example@student.edu.vn" maxlength="255" />
+                            </div>
+
+                            <div class="kqht-form-group">
+                                <label for="pfDiaChi">Địa chỉ liên hệ</label>
+                                <textarea id="pfDiaChi" rows="2" class="kqht-form-control" placeholder="Nhập địa chỉ thường trú hoặc nơi ở hiện tại..." maxlength="255">@Model.DiaChi</textarea>
+                            </div>
+
+                            <div id="pfAlertBox" class="kqht-alert-box"></div>
+
+                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                                <button type="submit" id="pfSubmitBtn" class="kqht-btn-primary">
+                                    💾 Lưu thông tin cá nhân
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Cột phải: Đổi mật khẩu tài khoản -->
+                <section class="kqht-semester-card" style="margin-bottom:0;">
+                    <div class="kqht-semester-header">
+                        <h3 class="kqht-semester-title">
+                            <span>🔒 Bảo mật &amp; Đổi mật khẩu</span>
+                        </h3>
+                    </div>
+                    <div style="padding:20px;">
+                        <div class="kqht-readonly-grid" style="grid-template-columns:1fr; margin-bottom:18px;">
+                            <div class="kqht-readonly-item">
+                                <span>Tài khoản đăng nhập hiện tại</span>
+                                <strong class="col-mono" style="color:var(--color-primary);">@Model.Username</strong>
+                            </div>
+                        </div>
+
+                        <form id="portalPasswordForm" onsubmit="submitStudentPasswordChange(event)">
+                            <div class="kqht-form-group">
+                                <label for="pwCurrent">Mật khẩu hiện tại *</label>
+                                <input type="password" id="pwCurrent" class="kqht-form-control" required placeholder="Nhập mật khẩu đang sử dụng..." autocomplete="current-password" />
+                            </div>
+
+                            <div class="kqht-form-group">
+                                <label for="pwNew">Mật khẩu mới * (Tối thiểu 6 ký tự)</label>
+                                <input type="password" id="pwNew" class="kqht-form-control" required minlength="6" placeholder="Nhập mật khẩu mới..." autocomplete="new-password" />
+                            </div>
+
+                            <div class="kqht-form-group">
+                                <label for="pwConfirm">Xác nhận mật khẩu mới *</label>
+                                <input type="password" id="pwConfirm" class="kqht-form-control" required minlength="6" placeholder="Nhập lại mật khẩu mới..." autocomplete="new-password" />
+                            </div>
+
+                            <div id="pwAlertBox" class="kqht-alert-box"></div>
+
+                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                                <button type="submit" id="pwSubmitBtn" class="kqht-btn-primary">
+                                    🔑 Cập nhật mật khẩu
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- MODAL 1: GỬI ĐƠN KHIẾU NẠI ĐIỂM -->
+<div id="portalComplaintModal" class="kqht-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="complaintModalTitle">
+    <div class="kqht-modal">
+        <div class="kqht-modal-header">
+            <h3 id="complaintModalTitle">📝 Gửi đơn khiếu nại điểm</h3>
+            <button type="button" class="kqht-modal-close" onclick="closePortalComplaintModal()">&times;</button>
+        </div>
+        <form id="portalComplaintForm" onsubmit="submitPortalComplaint(event)">
+            <div class="kqht-modal-body">
+                <input type="hidden" id="cpMaSV" />
+                <input type="hidden" id="cpMaLHP" />
+
+                <div class="kqht-form-group">
+                    <label>Sinh viên</label>
+                    <input type="text" id="cpStudentDisplay" class="kqht-form-control" readonly />
+                </div>
+
+                <div class="kqht-form-group">
+                    <label>Học phần &amp; Lớp học phần</label>
+                    <input type="text" id="cpCourseDisplay" class="kqht-form-control" readonly />
+                </div>
+
+                <div class="kqht-form-group">
+                    <label>Giảng viên phụ trách học phần</label>
+                    <input type="text" id="cpLecturerDisplay" class="kqht-form-control" readonly style="font-weight:700; color:var(--color-primary);" />
+                </div>
+
+                <div class="kqht-form-group">
+                    <label for="cpLoaiDiem">Cột điểm cần phúc khảo / khiếu nại *</label>
+                    <select id="cpLoaiDiem" class="kqht-form-control" required>
+                        <option value="quatrinh">Điểm quá trình (Chuyên cần / Giữa kỳ)</option>
+                        <option value="thiLan1" selected>Điểm thi kết thúc học phần (Thi L1)</option>
+                        <option value="thiLan2">Điểm thi kết thúc học phần (Thi L2)</option>
+                        <option value="cuoiky">Điểm tổng kết học phần</option>
+                    </select>
+                </div>
+
+                <div class="kqht-form-group" style="margin-bottom:0;">
+                    <label for="cpLyDo">Nội dung / Lý do khiếu nại chi tiết *</label>
+                    <textarea id="cpLyDo" rows="4" class="kqht-form-control" required placeholder="Nêu rõ thắc mắc về điểm số hoặc minh chứng bài thi/bài kiểm tra của bạn..."></textarea>
+                </div>
+                <div id="cpErrorMsg" style="display:none; margin-top:10px; color:#ef4444; font-size:12.5px; font-weight:600;"></div>
+            </div>
+            <div class="kqht-modal-footer">
+                <button type="button" class="kqht-btn-outline" onclick="closePortalComplaintModal()">Hủy</button>
+                <button type="submit" id="cpSubmitBtn" class="kqht-btn-primary">Gửi khiếu nại</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 2: XEM CHI TIẾT & PHẢN HỒI CỦA GIẢNG VIÊN -->
+<div id="portalFeedbackModal" class="kqht-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+    <div class="kqht-modal">
+        <div class="kqht-modal-header">
+            <h3 id="feedbackModalTitle">💬 Chi tiết phản hồi đơn khiếu nại</h3>
+            <button type="button" class="kqht-modal-close" onclick="closePortalFeedbackModal()">&times;</button>
+        </div>
+        <div class="kqht-modal-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; font-size:13px;">
+                <div>
+                    <span style="color:var(--color-text-muted); display:block;">Lớp học phần:</span>
+                    <strong id="fbMaLHP" class="col-mono"></strong>
+                </div>
+                <div>
+                    <span style="color:var(--color-text-muted); display:block;">Trạng thái:</span>
+                    <strong id="fbStatus"></strong>
+                </div>
+                <div>
+                    <span style="color:var(--color-text-muted); display:block;">Cột điểm:</span>
+                    <strong id="fbLoaiDiem"></strong>
+                </div>
+                <div>
+                    <span style="color:var(--color-text-muted); display:block;">Thời gian gửi:</span>
+                    <strong id="fbNgayGui" class="col-mono"></strong>
+                </div>
+            </div>
+
+            <div class="kqht-form-group">
+                <label>Học phần &amp; Giảng viên phụ trách</label>
+                <div id="fbTenMon" style="padding:9px 12px; border-radius:8px; background:var(--color-surface-header); font-weight:600; font-size:13.5px;"></div>
+            </div>
+
+            <div class="kqht-form-group">
+                <label>Lý do khiếu nại của bạn</label>
+                <div id="fbLyDo" style="padding:10px 12px; border-radius:8px; background:var(--color-surface-header); font-size:13.5px; white-space:pre-wrap;"></div>
+            </div>
+
+            <div class="kqht-form-group" style="margin-bottom:0;">
+                <label style="color:var(--color-primary);">Phản hồi từ Giảng viên / Khoa</label>
+                <div id="fbPhanHoi" style="padding:12px; border-radius:8px; background:rgba(59,130,246,0.09); border:1px solid rgba(59,130,246,0.28); font-size:13.5px; font-weight:600; white-space:pre-wrap;"></div>
+            </div>
+        </div>
+        <div class="kqht-modal-footer">
+            <button type="button" id="fbNewAppealBtn" class="kqht-btn-outline" style="display:none;">Gửi đơn phúc khảo mới</button>
+            <button type="button" class="kqht-btn-primary" onclick="closePortalFeedbackModal()">Đóng</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function switchPortalKqhtTab(tabKey) {
+        document.querySelectorAll('.kqht-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab-target') === tabKey);
+        });
+        document.querySelectorAll('.kqht-tab-pane').forEach(pane => {
+            pane.classList.toggle('active', pane.id === `tab-pane-${tabKey}`);
+        });
+        const url = new URL(window.location.href);
+        if (tabKey === 'ket-qua') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', tabKey);
+        window.history.replaceState({}, '', url.toString());
+    }
+
+    (function initTabFromHash() {
+        const hash = (window.location.hash || '').toLowerCase();
+        if (hash === '#lich-su-khieu-nai') {
+            switchPortalKqhtTab('khieu-nai');
+        } else if (hash === '#ho-so-sinh-vien' || hash === '#ho-so') {
+            switchPortalKqhtTab('ho-so');
+        }
+    })();
+
+    function filterPortalGradeRows(keyword) {
+        const q = (keyword || '').trim().toLowerCase();
+        document.querySelectorAll('.kqht-course-row').forEach(row => {
+            const text = row.getAttribute('data-search') || '';
+            row.style.display = (!q || text.includes(q)) ? '' : 'none';
+        });
+    }
+
+    function openPortalComplaintModal(maSV, maLHP, maMon, tenMon, gvDisplay) {
+        document.getElementById('cpMaSV').value = maSV;
+        document.getElementById('cpMaLHP').value = maLHP;
+        document.getElementById('cpStudentDisplay').value = `${maSV} - @Html.Raw((Model.HoTen ?? "").Replace("'", "\\'"))`;
+        document.getElementById('cpCourseDisplay').value = `${tenMon} (${maMon}) — Lớp HP: ${maLHP}`;
+        document.getElementById('cpLecturerDisplay').value = gvDisplay || 'Chưa phân công giảng viên';
+        document.getElementById('cpLoaiDiem').value = 'thiLan1';
+        document.getElementById('cpLyDo').value = '';
+        const err = document.getElementById('cpErrorMsg');
+        err.style.display = 'none';
+        err.textContent = '';
+        document.getElementById('portalComplaintModal').classList.add('open');
+    }
+
+    function closePortalComplaintModal() {
+        document.getElementById('portalComplaintModal').classList.remove('open');
+    }
+
+    async function submitPortalComplaint(e) {
+        e.preventDefault();
+        const maSV = document.getElementById('cpMaSV').value.trim();
+        const maLHP = document.getElementById('cpMaLHP').value.trim();
+        const loaiDiem = document.getElementById('cpLoaiDiem').value;
+        const lyDo = document.getElementById('cpLyDo').value.trim();
+        const err = document.getElementById('cpErrorMsg');
+        const btn = document.getElementById('cpSubmitBtn');
+
+        if (!lyDo) {
+            err.textContent = 'Vui lòng nhập lý do khiếu nại chi tiết.';
+            err.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Đang gửi...';
+        err.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/khieunai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ maSV, maLHP, loaiDiem, lyDo })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                err.textContent = data.message || 'Không thể gửi đơn khiếu nại. Vui lòng thử lại.';
+                err.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Gửi khiếu nại';
+                return;
+            }
+            closePortalComplaintModal();
+            window.location.reload();
+        } catch (ex) {
+            err.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Gửi khiếu nại';
+        }
+    }
+
+    function openPortalFeedbackModal(id) {
+        const btn = document.querySelector(`[data-cp-id="${id}"]`);
+        if (!btn) return;
+        const mon = btn.getAttribute('data-cp-mon') || '';
+        const gv = btn.getAttribute('data-cp-gv') || '';
+        document.getElementById('fbMaLHP').textContent = btn.getAttribute('data-cp-lhp') || '';
+        document.getElementById('fbStatus').textContent = btn.getAttribute('data-cp-status') || '';
+        document.getElementById('fbLoaiDiem').textContent = btn.getAttribute('data-cp-loai') || '';
+        document.getElementById('fbNgayGui').textContent = btn.getAttribute('data-cp-ngay') || '';
+        document.getElementById('fbTenMon').textContent = gv ? `${mon} — GV: ${gv}` : mon;
+        document.getElementById('fbLyDo').textContent = btn.getAttribute('data-cp-lydo') || '';
+        document.getElementById('fbPhanHoi').textContent = btn.getAttribute('data-cp-phanhoi') || '';
+
+        const rawStatus = (btn.getAttribute('data-cp-status-raw') || '').toLowerCase();
+        const newBtn = document.getElementById('fbNewAppealBtn');
+        if (rawStatus && rawStatus !== 'pending') {
+            newBtn.style.display = 'inline-flex';
+            newBtn.onclick = function () {
+                closePortalFeedbackModal();
+                openPortalComplaintModal(
+                    btn.getAttribute('data-cp-masv'),
+                    btn.getAttribute('data-cp-lhp'),
+                    btn.getAttribute('data-cp-mamon'),
+                    btn.getAttribute('data-cp-tenmon'),
+                    btn.getAttribute('data-cp-gv')
+                );
+            };
+        } else {
+            newBtn.style.display = 'none';
+        }
+
+        document.getElementById('portalFeedbackModal').classList.add('open');
+    }
+
+    function closePortalFeedbackModal() {
+        document.getElementById('portalFeedbackModal').classList.remove('open');
+    }
+
+    async function submitStudentProfileUpdate(e) {
+        e.preventDefault();
+        const btn = document.getElementById('pfSubmitBtn');
+        const alertBox = document.getElementById('pfAlertBox');
+        alertBox.className = 'kqht-alert-box';
+        alertBox.textContent = '';
+
+        const payload = {
+            maSV: document.getElementById('pfMaSV').value.trim(),
+            ngaySinh: document.getElementById('pfNgaySinh').value || null,
+            gioiTinh: document.getElementById('pfGioiTinh').value,
+            cccd: document.getElementById('pfCCCD').value.trim(),
+            sdt: document.getElementById('pfSDT').value.trim(),
+            email: document.getElementById('pfEmail').value.trim(),
+            diaChi: document.getElementById('pfDiaChi').value.trim()
+        };
+
+        btn.disabled = true;
+        btn.textContent = 'Đang lưu...';
+
+        try {
+            const res = await fetch('/Portal/CapNhatHoSo', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status === 'error') {
+                alertBox.className = 'kqht-alert-box error';
+                alertBox.textContent = data.message || 'Không thể cập nhật thông tin hồ sơ.';
+            } else {
+                alertBox.className = 'kqht-alert-box success';
+                alertBox.textContent = data.message || 'Đã cập nhật thông tin cá nhân thành công!';
+            }
+        } catch (err) {
+            alertBox.className = 'kqht-alert-box error';
+            alertBox.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '💾 Lưu thông tin cá nhân';
+        }
+    }
+
+    async function submitStudentPasswordChange(e) {
+        e.preventDefault();
+        const btn = document.getElementById('pwSubmitBtn');
+        const alertBox = document.getElementById('pwAlertBox');
+        alertBox.className = 'kqht-alert-box';
+        alertBox.textContent = '';
+
+        const currentPassword = document.getElementById('pwCurrent').value;
+        const newPassword = document.getElementById('pwNew').value;
+        const confirmPassword = document.getElementById('pwConfirm').value;
+
+        if (newPassword !== confirmPassword) {
+            alertBox.className = 'kqht-alert-box error';
+            alertBox.textContent = 'Mật khẩu mới và xác nhận mật khẩu không khớp!';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Đang xử lý...';
+
+        try {
+            const res = await fetch('/Portal/DoiMatKhau', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.status === 'error') {
+                alertBox.className = 'kqht-alert-box error';
+                alertBox.textContent = data.message || 'Không thể đổi mật khẩu.';
+            } else {
+                alertBox.className = 'kqht-alert-box success';
+                alertBox.textContent = data.message || 'Đổi mật khẩu thành công!';
+                document.getElementById('portalPasswordForm').reset();
+            }
+        } catch (err) {
+            alertBox.className = 'kqht-alert-box error';
+            alertBox.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔑 Cập nhật mật khẩu';
+        }
+    }
+</script>
+}

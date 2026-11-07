@@ -286,7 +286,12 @@
                 currentFilteredSv = allStudents;
 
                 populateFilterOptions();
-                renderStudentResultsTable();
+                await renderStudentResultsTable();
+
+                const urlMaSV = new URLSearchParams(window.location.search).get('maSV');
+                if (urlMaSV) {
+                    await viewStudentDetail(urlMaSV.trim());
+                }
 
                 // Cho phép nhấn Enter trên ô tìm kiếm
                 document.getElementById('tc-filter-keyword').addEventListener('keydown', (e) => {
