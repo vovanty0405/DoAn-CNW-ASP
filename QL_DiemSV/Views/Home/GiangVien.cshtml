@@ -26,8 +26,8 @@
         </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <!-- Filter & Sort Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
             <input id="gv-search" oninput="renderGvTable()" type="text" placeholder="Tìm Mã GV, Họ tên, Email..."
@@ -44,6 +44,16 @@
             <option value="Phó Giáo sư">Phó Giáo sư</option>
             <option value="Giáo sư">Giáo sư</option>
         </select>
+        <select id="gv-sort" onchange="onGvSortDropdownChange(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none font-medium">
+            <option value="magv_asc">Sắp xếp: Mã GV tăng dần</option>
+            <option value="magv_desc">Sắp xếp: Mã GV giảm dần</option>
+            <option value="newest">Sắp xếp: Mới nhất</option>
+            <option value="oldest">Sắp xếp: Cũ nhất</option>
+            <option value="hoten_asc">Sắp xếp: Họ tên (A → Z)</option>
+            <option value="hoten_desc">Sắp xếp: Họ tên (Z → A)</option>
+            <option value="khoa_asc">Sắp xếp: Khoa (A → Z)</option>
+            <option value="hocvi_asc">Sắp xếp: Học vị</option>
+        </select>
     </div>
 
     <!-- Table -->
@@ -51,12 +61,22 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider">
-                        <th class="px-5 py-3.5 font-semibold">Mã GV</th>
-                        <th class="px-5 py-3.5 font-semibold">Họ và Tên</th>
-                        <th class="px-5 py-3.5 font-semibold">Học vị</th>
-                        <th class="px-5 py-3.5 font-semibold">Khoa trực thuộc</th>
-                        <th class="px-5 py-3.5 font-semibold">Email & Điện thoại</th>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider select-none">
+                        <th onclick="sortGvByColumn('magv')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Mã GV <span id="gv-sort-icon-magv" class="text-primary">🔼</span></span>
+                        </th>
+                        <th onclick="sortGvByColumn('hoten')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Họ và Tên <span id="gv-sort-icon-hoten" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortGvByColumn('hocvi')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Học vị <span id="gv-sort-icon-hocvi" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortGvByColumn('khoa')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Khoa trực thuộc <span id="gv-sort-icon-khoa" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortGvByColumn('email')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Email &amp; Điện thoại <span id="gv-sort-icon-email" class="text-text-muted/40">↕</span></span>
+                        </th>
                         <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                     </tr>
                 </thead>
@@ -241,18 +261,73 @@
     <script>
         let gvList = [], khoas = [], editingMaGV = null, editingMaKhoa = null;
         let gvCurrentPage = 1, gvPageSize = 10;
+        let gvSortCol = 'magv', gvSortDir = 'asc';
         let pendingDeleteAction = null;
 
         async function loadData() {
-            const [resGv, resKhoa] = await Promise.all([apiFetch('/api/giangvien'), apiFetch('/api/khoa')]);
+            const sortVal = document.getElementById('gv-sort')?.value || 'magv_asc';
+            const [resGv, resKhoa] = await Promise.all([
+                apiFetch(`/api/giangvien?sort=${encodeURIComponent(sortVal)}`),
+                apiFetch('/api/khoa')
+            ]);
             gvList = resGv.data || [];
             khoas = resKhoa.data || [];
 
+            const prevGvKhoa = document.getElementById('gv-khoa').value;
             document.getElementById('gv-khoa').innerHTML = '<option value="">Tất cả Khoa</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+            document.getElementById('gv-khoa').value = prevGvKhoa;
             document.getElementById('g-makhoa').innerHTML = khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
 
             renderGvTable();
             renderKhoaTable();
+        }
+
+        async function onGvSortDropdownChange(val) {
+            if (val === 'newest' || val === 'oldest') {
+                gvSortCol = '';
+            } else {
+                const parts = val.split('_');
+                gvSortCol = parts[0] || 'magv';
+                gvSortDir = parts[1] || 'asc';
+            }
+            updateGvSortIcons();
+            const resGv = await apiFetch(`/api/giangvien?sort=${encodeURIComponent(val)}`);
+            gvList = resGv.data || [];
+            gvCurrentPage = 1;
+            renderGvTable();
+        }
+
+        async function sortGvByColumn(col) {
+            if (gvSortCol === col) {
+                gvSortDir = gvSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                gvSortCol = col;
+                gvSortDir = 'asc';
+            }
+            const sortKey = `${gvSortCol}_${gvSortDir}`;
+            const selectEl = document.getElementById('gv-sort');
+            if (selectEl && [...selectEl.options].some(o => o.value === sortKey)) {
+                selectEl.value = sortKey;
+            }
+            updateGvSortIcons();
+            const resGv = await apiFetch(`/api/giangvien?sort=${encodeURIComponent(sortKey)}`);
+            gvList = resGv.data || [];
+            gvCurrentPage = 1;
+            renderGvTable();
+        }
+
+        function updateGvSortIcons() {
+            ['magv', 'hoten', 'hocvi', 'khoa', 'email'].forEach(c => {
+                const el = document.getElementById(`gv-sort-icon-${c}`);
+                if (!el) return;
+                if (c === gvSortCol) {
+                    el.textContent = gvSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
         }
 
         function getFilteredGv() {

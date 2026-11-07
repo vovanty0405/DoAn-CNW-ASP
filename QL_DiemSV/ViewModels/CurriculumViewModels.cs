@@ -12,6 +12,11 @@ public class CurriculumEditViewModel {
  public List<Nganh> Majors {get;set;}=new();
 }
 public class CurriculumCatalogViewModel {
+ public Dictionary<int,int> SectionCounts {get;set;}=new();
+ public int Page {get;set;}=1;
+ public int PageSize {get;set;}=20;
+ public int Total {get;set;}
+ public int TotalPages => Math.Max(1,(Total+PageSize-1)/PageSize);
  public List<Curriculum> All {get;set;}=new();
  public List<Curriculum> Visible {get;set;}=new();
  public string? System {get;set;}

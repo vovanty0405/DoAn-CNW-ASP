@@ -19,21 +19,30 @@
         </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <!-- Filter & Sort Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="mh-search" oninput="renderMhTable()" type="text" placeholder="Tìm Mã môn, Tên môn học..."
+            <input id="mh-search" oninput="renderMhTable(true)" type="text" placeholder="Tìm Mã môn, Tên môn học..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
         </div>
-        <select id="mh-khoa" onchange="renderMhTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="mh-khoa" onchange="renderMhTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Khoa phụ trách</option>
         </select>
-        <select id="mh-tc" onchange="renderMhTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="mh-tc" onchange="renderMhTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Số tín chỉ</option>
             <option value="2">2 Tín chỉ</option>
             <option value="3">3 Tín chỉ</option>
             <option value="4">4 Tín chỉ</option>
+        </select>
+        <select id="mh-sort" onchange="onMhSortDropdownChange(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary font-medium">
+            <option value="mamon_asc">Sắp xếp: Mã môn tăng dần</option>
+            <option value="mamon_desc">Sắp xếp: Mã môn giảm dần</option>
+            <option value="tenmon_asc">Sắp xếp: Tên môn (A → Z)</option>
+            <option value="tenmon_desc">Sắp xếp: Tên môn (Z → A)</option>
+            <option value="sotc_desc">Sắp xếp: Số tín chỉ (Cao → Thấp)</option>
+            <option value="sotc_asc">Sắp xếp: Số tín chỉ (Thấp → Cao)</option>
+            <option value="khoa_asc">Sắp xếp: Khoa phụ trách (A → Z)</option>
         </select>
     </div>
 
@@ -42,12 +51,22 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
-                        <th class="px-5 py-3.5 font-semibold">Mã Môn</th>
-                        <th class="px-5 py-3.5 font-semibold">Tên Môn Học</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Tín chỉ</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">LT / TH</th>
-                        <th class="px-5 py-3.5 font-semibold">Khoa quản lý</th>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase select-none">
+                        <th onclick="sortMhByColumn('mamon')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Mã Môn <span id="mh-sort-icon-mamon" class="text-primary">🔼</span></span>
+                        </th>
+                        <th onclick="sortMhByColumn('tenmon')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Tên Môn Học <span id="mh-sort-icon-tenmon" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortMhByColumn('sotc')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Tín chỉ <span id="mh-sort-icon-sotc" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortMhByColumn('lt')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">LT / TH <span id="mh-sort-icon-lt" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortMhByColumn('khoa')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Khoa quản lý <span id="mh-sort-icon-khoa" class="text-text-muted/40">↕</span></span>
+                        </th>
                         <th class="px-5 py-3.5 font-semibold">Môn Tiên Quyết</th>
                         <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                     </tr>
@@ -229,15 +248,22 @@
     <script>
         let mhList = [], khoas = [], editingMaMon = null;
         let mhCurrentPage = 1, mhPageSize = 10;
+        let mhSortCol = 'mamon', mhSortDir = 'asc';
         let selectedPrereqSet = new Set();
 
         async function loadData() {
             try {
-                const [resMh, resKhoa] = await Promise.all([apiFetch('/api/monhoc'), apiFetch('/api/khoa')]);
+                const sortVal = document.getElementById('mh-sort')?.value || 'mamon_asc';
+                const [resMh, resKhoa] = await Promise.all([
+                    apiFetch(`/api/monhoc?sort=${encodeURIComponent(sortVal)}`),
+                    apiFetch('/api/khoa')
+                ]);
                 mhList = resMh.data || [];
                 khoas = resKhoa.data || [];
 
+                const prevMhKhoa = document.getElementById('mh-khoa').value;
                 document.getElementById('mh-khoa').innerHTML = '<option value="">Tất cả Khoa phụ trách</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+                document.getElementById('mh-khoa').value = prevMhKhoa;
                 document.getElementById('mh-makhoa').innerHTML = khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
                 
                 const prereqFilter = document.getElementById('prereq-khoa-filter');
@@ -249,6 +275,48 @@
             } catch (err) {
                 showToast('Lỗi khi tải dữ liệu: ' + err.message, 'error');
             }
+        }
+
+        async function onMhSortDropdownChange(val) {
+            const parts = val.split('_');
+            mhSortCol = parts[0] || 'mamon';
+            mhSortDir = parts[1] || 'asc';
+            updateMhSortIcons();
+            const resMh = await apiFetch(`/api/monhoc?sort=${encodeURIComponent(val)}`);
+            mhList = resMh.data || [];
+            renderMhTable(true);
+        }
+
+        async function sortMhByColumn(col) {
+            if (mhSortCol === col) {
+                mhSortDir = mhSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                mhSortCol = col;
+                mhSortDir = 'asc';
+            }
+            const sortKey = `${mhSortCol}_${mhSortDir}`;
+            const selectEl = document.getElementById('mh-sort');
+            if (selectEl && [...selectEl.options].some(o => o.value === sortKey)) {
+                selectEl.value = sortKey;
+            }
+            updateMhSortIcons();
+            const resMh = await apiFetch(`/api/monhoc?sort=${encodeURIComponent(sortKey)}`);
+            mhList = resMh.data || [];
+            renderMhTable(true);
+        }
+
+        function updateMhSortIcons() {
+            ['mamon', 'tenmon', 'sotc', 'lt', 'khoa'].forEach(c => {
+                const el = document.getElementById(`mh-sort-icon-${c}`);
+                if (!el) return;
+                if (c === mhSortCol) {
+                    el.textContent = mhSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
         }
 
         function getFilteredMh() {

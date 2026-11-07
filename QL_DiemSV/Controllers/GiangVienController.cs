@@ -18,7 +18,7 @@ public class GiangVienController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa)
+    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? sort = null)
     {
         var query = _db.GiangViens
             .Include(g => g.Khoa)
@@ -29,7 +29,23 @@ public class GiangVienController : ControllerBase
             query = query.Where(g => g.MaKhoa == maKhoa);
         }
 
-        var data = await query.OrderBy(g => g.MaGV).ToListAsync();
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "newest" => query.OrderByDescending(g => g.UserID).ThenByDescending(g => g.MaGV),
+            "oldest" => query.OrderBy(g => g.UserID).ThenBy(g => g.MaGV),
+            "magv_desc" => query.OrderByDescending(g => g.MaGV),
+            "hoten_asc" => query.OrderBy(g => g.HoTen).ThenBy(g => g.MaGV),
+            "hoten_desc" => query.OrderByDescending(g => g.HoTen).ThenByDescending(g => g.MaGV),
+            "hocvi_asc" => query.OrderBy(g => g.HocVi).ThenBy(g => g.MaGV),
+            "hocvi_desc" => query.OrderByDescending(g => g.HocVi).ThenByDescending(g => g.MaGV),
+            "khoa_asc" => query.OrderBy(g => g.Khoa!.TenKhoa).ThenBy(g => g.MaGV),
+            "khoa_desc" => query.OrderByDescending(g => g.Khoa!.TenKhoa).ThenByDescending(g => g.MaGV),
+            "email_asc" => query.OrderBy(g => g.Email).ThenBy(g => g.MaGV),
+            "email_desc" => query.OrderByDescending(g => g.Email).ThenByDescending(g => g.MaGV),
+            _ => query.OrderBy(g => g.MaGV)
+        };
+
+        var data = await query.ToListAsync();
         return Ok(new { status = "success", data });
     }
 

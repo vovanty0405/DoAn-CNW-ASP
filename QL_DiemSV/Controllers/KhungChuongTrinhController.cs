@@ -20,7 +20,7 @@ public class KhungChuongTrinhController : ControllerBase
     }
 
     [HttpGet("{maNganh}")]
-    public async Task<IActionResult> GetByNganh(string maNganh)
+    public async Task<IActionResult> GetByNganh(string maNganh, [FromQuery] string? sort = null)
     {
         var quyDinh = await _db.QuyDinhTotNghieps.FindAsync(maNganh);
         if (quyDinh == null)
@@ -36,8 +36,21 @@ public class KhungChuongTrinhController : ControllerBase
         }
 
         var subjects = (await _catalog.GetAsync()).ToDictionary(m => m.MaMon);
-        var danhSachMon = await _db.KhungChuongTrinhs.AsNoTracking()
-            .Where(k => k.MaNganh == maNganh).OrderBy(k => k.HocKyDuKien).ThenBy(k => k.MaMon)
+        var query = _db.KhungChuongTrinhs.AsNoTracking().Where(k => k.MaNganh == maNganh);
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "newest" => query.OrderBy(k => k.HocKyDuKien).ThenByDescending(k => k.ID),
+            "oldest" => query.OrderBy(k => k.HocKyDuKien).ThenBy(k => k.ID),
+            "mamon_desc" => query.OrderBy(k => k.HocKyDuKien).ThenByDescending(k => k.MaMon),
+            "tenmon_asc" => query.OrderBy(k => k.HocKyDuKien).ThenBy(k => k.MonHoc!.TenMon).ThenBy(k => k.MaMon),
+            "tenmon_desc" => query.OrderBy(k => k.HocKyDuKien).ThenByDescending(k => k.MonHoc!.TenMon).ThenByDescending(k => k.MaMon),
+            "sotc_asc" => query.OrderBy(k => k.HocKyDuKien).ThenBy(k => k.MonHoc!.SoTinChi).ThenBy(k => k.MaMon),
+            "sotc_desc" => query.OrderBy(k => k.HocKyDuKien).ThenByDescending(k => k.MonHoc!.SoTinChi).ThenByDescending(k => k.MaMon),
+            "loai_asc" => query.OrderBy(k => k.HocKyDuKien).ThenBy(k => k.LoaiMon).ThenBy(k => k.MaMon),
+            "loai_desc" => query.OrderBy(k => k.HocKyDuKien).ThenByDescending(k => k.LoaiMon).ThenByDescending(k => k.MaMon),
+            _ => query.OrderBy(k => k.HocKyDuKien).ThenBy(k => k.MaMon)
+        };
+        var danhSachMon = await query
             .Select(k => new KhungChuongTrinh { ID = k.ID, MaNganh = k.MaNganh, MaMon = k.MaMon, HocKyDuKien = k.HocKyDuKien, LoaiMon = k.LoaiMon })
             .ToListAsync();
         foreach (var row in danhSachMon) row.MonHoc = subjects.GetValueOrDefault(row.MaMon);

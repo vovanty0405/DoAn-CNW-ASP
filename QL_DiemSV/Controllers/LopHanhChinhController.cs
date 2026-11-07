@@ -18,11 +18,28 @@ public class LopHanhChinhController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maNganh)
+    public async Task<IActionResult> GetAll([FromQuery] string? maNganh, [FromQuery] string? sort = null)
     {
         var query = _db.LopHanhChinhs.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(l => l.MaNganh == maNganh);
-        var data = await query.OrderBy(l => l.MaLop).Select(l => new
+
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "malop_desc" => query.OrderByDescending(l => l.MaLop),
+            "tenlop_asc" => query.OrderBy(l => l.TenLop).ThenBy(l => l.MaLop),
+            "tenlop_desc" => query.OrderByDescending(l => l.TenLop).ThenByDescending(l => l.MaLop),
+            "nienkhoa_desc" or "newest" => query.OrderByDescending(l => l.NienKhoa).ThenByDescending(l => l.MaLop),
+            "nienkhoa_asc" or "oldest" => query.OrderBy(l => l.NienKhoa).ThenBy(l => l.MaLop),
+            "nganh_asc" => query.OrderBy(l => l.Nganh!.TenNganh).ThenBy(l => l.MaLop),
+            "nganh_desc" => query.OrderByDescending(l => l.Nganh!.TenNganh).ThenByDescending(l => l.MaLop),
+            "gvcn_asc" => query.OrderBy(l => l.GiangVien!.HoTen).ThenBy(l => l.MaLop),
+            "gvcn_desc" => query.OrderByDescending(l => l.GiangVien!.HoTen).ThenByDescending(l => l.MaLop),
+            "siso_desc" => query.OrderByDescending(l => l.SinhViens.Count()).ThenBy(l => l.MaLop),
+            "siso_asc" => query.OrderBy(l => l.SinhViens.Count()).ThenBy(l => l.MaLop),
+            _ => query.OrderBy(l => l.MaLop)
+        };
+
+        var data = await query.Select(l => new
         {
             l.MaLop, l.TenLop, l.NienKhoa, l.MaNganh, l.MaGVCN,
             Nganh = l.Nganh == null ? null : new { l.Nganh.MaNganh, l.Nganh.TenNganh, l.Nganh.MaKhoa,

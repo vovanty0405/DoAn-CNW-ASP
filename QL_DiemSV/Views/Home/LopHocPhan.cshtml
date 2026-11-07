@@ -20,8 +20,8 @@
     </div>
 
     <a href="/quan-ly-lich-hoc" class="inline-block px-4 py-2 rounded-xl bg-primary text-white">Sắp xếp lịch học & Ma trận phòng</a>
-    <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <!-- Filter & Sort Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
             <input id="lhp-search" oninput="queueLhpSearch()" type="text" placeholder="Tìm Mã LHP, Tên lớp, Phòng..."
@@ -36,6 +36,17 @@
         <select id="lhp-gv" onchange="renderLhpTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Giảng viên</option>
         </select>
+        <select id="lhp-sort" onchange="onLhpSortDropdownChange(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary font-medium">
+            <option value="malhp_asc">Sắp xếp: Mã LHP tăng dần</option>
+            <option value="malhp_desc">Sắp xếp: Mã LHP giảm dần</option>
+            <option value="newest">Sắp xếp: Mới nhất</option>
+            <option value="oldest">Sắp xếp: Cũ nhất</option>
+            <option value="tenlhp_asc">Sắp xếp: Tên lớp (A → Z)</option>
+            <option value="tenlhp_desc">Sắp xếp: Tên lớp (Z → A)</option>
+            <option value="siso_desc">Sắp xếp: Sĩ số (Cao → Thấp)</option>
+            <option value="siso_asc">Sắp xếp: Sĩ số (Thấp → Cao)</option>
+            <option value="gv_asc">Sắp xếp: Giảng viên (A → Z)</option>
+        </select>
     </div>
 
     <!-- Table -->
@@ -43,14 +54,28 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
-                        <th class="px-5 py-3.5 font-semibold">Mã LHP</th>
-                        <th class="px-5 py-3.5 font-semibold">Tên Lớp Học Phần / Môn</th>
-                        <th class="px-5 py-3.5 font-semibold">Học kỳ</th>
-                        <th class="px-5 py-3.5 font-semibold">Giảng viên</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Phòng</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Sĩ số</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Trạng thái</th>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase select-none">
+                        <th onclick="sortLhpByColumn('malhp')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Mã LHP <span id="lhp-sort-icon-malhp" class="text-primary">🔼</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('tenlhp')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Tên Lớp Học Phần / Môn <span id="lhp-sort-icon-tenlhp" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('hocky')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Học kỳ <span id="lhp-sort-icon-hocky" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('gv')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Giảng viên <span id="lhp-sort-icon-gv" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('phong')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Phòng <span id="lhp-sort-icon-phong" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('siso')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Sĩ số <span id="lhp-sort-icon-siso" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhpByColumn('trangthai')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Trạng thái <span id="lhp-sort-icon-trangthai" class="text-text-muted/40">↕</span></span>
+                        </th>
                         <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                     </tr>
                 </thead>
@@ -280,9 +305,53 @@
     <script>
         let lhpList = [], hks = [], mons = [], gvs = [], editingMaLHP = null, activeEnrollLHP = null, editingMaHK = null;
         let lhpCurrentPage = 1, lhpPageSize = 10;
+        let lhpSortCol = 'malhp', lhpSortDir = 'asc', lhpSortParam = 'malhp_asc';
         let pendingDeleteAction = null;
         let lhpRequest = 0, lhpSearchTimer;
         function queueLhpSearch() { clearTimeout(lhpSearchTimer); lhpSearchTimer = setTimeout(() => renderLhpTable(true), 250); }
+
+        function onLhpSortDropdownChange(val) {
+            lhpSortParam = val;
+            if (val === 'newest') { lhpSortCol = 'malhp'; lhpSortDir = 'desc'; }
+            else if (val === 'oldest') { lhpSortCol = 'malhp'; lhpSortDir = 'asc'; }
+            else {
+                const parts = val.split('_');
+                lhpSortCol = parts[0] || 'malhp';
+                lhpSortDir = parts[1] || 'asc';
+            }
+            updateLhpSortIcons();
+            renderLhpTable(true);
+        }
+
+        function sortLhpByColumn(col) {
+            if (lhpSortCol === col) {
+                lhpSortDir = lhpSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                lhpSortCol = col;
+                lhpSortDir = 'asc';
+            }
+            lhpSortParam = `${lhpSortCol}_${lhpSortDir}`;
+            const selectEl = document.getElementById('lhp-sort');
+            if (selectEl && [...selectEl.options].some(o => o.value === lhpSortParam)) {
+                selectEl.value = lhpSortParam;
+            }
+            updateLhpSortIcons();
+            renderLhpTable(true);
+        }
+
+        function updateLhpSortIcons() {
+            ['malhp', 'tenlhp', 'hocky', 'gv', 'phong', 'siso', 'trangthai'].forEach(c => {
+                const el = document.getElementById(`lhp-sort-icon-${c}`);
+                if (!el) return;
+                if (c === lhpSortCol) {
+                    el.textContent = lhpSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
+        }
 
         async function loadData() {
             const selectedTerm = document.getElementById("lhp-hk").value;
@@ -316,7 +385,8 @@
                 maHK: document.getElementById('lhp-hk').value,
                 maMon: document.getElementById('lhp-mon').value,
                 maGV: document.getElementById('lhp-gv').value,
-                search: document.getElementById('lhp-search').value.trim()
+                search: document.getElementById('lhp-search').value.trim(),
+                sort: lhpSortParam
             });
             let response;
             try { response = await apiFetch('/api/lophocphan?' + params); }

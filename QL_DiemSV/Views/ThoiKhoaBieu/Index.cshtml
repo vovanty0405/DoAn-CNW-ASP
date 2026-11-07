@@ -185,14 +185,18 @@
         }
         else
         {
-            var byDay = Enumerable.Range(2, 7).ToDictionary(d => d, d => RoomMatrixRules.Blocks(lessons.Where(x => x.Thu == d)));
-            <div class="scroll">
-                <table class="grid-table">
+            var byDay = Enumerable.Range(2, 7).ToDictionary(d => d, d => TimetableLayout.Lanes(lessons.Where(x => x.Thu == d)));
+            var conflicts = lessons.ToDictionary(x => x, x => TimetableLayout.ConflictLabel(x, lessons));
+            var columnCount = byDay.Values.Sum(lanes => lanes.Count);
+            var hasParallelLessons = byDay.Values.Any(lanes => lanes.Count > 1);
+            if(hasParallelLessons){<p class="notice muted">Các buổi học cùng giờ được đặt cạnh nhau trong từng ngày. Chỉ cảnh báo khi trùng giảng viên hoặc phòng học. Có thể cuộn ngang để xem đầy đủ.</p>}
+            <div class="scroll parallel-schedule-wrap" tabindex="0" aria-label="Thời khóa biểu theo tuần, cuộn ngang để xem các buổi học đồng thời">
+                <table class="grid-table parallel-schedule" style="--schedule-width:@(hasParallelLessons ? 136 + columnCount * 190 : 850)px">
                     <colgroup>
                         <col style="width:68px" />
                         @for (int d = 2; d <= 8; d++)
                         {
-                            <col />
+                            foreach(var lane in byDay[d]){<col />}
                         }
                         <col style="width:68px" />
                     </colgroup>
@@ -201,7 +205,7 @@
                             <th>TIẾT</th>
                             @for (int d = 2; d <= 8; d++)
                             {
-                                <th>@ScheduleRules.DayName(d).ToUpper()</th>
+                                <th colspan="@byDay[d].Count" scope="colgroup" class="schedule-day-heading">@ScheduleRules.DayName(d).ToUpper()</th>
                             }
                             <th>TIẾT</th>
                         </tr>
@@ -210,34 +214,34 @@
                         @for (int tiet = 1; tiet <= 12; tiet++)
                         {
                             <tr>
-                                <th>Tiết @tiet</th>
+                                <th class="period-label">Tiết @tiet<small>@RoomMatrixRules.PeriodTime(tiet)</small></th>
                                 @for (int thu = 2; thu <= 8; thu++)
                                 {
-                                    var blocks = byDay[thu];
-                                    var block = blocks.FirstOrDefault(x => x.Start == tiet);
-                                    var covered = blocks.Any(x => x.Start < tiet && tiet < x.Start + x.Span);
-                                    if (block != null && !covered)
+                                    foreach (var lane in byDay[thu])
                                     {
-                                        <td rowspan="@block.Span" class="course" style="padding: 10px; vertical-align: top; text-align: left;">
-                                            @foreach (var mon in block.Lessons)
-                                            {
-                                                <div style="@(block.Lessons.Count > 1 ? "padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px dashed var(--color-surface-hover);" : "")">
-                                                    <strong style="font-size: 13px; color: var(--color-primary); margin-bottom: 2px;">
-                                                        @(mon.LopHocPhan?.MonHoc?.TenMon ?? mon.LopHocPhan?.TenLopHP)
-                                                    </strong>
-                                                    <div><b>@mon.MaLHP</b> • Nhóm @(mon.LopHocPhan?.NMH ?? "01")</div>
-                                                    <div>Phòng: <b>@mon.PhongHoc</b> • Tiết @mon.TietBatDau–@(mon.TietBatDau + mon.SoTiet - 1)</div>
-                                                    <div>@(mon.LoaiBuoiHoc ? "Thực hành" : "Lý thuyết") • @(mon.GiangVien?.HoTen ?? mon.MaGV)</div>
-                                                </div>
-                                            }
+                                        if (lane.Any(x => x.TietBatDau < tiet && tiet < x.TietBatDau + x.SoTiet)) { continue; }
+                                        var mon = lane.FirstOrDefault(x => x.TietBatDau == tiet);
+                                        if (mon == null)
+                                        {
+                                            <td class="schedule-empty">–</td>
+                                            continue;
+                                        }
+                                        var conflict = conflicts[mon];
+                                        <td rowspan="@mon.SoTiet" class="course @(conflict.Length > 0 ? "schedule-resource-conflict" : "")"
+                                            data-lesson-id="@mon.Id" data-start-period="@mon.TietBatDau" data-period-count="@mon.SoTiet" data-day="@thu"
+                                            style="--lesson-span:@mon.SoTiet">
+                                            <div class="schedule-course-card">
+                                                <strong>@(mon.LopHocPhan?.MonHoc?.TenMon ?? mon.LopHocPhan?.TenLopHP)</strong>
+                                                <div><b>@mon.MaLHP</b> · Nhóm @(mon.LopHocPhan?.NMH ?? "01")</div>
+                                                <div>Phòng: <b>@mon.PhongHoc</b></div>
+                                                <div class="schedule-course-time">Tiết @mon.TietBatDau–@(mon.TietBatDau + mon.SoTiet - 1) · @(mon.LoaiBuoiHoc ? "Thực hành" : "Lý thuyết")</div>
+                                                <div class="schedule-course-teacher">@(mon.GiangVien?.HoTen ?? mon.MaGV)</div>
+                                                @if(conflict.Length > 0){<span class="schedule-conflict-badge">@conflict</span>}
+                                            </div>
                                         </td>
                                     }
-                                    else if (!covered)
-                                    {
-                                        <td></td>
-                                    }
                                 }
-                                <th>Tiết @tiet</th>
+                                <th class="period-label">Tiết @tiet<small>@RoomMatrixRules.PeriodTime(tiet)</small></th>
                             </tr>
                         }
                     </tbody>
@@ -246,7 +250,7 @@
                             <th>TIẾT</th>
                             @for (int d = 2; d <= 8; d++)
                             {
-                                <th>@ScheduleRules.DayName(d).ToUpper()</th>
+                                <th colspan="@byDay[d].Count" scope="colgroup" class="schedule-day-heading">@ScheduleRules.DayName(d).ToUpper()</th>
                             }
                             <th>TIẾT</th>
                         </tr>

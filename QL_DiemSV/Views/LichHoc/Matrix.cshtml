@@ -56,9 +56,11 @@
         @if(tiet==1){<th rowspan="12" scope="rowgroup" class="room-label"><strong>@room.MaPhong</strong><small>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha,room.ToaNha)</small><small>@room.SucChua chỗ</small><span class="badge @(room.TrangThai=="HoatDong"?"active":room.TrangThai=="BaoTri"?"maintenance":"locked")">@RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai,room.TrangThai)</span></th>}
         <th scope="row" class="period-label">Tiết @tiet<small>@RoomMatrixRules.PeriodTime(tiet)</small></th>
         @for(int d=2;d<=8;d++){
-            var blocks=byDay[d];var block=blocks.FirstOrDefault(x=>x.Start==tiet);
+            var blocks=byDay[d];
+            if(blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){continue;}
+            var block=blocks.FirstOrDefault(x=>x.Start==tiet);
             if(block!=null){<td rowspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons,Model.SectionSizes)" /></td>}
-            else if(!blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){<td class="available-cell"><span aria-label="Trống">—</span></td>}
+            else{<td class="available-cell"><span aria-label="Trống">–</span></td>}
         }
         </tr>
     }

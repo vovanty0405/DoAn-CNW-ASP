@@ -41,11 +41,14 @@ var byDay=Enumerable.Range(2,7).ToDictionary(d=>d,d=>RoomMatrixRules.Blocks(Mode
 <div class="portal-table-wrap"><table class="portal-table lookup-grid enhanced-grid"><caption class="sr-only">Thời khóa biểu tuần @Model.Week của @Model.FullName</caption><colgroup><col class="period-column" />@for(int d=2;d<=8;d++){<col />}<col class="period-column" /></colgroup><thead><tr><th scope="col">TIẾT</th>@for(int day=2;day<=8;day++){<th scope="col">@ScheduleRules.DayName(day).ToUpper()<small>@Model.HocKy?.NgayBatDauTuan1?.AddDays((Model.Week-1)*7+day-2).ToString("dd/MM")</small></th>}<th scope="col">TIẾT</th></tr></thead><tbody>
 @for(int period=1;period<=12;period++){<tr><th scope="row" class="period-label">Tiết @period<small>@RoomMatrixRules.PeriodTime(period)</small></th>
 @for(int day=2;day<=8;day++){
-    var blocks=byDay[day];var block=blocks.FirstOrDefault(x=>x.Start==period);
+    var blocks=byDay[day];
+    // Covered periods belong to the TD rendered at the starting period.
+    if(blocks.Any(x=>x.Start<period&&period<x.Start+x.Span)){continue;}
+    var block=blocks.FirstOrDefault(x=>x.Start==period);
     if(block!=null){var state=block.Lessons.Count==1?Model.StatusClass(block.Lessons[0]):"mixed";<td rowspan="@block.Span" class="lookup-booking lesson-state state-@state">
     @foreach(var lesson in block.Lessons){var lessonState=Model.StatusClass(lesson);<div class="lesson-card state-@lessonState"><strong>@lesson.LopHocPhan?.MonHoc?.TenMon</strong><span class="lesson-room">Phòng: @lesson.PhongHoc</span><span>@lesson.MaLHP / Nhóm @lesson.LopHocPhan?.NMH</span><span>@lesson.GiangVien?.HoTen</span><span>@(lesson.LoaiBuoiHoc?"Thực hành":"Lý thuyết") · Tiết @lesson.TietBatDau–@(lesson.TietBatDau+lesson.SoTiet-1)</span>@if(lessonState!="normal"){<small class="lesson-status">@TimetablePresentation.StatusLabel(lessonState)</small>}</div>}
     </td>}
-    else if(!blocks.Any(x=>x.Start<period&&period<x.Start+x.Span)){<td class="lookup-empty">—</td>}
+    else{<td class="lookup-empty">–</td>}
 }
 <th class="period-label">Tiết @period<small>@RoomMatrixRules.PeriodTime(period)</small></th></tr>}
 </tbody><tfoot><tr><th>TIẾT</th>@for(int day=2;day<=8;day++){<th>@ScheduleRules.DayName(day).ToUpper()</th>}<th>TIẾT</th></tr></tfoot></table></div>

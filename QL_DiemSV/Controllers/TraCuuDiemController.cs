@@ -19,7 +19,7 @@ public class TraCuuDiemController : ControllerBase
     [HttpGet("{maSV}")]
     public async Task<IActionResult> TraCuuTheoMaSV(string maSV)
     {
-        var sv = await _db.SinhViens
+        var sv = await _db.SinhViens.AsNoTracking()
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
                     .ThenInclude(n => n!.Khoa)
@@ -40,11 +40,11 @@ public class TraCuuDiemController : ControllerBase
         int reqTCTuChon = quyDinh?.TCTuChon ?? 30;
         double reqMinGPA = quyDinh?.MinGPA ?? 2.0;
 
-        var khungCT = await _db.KhungChuongTrinhs
+        var khungCT = await _db.KhungChuongTrinhs.AsNoTracking()
             .Where(k => k.MaNganh == maNganh)
             .ToDictionaryAsync(k => k.MaMon, k => k.LoaiMon);
 
-        var ketQuas = await _db.KetQuaHocTaps
+        var ketQuas = await _db.KetQuaHocTaps.AsNoTracking()
             .Include(k => k.LopHocPhan)
                 .ThenInclude(l => l!.MonHoc)
             .Include(k => k.LopHocPhan)
@@ -52,8 +52,13 @@ public class TraCuuDiemController : ControllerBase
             .Where(k => k.MaSV == maSV && k.LopHocPhan != null && k.LopHocPhan.HocKy != null && k.LopHocPhan.MonHoc != null)
             .ToListAsync();
 
+        var completedSoFar = new List<QL_DiemSV.Models.KetQuaHocTap>();
         var groupedByHK = ketQuas
             .GroupBy(k => k.LopHocPhan!.MaHK!)
+            .OrderBy(g => g.First().LopHocPhan!.HocKy!.NamHocBatDau)
+            .ThenBy(g => TranscriptStatistics.TermOrder(g.First().LopHocPhan!.HocKy!))
+            .ThenBy(g => g.First().LopHocPhan!.HocKy!.NgayBatDauTuan1)
+            .ThenBy(g => g.Key)
             .Select(g =>
             {
                 var hk = g.First().LopHocPhan!.HocKy!;
@@ -87,16 +92,9 @@ public class TraCuuDiemController : ControllerBase
                     };
                 }).ToList();
 
-                var gradedCourses = danhSachMon.Where(m => m.DiemTongKet != null).ToList();
-                int tongTinChiHK = gradedCourses.Where(m => m.QuaMon).Sum(m => m.SoTinChi);
-                int totalCreditsAttemptedHK = gradedCourses.Sum(m => m.SoTinChi);
-
-                double gpaHKHe10 = totalCreditsAttemptedHK > 0
-                    ? Math.Round(gradedCourses.Sum(m => m.DiemTongKet!.Value * m.SoTinChi) / totalCreditsAttemptedHK, 2)
-                    : 0;
-                double gpaHKHe4 = totalCreditsAttemptedHK > 0
-                    ? Math.Round(gradedCourses.Sum(m => m.DiemHe4!.Value * m.SoTinChi) / totalCreditsAttemptedHK, 2)
-                    : 0;
+                var semesterTotals = TranscriptStatistics.Calculate(g);
+                completedSoFar.AddRange(g);
+                var accumulatedTotals = TranscriptStatistics.Calculate(completedSoFar, cumulative: true);
 
                 return new
                 {
@@ -104,14 +102,14 @@ public class TraCuuDiemController : ControllerBase
                     hk.TenHK,
                     NamHoc = $"{hk.NamHocBatDau} - {hk.NamHocKetThuc}",
                     hk.NamHocBatDau,
-                    TongTinChiHK = tongTinChiHK,
-                    GPA_HK_He10 = gpaHKHe10,
-                    GPA_HK_He4 = gpaHKHe4,
+                    TongTinChiHK = semesterTotals.TinChiDat,
+                    GPA_HK_He10 = semesterTotals.GPAHe10,
+                    GPA_HK_He4 = semesterTotals.GPAHe4,
+                    ThongKeHocKy = semesterTotals,
+                    TichLuyDenHocKy = accumulatedTotals,
                     DanhSachMon = danhSachMon
                 };
             })
-            .OrderBy(x => x.NamHocBatDau)
-            .ThenBy(x => x.MaHK)
             .ToList();
 
         // Tính tích lũy toàn khóa (lấy điểm cao nhất cho mỗi môn học)
@@ -127,7 +125,6 @@ public class TraCuuDiemController : ControllerBase
         int soMonNo = 0;
         int tcNo = 0;
 
-        double weightedSum10 = 0;
         double weightedSum4 = 0;
         int totalAttemptedCredits = 0;
 
@@ -140,7 +137,6 @@ public class TraCuuDiemController : ControllerBase
             string loaiMon = khungCT.ContainsKey(maMon) ? khungCT[maMon] : "Bắt buộc";
 
             totalAttemptedCredits += tc;
-            weightedSum10 += tk * tc;
             weightedSum4 += he4 * tc;
 
             if (tk >= 4.0)
@@ -156,18 +152,10 @@ public class TraCuuDiemController : ControllerBase
             }
         }
 
-        double gpaToanKhoa10 = totalAttemptedCredits > 0 ? Math.Round(weightedSum10 / totalAttemptedCredits, 2) : 0;
         double gpaToanKhoa4 = totalAttemptedCredits > 0 ? Math.Round(weightedSum4 / totalAttemptedCredits, 2) : 0;
 
-        string xepLoai = "Chưa xếp loại";
-        if (totalAttemptedCredits > 0)
-        {
-            if (gpaToanKhoa4 >= 3.6) xepLoai = "Xuất sắc";
-            else if (gpaToanKhoa4 >= 3.2) xepLoai = "Giỏi";
-            else if (gpaToanKhoa4 >= 2.5) xepLoai = "Khá";
-            else if (gpaToanKhoa4 >= 2.0) xepLoai = "Trung bình";
-            else xepLoai = "Yếu";
-        }
+        var overallTotals = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
+        string xepLoai = overallTotals.XepLoai;
 
         var lyDoKhongDat = new List<string>();
         if (tcTichLuy < reqTongTC) lyDoKhongDat.Add($"Thiếu {reqTongTC - tcTichLuy} tín chỉ tích lũy ({tcTichLuy}/{reqTongTC} TC)");
@@ -203,8 +191,9 @@ public class TraCuuDiemController : ControllerBase
                     TongTinChiTichLuy = tcTichLuy,
                     TCBatBuocDat = tcBatBuocDat,
                     TCTuChonDat = tcTuChonDat,
-                    GPA_He10 = gpaToanKhoa10,
-                    GPA_He4 = gpaToanKhoa4,
+                    GPA_He10 = overallTotals.GPAHe10,
+                    GPA_He4 = overallTotals.GPAHe4,
+                    ThongKe = overallTotals,
                     XepLoai = xepLoai,
                     SoMonNo = soMonNo,
                     SoTinChiNo = tcNo,

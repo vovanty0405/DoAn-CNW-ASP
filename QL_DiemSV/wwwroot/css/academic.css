@@ -115,5 +115,34 @@ main:has(.matrix-page){padding:16px;min-width:0}
     font-weight: 600 !important;
 }
 
+/* Separate period cells without inserting extra table rows (which would break rowspan). */
+.academic .grid-table,.academic .weekly-matrix{border-collapse:separate;border-spacing:4px;table-layout:fixed;width:100%}
+.academic .grid-table tbody tr,.academic .weekly-matrix tbody tr{height:56px}
+.academic .grid-table th,.academic .grid-table td,.academic .weekly-matrix th,.academic .weekly-matrix td{border:1px solid color-mix(in srgb,var(--color-text-muted) 30%,var(--color-surface));border-radius:6px}
+.academic .grid-table .period-label{padding:8px 3px;text-align:center;vertical-align:middle;white-space:normal}
+.academic .grid-table .period-label small{display:block;font-size:10px;line-height:1.5;margin-top:4px;color:var(--color-text-muted);font-weight:400}
+.academic .grid-table .schedule-empty{text-align:center;color:var(--color-text-muted);background:var(--color-canvas)}
+.academic .grid-table td.course{border-color:color-mix(in srgb,var(--color-primary) 50%,var(--color-surface));border-left:3px solid var(--color-primary);border-radius:9px}
+.academic .weekly-matrix td{height:auto}
+@media print{.academic .grid-table,.academic .weekly-matrix{border-spacing:2px}.academic .grid-table tbody tr,.academic .weekly-matrix tbody tr{height:32px}}
 /* Semester configuration uses the same panel, toolbar and grid as the room catalogue. */
 .academic .term-toolbar{gap:12px;align-items:end}.academic .term-toolbar label{flex:1 1 165px;min-width:0}.academic .term-toolbar .term-picker{flex:1.4 1 230px}.academic .term-toolbar .term-weeks{flex:0 1 90px}.academic .term-toolbar .term-price{flex:1 1 155px}.academic .term-toolbar input,.academic .term-toolbar select{width:100%;box-sizing:border-box;min-height:40px}.academic .term-form-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}.academic #term-table .row-actions button{border:1px solid var(--color-surface-hover)}.academic #term-table .row-actions .secondary:hover{background:color-mix(in srgb,var(--color-text-primary) 10%,var(--color-surface-hover));border-color:var(--color-text-muted)}.academic #term-table .row-actions .danger{border-color:#fb718530}.academic #term-table .row-actions .danger:hover{background:#fb718530}.academic #term-table .term-money{white-space:nowrap}.academic .term-selected-row td{background:color-mix(in srgb,var(--color-primary) 7%,var(--color-surface))}.academic .badge.upcoming{color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-surface))}.academic .badge.ended{color:var(--color-text-muted);background:var(--color-surface-hover)}@media(max-width:700px){.academic .term-toolbar label,.academic .term-toolbar .term-picker,.academic .term-toolbar .term-price{flex:1 1 100%}.academic .term-toolbar .term-weeks{flex:1 1 100%}.academic .term-form-actions{width:100%;margin-left:0}}
+
+/* Parallel lessons retain their own rowspans and start periods instead of stacking in a union cell. */
+.academic .parallel-schedule-wrap{max-width:100%;overscroll-behavior-x:contain}
+.academic .parallel-schedule{min-width:var(--schedule-width);width:100%;border-spacing:4px}
+.academic .parallel-schedule tbody tr{height:88px}
+.academic .parallel-schedule th,.academic .parallel-schedule td{box-sizing:border-box}
+.academic .parallel-schedule .schedule-day-heading{white-space:normal;border-bottom:2px solid var(--color-primary)}
+.academic .parallel-schedule td.course{padding:8px;vertical-align:top;text-align:left}
+.academic .parallel-schedule .schedule-course-card{max-height:calc(var(--lesson-span) * 92px - 22px);overflow:auto;scrollbar-width:thin;overflow-wrap:anywhere;font-size:11px;line-height:1.6}
+.academic .schedule-course-card strong{font-size:12px;margin-bottom:5px}
+.academic .schedule-course-time{font-weight:600;margin:4px 0}
+.academic .schedule-course-teacher{color:var(--color-text-primary)}
+.academic .parallel-schedule td.schedule-resource-conflict{border-color:#fb7185;border-left-color:#fb7185}
+.academic .schedule-conflict-badge{display:inline-block;margin-top:6px;padding:2px 6px;border-radius:5px;background:#fb718522;color:#fda4af;font-size:10px}
+@media print{.academic .parallel-schedule{min-width:0!important;width:100%;border-spacing:2px}.academic .parallel-schedule .schedule-course-card{max-height:none;overflow:visible;font-size:8px}.academic .parallel-schedule .schedule-course-card strong{font-size:9px}}
+
+.academic .parallel-schedule tr>th:first-child{position:sticky;left:0;z-index:2;background:var(--color-surface-header)}
+.academic .parallel-schedule tr>th:last-child{position:sticky;right:0;z-index:2;background:var(--color-surface-header)}
+@media print{.academic .parallel-schedule tr>th:first-child,.academic .parallel-schedule tr>th:last-child{position:static}}

@@ -18,7 +18,7 @@ public class NganhController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa)
+    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? search = null, [FromQuery] string? sort = null)
     {
         var query = _db.Nganhs
             .Include(n => n.Khoa)
@@ -30,7 +30,23 @@ public class NganhController : ControllerBase
             query = query.Where(n => n.MaKhoa == maKhoa);
         }
 
-        var data = await query.OrderBy(n => n.MaNganh).ToListAsync();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            query = query.Where(n => n.MaNganh.Contains(search) || n.TenNganh.Contains(search));
+        }
+
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "manganh_desc" or "newest" => query.OrderByDescending(n => n.MaNganh),
+            "tennganh_asc" => query.OrderBy(n => n.TenNganh).ThenBy(n => n.MaNganh),
+            "tennganh_desc" => query.OrderByDescending(n => n.TenNganh).ThenByDescending(n => n.MaNganh),
+            "khoa_asc" => query.OrderBy(n => n.Khoa!.TenKhoa).ThenBy(n => n.MaNganh),
+            "khoa_desc" => query.OrderByDescending(n => n.Khoa!.TenKhoa).ThenByDescending(n => n.MaNganh),
+            _ => query.OrderBy(n => n.MaNganh)
+        };
+
+        var data = await query.ToListAsync();
         return Ok(new { status = "success", data });
     }
 

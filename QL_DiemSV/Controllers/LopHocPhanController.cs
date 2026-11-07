@@ -22,7 +22,7 @@ public class LopHocPhanController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maHK, [FromQuery] string? maGV,
         [FromQuery] string? maMon, int page = 1, int pageSize = 20, string? search = null,
-        string? maKhoa = null, string? gradeStatus = null)
+        string? maKhoa = null, string? gradeStatus = null, string? sort = null)
     {
         maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -48,7 +48,27 @@ public class LopHocPhanController : ControllerBase
         var total = summary?.Total ?? 0;
         var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
         page = Math.Clamp(page, 1, totalPages);
-        var sections = await query.OrderBy(l => l.MaLHP).Skip((page - 1) * pageSize).Take(pageSize)
+
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "malhp_desc" or "newest" => query.OrderByDescending(l => l.MaLHP),
+            "oldest" => query.OrderBy(l => l.MaLHP),
+            "tenlhp_asc" => query.OrderBy(l => l.TenLopHP).ThenBy(l => l.MaLHP),
+            "tenlhp_desc" => query.OrderByDescending(l => l.TenLopHP).ThenByDescending(l => l.MaLHP),
+            "hocky_asc" => query.OrderBy(l => l.MaHK).ThenBy(l => l.MaLHP),
+            "hocky_desc" => query.OrderByDescending(l => l.MaHK).ThenByDescending(l => l.MaLHP),
+            "gv_asc" => query.OrderBy(l => l.GiangVien!.HoTen).ThenBy(l => l.MaLHP),
+            "gv_desc" => query.OrderByDescending(l => l.GiangVien!.HoTen).ThenByDescending(l => l.MaLHP),
+            "phong_asc" => query.OrderBy(l => l.PhongHoc).ThenBy(l => l.MaLHP),
+            "phong_desc" => query.OrderByDescending(l => l.PhongHoc).ThenByDescending(l => l.MaLHP),
+            "siso_asc" => query.OrderBy(l => l.KetQuaHocTaps.Count()).ThenBy(l => l.MaLHP),
+            "siso_desc" => query.OrderByDescending(l => l.KetQuaHocTaps.Count()).ThenByDescending(l => l.MaLHP),
+            "trangthai_asc" => query.OrderBy(l => l.TrangThai).ThenBy(l => l.MaLHP),
+            "trangthai_desc" => query.OrderByDescending(l => l.TrangThai).ThenByDescending(l => l.MaLHP),
+            _ => query.OrderBy(l => l.MaLHP)
+        };
+
+        var sections = await query.Skip((page - 1) * pageSize).Take(pageSize)
             .Select(l => new
             {
                 l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK, l.MaGV, l.PhongHoc, l.SiSoToiDa,

@@ -23,8 +23,8 @@
         </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <!-- Filter & Sort Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
             <input id="sv-search" oninput="queueSvSearch()" type="text" placeholder="Tìm Mã SV, Họ tên, Email..."
@@ -46,6 +46,16 @@
             <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
             <option value="Thôi học">Thôi học</option>
         </select>
+        <select id="sv-sort" onchange="onSvSortDropdownChange(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none font-medium">
+            <option value="masv_asc">Sắp xếp: Mã SV tăng dần</option>
+            <option value="masv_desc">Sắp xếp: Mã SV giảm dần</option>
+            <option value="newest">Sắp xếp: Mới nhất</option>
+            <option value="oldest">Sắp xếp: Cũ nhất</option>
+            <option value="hoten_asc">Sắp xếp: Họ tên (A → Z)</option>
+            <option value="hoten_desc">Sắp xếp: Họ tên (Z → A)</option>
+            <option value="malop_asc">Sắp xếp: Lớp hành chính (A → Z)</option>
+            <option value="ngaysinh_desc">Sắp xếp: Ngày sinh (Trẻ → Lớn)</option>
+        </select>
     </div>
 
     <!-- Data Table -->
@@ -53,14 +63,28 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider">
-                        <th class="px-5 py-3.5 font-semibold">Mã SV</th>
-                        <th class="px-5 py-3.5 font-semibold">Họ và Tên</th>
-                        <th class="px-5 py-3.5 font-semibold">Giới tính</th>
-                        <th class="px-5 py-3.5 font-semibold">Ngày sinh</th>
-                        <th class="px-5 py-3.5 font-semibold">Lớp hành chính</th>
-                        <th class="px-5 py-3.5 font-semibold">Ngành / Khoa</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Trạng thái</th>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase tracking-wider select-none">
+                        <th onclick="sortSvByColumn('masv')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Mã SV <span id="sv-sort-icon-masv" class="text-primary">🔼</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('hoten')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Họ và Tên <span id="sv-sort-icon-hoten" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('gioitinh')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Giới tính <span id="sv-sort-icon-gioitinh" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('ngaysinh')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Ngày sinh <span id="sv-sort-icon-ngaysinh" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('malop')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Lớp hành chính <span id="sv-sort-icon-malop" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('nganh')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Ngành / Khoa <span id="sv-sort-icon-nganh" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortSvByColumn('trangthai')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Trạng thái <span id="sv-sort-icon-trangthai" class="text-text-muted/40">↕</span></span>
+                        </th>
                         <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                     </tr>
                 </thead>
@@ -158,8 +182,52 @@
         let svList = [], khoas = [], nganhs = [], lops = [];
         let editingMaSV = null;
         let svCurrentPage = 1, svPageSize = 10;
+        let svSortCol = 'masv', svSortDir = 'asc', svSortParam = 'masv_asc';
         let svRequest = 0, svSearchTimer;
         function queueSvSearch() { clearTimeout(svSearchTimer); svSearchTimer = setTimeout(() => renderSvTable(true), 250); }
+
+        function onSvSortDropdownChange(val) {
+            svSortParam = val;
+            if (val === 'newest' || val === 'oldest') {
+                svSortCol = '';
+            } else {
+                const parts = val.split('_');
+                svSortCol = parts[0] || 'masv';
+                svSortDir = parts[1] || 'asc';
+            }
+            updateSvSortIcons();
+            renderSvTable(true);
+        }
+
+        function sortSvByColumn(col) {
+            if (svSortCol === col) {
+                svSortDir = svSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                svSortCol = col;
+                svSortDir = 'asc';
+            }
+            svSortParam = `${svSortCol}_${svSortDir}`;
+            const selectEl = document.getElementById('sv-sort');
+            if (selectEl && [...selectEl.options].some(o => o.value === svSortParam)) {
+                selectEl.value = svSortParam;
+            }
+            updateSvSortIcons();
+            renderSvTable(true);
+        }
+
+        function updateSvSortIcons() {
+            ['masv', 'hoten', 'gioitinh', 'ngaysinh', 'malop', 'nganh', 'trangthai'].forEach(c => {
+                const el = document.getElementById(`sv-sort-icon-${c}`);
+                if (!el) return;
+                if (c === svSortCol) {
+                    el.textContent = svSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
+        }
 
         async function loadData() {
             const [resKhoa, resNganh, resLop] = await Promise.all([
@@ -202,7 +270,8 @@
                 maKhoa: document.getElementById('sv-khoa').value,
                 maNganh: document.getElementById('sv-nganh').value,
                 maLop: document.getElementById('sv-lop').value,
-                status: document.getElementById('sv-status').value
+                status: document.getElementById('sv-status').value,
+                sort: svSortParam
             });
         }
         async function renderSvTable(resetPage = false) {

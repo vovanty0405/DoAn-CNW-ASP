@@ -3,6 +3,7 @@
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+*.log
 .vs/
 *.user
 *.suo
@@ -22,7 +23,20 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Isolated build output used while the development app is running
+# Isolated build output
 .verification/
 
 QL_DiemSV/App_Data/PortalFiles/
+
+## Thư mục không push lên GitHub
+tests/
+tools/
+[Tt]ài [Ll]iệu/
+Tài Liệu/
+
+## Các file tài liệu Markdown và script SQL loại trừ
+*.md
+*.sql
+
+## Ngoại lệ: Giữ lại duy nhất file script CSDL này
+!Database_QLDiemSV_Full.sql

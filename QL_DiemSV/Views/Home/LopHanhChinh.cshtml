@@ -19,19 +19,32 @@
         </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <!-- Filter & Sort Bar -->
+    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="lhc-search" oninput="renderLhcTable()" type="text" placeholder="Tìm Mã lớp, Tên lớp..."
+            <input id="lhc-search" oninput="renderLhcTable(true)" type="text" placeholder="Tìm Mã lớp, Tên lớp..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
         </div>
-        <select id="lhc-nganh" onchange="renderLhcTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="lhc-nganh" onchange="renderLhcTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Ngành học</option>
         </select>
-        <select id="lhc-gv" onchange="renderLhcTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+        <select id="lhc-gv" onchange="renderLhcTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
             <option value="">Tất cả Cố vấn học tập (GVCN)</option>
         </select>
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-text-muted whitespace-nowrap">Sắp xếp:</span>
+            <select id="lhc-sort" onchange="onLhcSortDropdownChange(this.value)" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
+                <option value="malop_asc">Mã lớp tăng dần (A → Z)</option>
+                <option value="malop_desc">Mã lớp giảm dần (Z → A)</option>
+                <option value="tenlop_asc">Tên lớp (A → Z)</option>
+                <option value="tenlop_desc">Tên lớp (Z → A)</option>
+                <option value="newest">Niên khóa mới nhất</option>
+                <option value="oldest">Niên khóa cũ nhất</option>
+                <option value="siso_desc">Sĩ số cao → thấp</option>
+                <option value="siso_asc">Sĩ số thấp → cao</option>
+            </select>
+        </div>
     </div>
 
     <!-- Table -->
@@ -39,13 +52,25 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
-                        <th class="px-5 py-3.5 font-semibold">Mã Lớp</th>
-                        <th class="px-5 py-3.5 font-semibold">Tên Lớp Hành Chính</th>
-                        <th class="px-5 py-3.5 font-semibold">Niên khóa</th>
-                        <th class="px-5 py-3.5 font-semibold">Ngành / Khoa</th>
-                        <th class="px-5 py-3.5 font-semibold">Cố vấn học tập (GVCN)</th>
-                        <th class="px-5 py-3.5 font-semibold text-center">Sĩ số</th>
+                    <tr class="bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase select-none">
+                        <th onclick="sortLhcByColumn('malop')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Mã Lớp <span id="lhc-sort-icon-malop" class="text-primary">🔼</span></span>
+                        </th>
+                        <th onclick="sortLhcByColumn('tenlop')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Tên Lớp Hành Chính <span id="lhc-sort-icon-tenlop" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhcByColumn('nienkhoa')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Niên khóa <span id="lhc-sort-icon-nienkhoa" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhcByColumn('nganh')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Ngành / Khoa <span id="lhc-sort-icon-nganh" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhcByColumn('gvcn')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center gap-1">Cố vấn học tập (GVCN) <span id="lhc-sort-icon-gvcn" class="text-text-muted/40">↕</span></span>
+                        </th>
+                        <th onclick="sortLhcByColumn('siso')" class="px-5 py-3.5 font-semibold text-center cursor-pointer hover:text-primary transition-colors">
+                            <span class="inline-flex items-center justify-center gap-1">Sĩ số <span id="lhc-sort-icon-siso" class="text-text-muted/40">↕</span></span>
+                        </th>
                         <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                     </tr>
                 </thead>
@@ -154,19 +179,39 @@
 
             <!-- Bảng danh sách bên phải -->
             <div class="lg:col-span-8 overflow-hidden border border-surface-hover rounded-xl flex flex-col bg-canvas">
-                <div class="p-3 border-b border-surface-hover bg-surface-header flex justify-between items-center">
-                    <span class="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                        <i data-lucide="list" class="w-3.5 h-3.5 text-primary"></i> Danh Sách Ngành Đào Tạo
-                    </span>
-                    <span id="nganh-count-badge" class="text-xs text-text-muted">0 ngành</span>
+                <div class="p-3.5 border-b border-surface-hover bg-surface-header flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                            <i data-lucide="list" class="w-3.5 h-3.5 text-primary"></i> Danh Sách Ngành Đào Tạo
+                        </span>
+                        <span id="nganh-count-badge" class="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 text-xs font-bold">0 ngành</span>
+                    </div>
+                    <!-- Bộ lọc Khoa trực thuộc & Tìm kiếm nhanh -->
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                        <div class="relative flex-1 sm:w-44">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                            <input id="nganh-filter-search" oninput="renderNganhTable()" type="text" placeholder="Tìm mã, tên ngành..."
+                                   class="w-full bg-surface border border-surface-hover focus:border-primary rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-text-primary outline-none transition-colors" />
+                        </div>
+                        <select id="nganh-filter-khoa" onchange="renderNganhTable()"
+                                class="bg-surface border border-surface-hover focus:border-primary rounded-lg px-2.5 py-1.5 text-xs text-text-primary font-medium outline-none transition-colors">
+                            <option value="">-- Tất cả Khoa --</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="overflow-y-auto max-h-[420px] custom-scrollbar">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead class="sticky top-0 z-10 bg-surface-header border-b border-surface-hover shadow-sm">
-                            <tr class="text-xs text-text-muted uppercase tracking-wider">
-                                <th class="p-3.5 font-semibold">Mã Ngành</th>
-                                <th class="p-3.5 font-semibold">Tên Ngành Đào Tạo</th>
-                                <th class="p-3.5 font-semibold">Khoa Trực Thuộc</th>
+                            <tr class="text-xs text-text-muted uppercase tracking-wider select-none">
+                                <th onclick="sortNganhByColumn('manganh')" class="p-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                                    <span class="inline-flex items-center gap-1">Mã Ngành <span id="nganh-sort-icon-manganh" class="text-primary">🔼</span></span>
+                                </th>
+                                <th onclick="sortNganhByColumn('tennganh')" class="p-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                                    <span class="inline-flex items-center gap-1">Tên Ngành Đào Tạo <span id="nganh-sort-icon-tennganh" class="text-text-muted/40">↕</span></span>
+                                </th>
+                                <th onclick="sortNganhByColumn('khoa')" class="p-3.5 font-semibold cursor-pointer hover:text-primary transition-colors">
+                                    <span class="inline-flex items-center gap-1">Khoa Trực Thuộc <span id="nganh-sort-icon-khoa" class="text-text-muted/40">↕</span></span>
+                                </th>
                                 <th class="p-3.5 font-semibold text-right">THAO TÁC</th>
                             </tr>
                         </thead>
@@ -218,11 +263,14 @@
     <script>
         let lhcList = [], nganhs = [], gvs = [], khoas = [], editingMaLop = null, editingMaNganh = null;
         let lhcCurrentPage = 1, lhcPageSize = 10;
+        let lhcSortCol = 'malop', lhcSortDir = 'asc';
+        let nganhSortCol = 'manganh', nganhSortDir = 'asc';
         let pendingDeleteAction = null;
 
         async function loadData() {
+            const sortParam = document.getElementById('lhc-sort')?.value || `${lhcSortCol}_${lhcSortDir}`;
             const [resLhc, resNganh, resGv, resKhoa] = await Promise.all([
-                apiFetch('/api/lophanhchinh'),
+                apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(sortParam)}`),
                 apiFetch('/api/nganh'),
                 apiFetch('/api/giangvien'),
                 apiFetch('/api/khoa')
@@ -232,15 +280,75 @@
             gvs = resGv.data || [];
             khoas = resKhoa.data || [];
 
+            const prevLhcNganh = document.getElementById('lhc-nganh').value;
+            const prevLhcGv = document.getElementById('lhc-gv').value;
+            const prevNganhFilterKhoa = document.getElementById('nganh-filter-khoa')?.value || '';
+
             document.getElementById('lhc-nganh').innerHTML = '<option value="">Tất cả Ngành học</option>' + nganhs.map(n => `<option value="${n.MaNganh}">${n.TenNganh}</option>`).join('');
             document.getElementById('lhc-gv').innerHTML = '<option value="">Tất cả Cố vấn học tập</option>' + gvs.map(g => `<option value="${g.MaGV}">${g.HoTen}</option>`).join('');
+            document.getElementById('lhc-nganh').value = prevLhcNganh;
+            document.getElementById('lhc-gv').value = prevLhcGv;
 
             document.getElementById('l-manganh').innerHTML = nganhs.map(n => `<option value="${n.MaNganh}">${n.TenNganh}</option>`).join('');
             document.getElementById('l-magvcn').innerHTML = gvs.map(g => `<option value="${g.MaGV}">${g.MaGV} - ${g.HoTen}</option>`).join('');
             document.getElementById('n-makhoa').innerHTML = khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
 
+            const nganhFilterKhoaEl = document.getElementById('nganh-filter-khoa');
+            if (nganhFilterKhoaEl) {
+                nganhFilterKhoaEl.innerHTML = '<option value="">-- Tất cả Khoa --</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+                nganhFilterKhoaEl.value = prevNganhFilterKhoa;
+            }
+
             renderLhcTable();
             renderNganhTable();
+        }
+
+        async function onLhcSortDropdownChange(val) {
+            if (val === 'newest') { lhcSortCol = 'nienkhoa'; lhcSortDir = 'desc'; }
+            else if (val === 'oldest') { lhcSortCol = 'nienkhoa'; lhcSortDir = 'asc'; }
+            else {
+                const parts = val.split('_');
+                lhcSortCol = parts[0] || 'malop';
+                lhcSortDir = parts[1] || 'asc';
+            }
+            updateLhcSortIcons();
+            const resLhc = await apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(val)}`);
+            lhcList = resLhc.data || [];
+            renderLhcTable(true);
+        }
+
+        async function sortLhcByColumn(col) {
+            if (lhcSortCol === col) {
+                lhcSortDir = lhcSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                lhcSortCol = col;
+                lhcSortDir = 'asc';
+            }
+            const sortKey = `${lhcSortCol}_${lhcSortDir}`;
+            const selectEl = document.getElementById('lhc-sort');
+            if (selectEl) {
+                if (sortKey === 'nienkhoa_desc') selectEl.value = 'newest';
+                else if (sortKey === 'nienkhoa_asc') selectEl.value = 'oldest';
+                else if ([...selectEl.options].some(o => o.value === sortKey)) selectEl.value = sortKey;
+            }
+            updateLhcSortIcons();
+            const resLhc = await apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(sortKey)}`);
+            lhcList = resLhc.data || [];
+            renderLhcTable(true);
+        }
+
+        function updateLhcSortIcons() {
+            ['malop', 'tenlop', 'nienkhoa', 'nganh', 'gvcn', 'siso'].forEach(c => {
+                const el = document.getElementById(`lhc-sort-icon-${c}`);
+                if (!el) return;
+                if (c === lhcSortCol) {
+                    el.textContent = lhcSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
         }
 
         function getFilteredLhc() {
@@ -388,18 +496,57 @@
         }
         function deleteLhc(id) { confirmDeleteLhc(id, id); }
 
-        // --- QUẢN LÝ NGÀNH ĐÀO TẠO ---
+        // --- QUẢN LÝ NGÀNH ĐÀO TẠO (LỌC THEO KHOA, TÌM KIẾM & SẮP XẾP) ---
+        function sortNganhByColumn(col) {
+            if (nganhSortCol === col) {
+                nganhSortDir = nganhSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                nganhSortCol = col;
+                nganhSortDir = 'asc';
+            }
+            ['manganh', 'tennganh', 'khoa'].forEach(c => {
+                const el = document.getElementById(`nganh-sort-icon-${c}`);
+                if (!el) return;
+                if (c === nganhSortCol) {
+                    el.textContent = nganhSortDir === 'asc' ? '🔼' : '🔽';
+                    el.className = 'text-primary';
+                } else {
+                    el.textContent = '↕';
+                    el.className = 'text-text-muted/40';
+                }
+            });
+            renderNganhTable();
+        }
+
         function renderNganhTable() {
+            const filterKhoa = document.getElementById('nganh-filter-khoa')?.value || '';
+            const searchQ = (document.getElementById('nganh-filter-search')?.value || '').toLowerCase().trim();
+
+            let filtered = (nganhs || []).filter(n => {
+                const matchKhoa = !filterKhoa || n.MaKhoa === filterKhoa;
+                const matchQ = !searchQ || (n.MaNganh || '').toLowerCase().includes(searchQ) || (n.TenNganh || '').toLowerCase().includes(searchQ);
+                return matchKhoa && matchQ;
+            });
+
+            filtered.sort((a, b) => {
+                let va = '', vb = '';
+                if (nganhSortCol === 'tennganh') { va = a.TenNganh || ''; vb = b.TenNganh || ''; }
+                else if (nganhSortCol === 'khoa') { va = a.Khoa?.TenKhoa || a.MaKhoa || ''; vb = b.Khoa?.TenKhoa || b.MaKhoa || ''; }
+                else { va = a.MaNganh || ''; vb = b.MaNganh || ''; }
+                const cmp = va.localeCompare(vb, 'vi');
+                return nganhSortDir === 'asc' ? cmp : -cmp;
+            });
+
             const countBadge = document.getElementById('nganh-count-badge');
-            if (countBadge) countBadge.textContent = `${nganhs.length} ngành`;
+            if (countBadge) countBadge.textContent = `${filtered.length} ngành`;
 
             const tbody = document.getElementById('nganh-tbody');
-            if (!nganhs || nganhs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-text-muted">Chưa có ngành đào tạo nào</td></tr>`;
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-text-muted">Không tìm thấy ngành đào tạo nào phù hợp</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = nganhs.map(n => `
+            tbody.innerHTML = filtered.map(n => `
                 <tr class="hover:bg-surface-hover/30 transition-colors">
                     <td class="p-3.5 font-bold text-primary">${n.MaNganh}</td>
                     <td class="p-3.5 font-medium text-text-primary">${n.TenNganh}</td>

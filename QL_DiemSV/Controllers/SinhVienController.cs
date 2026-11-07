@@ -19,7 +19,7 @@ public class SinhVienController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maLop, int page = 1, int pageSize = 20,
-        string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null)
+        string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null, string? sort = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = _db.SinhViens.AsNoTracking();
@@ -33,10 +33,31 @@ public class SinhVienController : ControllerBase
             search = search.Trim();
             query = query.Where(s => s.MaSV.Contains(search) || s.HoTen.Contains(search) || (s.Email != null && s.Email.Contains(search)));
         }
+
+        query = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "newest" => query.OrderByDescending(s => s.UserID).ThenByDescending(s => s.MaSV),
+            "oldest" => query.OrderBy(s => s.UserID).ThenBy(s => s.MaSV),
+            "masv_desc" => query.OrderByDescending(s => s.MaSV),
+            "hoten_asc" => query.OrderBy(s => s.HoTen).ThenBy(s => s.MaSV),
+            "hoten_desc" => query.OrderByDescending(s => s.HoTen).ThenByDescending(s => s.MaSV),
+            "gioitinh_asc" => query.OrderBy(s => s.GioiTinh).ThenBy(s => s.MaSV),
+            "gioitinh_desc" => query.OrderByDescending(s => s.GioiTinh).ThenByDescending(s => s.MaSV),
+            "ngaysinh_asc" => query.OrderBy(s => s.NgaySinh).ThenBy(s => s.MaSV),
+            "ngaysinh_desc" => query.OrderByDescending(s => s.NgaySinh).ThenByDescending(s => s.MaSV),
+            "malop_asc" => query.OrderBy(s => s.MaLop).ThenBy(s => s.MaSV),
+            "malop_desc" => query.OrderByDescending(s => s.MaLop).ThenByDescending(s => s.MaSV),
+            "nganh_asc" => query.OrderBy(s => s.LopHanhChinh!.Nganh!.TenNganh).ThenBy(s => s.MaSV),
+            "nganh_desc" => query.OrderByDescending(s => s.LopHanhChinh!.Nganh!.TenNganh).ThenByDescending(s => s.MaSV),
+            "trangthai_asc" => query.OrderBy(s => s.TrangThai).ThenBy(s => s.MaSV),
+            "trangthai_desc" => query.OrderByDescending(s => s.TrangThai).ThenByDescending(s => s.MaSV),
+            _ => query.OrderBy(s => s.MaSV)
+        };
+
         var total = await query.CountAsync();
         var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
         page = Math.Clamp(page, 1, totalPages);
-        var data = await query.OrderBy(s => s.MaSV).Skip((page - 1) * pageSize).Take(pageSize)
+        var data = await query.Skip((page - 1) * pageSize).Take(pageSize)
             .Select(s => new
             {
                 s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.Email, s.SDT, s.CCCD, s.DiaChi, s.TrangThai,

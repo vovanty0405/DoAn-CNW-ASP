@@ -31,10 +31,24 @@ public class MonHocController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa)
+    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? sort = null)
     {
         var subjects = await _catalog.GetAsync();
-        var data = subjects.Where(m => string.IsNullOrWhiteSpace(maKhoa) || m.MaKhoa == maKhoa);
+        var query = subjects.Where(m => string.IsNullOrWhiteSpace(maKhoa) || m.MaKhoa == maKhoa);
+        var data = (sort?.Trim().ToLowerInvariant()) switch
+        {
+            "mamon_desc" or "newest" => query.OrderByDescending(m => m.MaMon),
+            "oldest" => query.OrderBy(m => m.MaMon),
+            "tenmon_asc" => query.OrderBy(m => m.TenMon).ThenBy(m => m.MaMon),
+            "tenmon_desc" => query.OrderByDescending(m => m.TenMon).ThenByDescending(m => m.MaMon),
+            "sotc_asc" => query.OrderBy(m => m.SoTinChi).ThenBy(m => m.MaMon),
+            "sotc_desc" => query.OrderByDescending(m => m.SoTinChi).ThenByDescending(m => m.MaMon),
+            "lt_asc" => query.OrderBy(m => m.SoTietLyThuyet).ThenBy(m => m.MaMon),
+            "lt_desc" => query.OrderByDescending(m => m.SoTietLyThuyet).ThenByDescending(m => m.MaMon),
+            "khoa_asc" => query.OrderBy(m => m.Khoa?.TenKhoa ?? m.MaKhoa).ThenBy(m => m.MaMon),
+            "khoa_desc" => query.OrderByDescending(m => m.Khoa?.TenKhoa ?? m.MaKhoa).ThenByDescending(m => m.MaMon),
+            _ => query.OrderBy(m => m.MaMon)
+        };
         return Ok(new { status = "success", data });
     }
 

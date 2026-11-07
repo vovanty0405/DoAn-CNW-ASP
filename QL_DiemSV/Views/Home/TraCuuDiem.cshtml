@@ -209,6 +209,7 @@
 
         <!-- Semesters Transcript -->
         <div id="tc-semesters" class="space-y-6"></div>
+        <section id="tc-overall-summary" class="bg-surface border border-surface-hover rounded-2xl overflow-hidden" aria-label="Tổng kết điểm sinh viên"></section>
     </div>
 </div>
 
@@ -492,6 +493,46 @@
         }
 
         // Tải chi tiết bảng điểm và kết quả xét tốt nghiệp từ API
+        function formatTranscriptGpa(value) { return value == null ? '—' : Number(value).toFixed(2); }
+        function transcriptSummaryRows(rows, labelSpan = 8, valueSpan = 4) {
+            return rows.map(([label, value]) => `<tr class="border-t border-surface-hover bg-canvas">
+                <th colspan="${labelSpan}" scope="row" class="px-5 py-2 text-left text-xs font-semibold text-text-muted">${label}</th>
+                <td colspan="${valueSpan}" class="px-5 py-2 text-left text-sm font-bold text-text-primary">${value}</td></tr>`).join('');
+        }
+        function semesterSummary(hk) {
+            const current = hk.ThongKeHocKy, cumulative = hk.TichLuyDenHocKy;
+            return transcriptSummaryRows([
+                ['Điểm trung bình học kỳ hệ 10', formatTranscriptGpa(current.GPAHe10)],
+                ['Điểm trung bình học kỳ hệ 4', formatTranscriptGpa(current.GPAHe4)],
+                ['Điểm trung bình tích lũy đến học kỳ này (hệ 10)', formatTranscriptGpa(cumulative.GPAHe10)],
+                ['Điểm trung bình tích lũy đến học kỳ này (hệ 4)', formatTranscriptGpa(cumulative.GPAHe4)],
+                ['Số tín chỉ đăng ký trong học kỳ', current.TinChiDangKy],
+                ['Số tín chỉ đã có điểm tổng kết', current.TinChiDaCoDiem],
+                ['Số tín chỉ đạt trong học kỳ', current.TinChiDat],
+                ['Số tín chỉ chưa đạt trong học kỳ', current.TinChiKhongDat],
+                ['Số tín chỉ chưa có điểm tổng kết', current.TinChiChuaCoDiem],
+                ['Số tín chỉ tích lũy đến học kỳ này', cumulative.TinChiDat],
+                ['Phân loại điểm trung bình học kỳ', current.XepLoai]
+            ]);
+        }
+        function overallTranscriptSummary(totals) {
+            return `<div class="px-6 py-4 bg-surface-header border-b border-surface-hover">
+                <h3 class="font-bold text-base text-primary">Tổng kết điểm đến hiện tại</h3>
+                <p class="text-xs text-text-muted mt-2">Chỉ tính điểm tổng kết đã có; môn 0 tín chỉ không ảnh hưởng GPA. Tích lũy lấy điểm cao nhất mỗi môn, không cộng lặp tín chỉ học lại/cải thiện.</p>
+                </div><table class="w-full text-sm"><tbody>${transcriptSummaryRows([
+                    ['Điểm trung bình tích lũy hệ 10', formatTranscriptGpa(totals.GPAHe10)],
+                    ['Điểm trung bình tích lũy hệ 4', formatTranscriptGpa(totals.GPAHe4)],
+                    ['Tổng tín chỉ đăng ký (không trùng môn)', totals.TinChiDangKy],
+                    ['Tổng tín chỉ đã có điểm tổng kết (không trùng môn)', totals.TinChiDaCoDiem],
+                    ['Tổng tín chỉ đạt / tích lũy', totals.TinChiDat],
+                    ['Số tín chỉ chưa đạt', totals.TinChiKhongDat],
+                    ['Số tín chỉ của môn chưa có điểm tổng kết', totals.TinChiChuaCoDiem],
+                    ['Số môn đã có điểm tổng kết', totals.SoMonDaCoDiem],
+                    ['Số môn chưa có điểm tổng kết', totals.SoMonChuaCoDiem],
+                    ['Xếp loại học lực hiện tại', totals.XepLoai]
+                ], 1, 1)}</tbody></table>`;
+        }
+
         async function loadTranscript(maSV) {
             try {
                 const res = await apiFetch(`/api/tracuudiem/${encodeURIComponent(maSV)}`);
@@ -505,8 +546,9 @@
                 document.getElementById('info-lop').textContent = sv.MaLop || 'N/A';
                 document.getElementById('info-nganh').textContent = sv.TenNganh || 'N/A';
                 document.getElementById('info-khoa').textContent = sv.TenKhoa || 'N/A';
-                document.getElementById('info-gpa10').textContent = tk.GPA_He10;
-                document.getElementById('info-gpa4').textContent = tk.GPA_He4;
+                document.getElementById('info-gpa10').textContent = formatTranscriptGpa(tk.GPA_He10);
+                document.getElementById('info-gpa4').textContent = formatTranscriptGpa(tk.GPA_He4);
+                document.getElementById('tc-overall-summary').innerHTML = overallTranscriptSummary(tk.ThongKe);
                 document.getElementById('info-xeploai').textContent = tk.XepLoai;
 
                 const badge = document.getElementById('grad-badge');
@@ -546,8 +588,8 @@
                             </div>
                             <div class="flex items-center gap-4 text-xs">
                                 <span>TC Đạt trong kỳ: <strong class="text-text-primary">${hk.TongTinChiHK} TC</strong></span>
-                                <span>GPA Học kỳ (Hệ 10): <strong class="text-primary">${hk.GPA_HK_He10}</strong></span>
-                                <span>GPA Học kỳ (Hệ 4): <strong class="text-[#10B981]">${hk.GPA_HK_He4}</strong></span>
+                                <span>GPA Học kỳ (Hệ 10): <strong class="text-primary">${formatTranscriptGpa(hk.GPA_HK_He10)}</strong></span>
+                                <span>GPA Học kỳ (Hệ 4): <strong class="text-[#10B981]">${formatTranscriptGpa(hk.GPA_HK_He4)}</strong></span>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
@@ -582,7 +624,7 @@
                                             <td class="px-4 py-3 text-center font-bold text-primary">${m.DiemHe4 ?? '-'}</td>
                                             <td class="px-4 py-3 text-center font-bold">${m.DiemChu ?? '-'}</td>
                                             <td class="px-4 py-3 text-center">
-                                                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${m.QuaMon ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${m.GhiChu || (m.QuaMon ? 'Đạt' : 'Học lại')}</span>
+                                                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${m.DiemTongKet == null ? 'bg-surface-hover text-text-muted' : m.QuaMon ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${m.DiemTongKet == null ? 'Chưa có điểm' : (m.GhiChu || (m.QuaMon ? 'Đạt' : 'Học lại'))}</span>
                                             </td>
                                             <td class="px-4 py-3 text-right">
                                                 <button onclick="openAppealModal('${m.MaLHP}', '${m.TenMon}', '${sv.MaSV}')" class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 text-xs font-semibold">
@@ -592,6 +634,7 @@
                                         </tr>
                                     `).join('')}
                                 </tbody>
+                                <tfoot>${semesterSummary(hk)}</tfoot>
                             </table>
                         </div>
                     </div>
