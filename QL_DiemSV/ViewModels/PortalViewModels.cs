@@ -112,6 +112,8 @@ public class ArticleEditViewModel
 
 public class PortalKetQuaHocTapViewModel
 {
+    public bool RequiresVerification { get; set; }
+    public bool IsOwnRecord { get; set; }
     public string MaSV { get; set; } = "";
     public string HoTen { get; set; } = "";
     public DateTime? NgaySinh { get; set; }
@@ -176,6 +178,9 @@ public class PortalSemesterGradesViewModel
     public double? GPAHe4HK { get; set; }
     public int TinChiDangKyHK { get; set; }
     public int TinChiDatHK { get; set; }
+    public int TinChiDaCoDiemHK { get; set; }
+    public int TinChiKhongDatHK { get; set; }
+    public int TinChiChuaCoDiemHK { get; set; }
     public string XepLoaiHK { get; set; } = "Chưa xếp loại";
     public double? GPAHe10TichLuy { get; set; }
     public double? GPAHe4TichLuy { get; set; }

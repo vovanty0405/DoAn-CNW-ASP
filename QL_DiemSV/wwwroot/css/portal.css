@@ -18,7 +18,7 @@
     --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
 }
 
-html.dark {
+html.dark:not(.enterprise) {
     --color-canvas: #0b1120;
     --color-surface: #111827;
     --color-surface-header: #1e293b;
@@ -326,7 +326,7 @@ html {
 }
 
 .portal-hero {
-    background: linear-gradient(115deg, #133e70, #17698b 70%, #157e88);
+    background: #133e70;
     color: white;
     min-height: 270px;
     border-radius: 20px;
@@ -610,7 +610,7 @@ html {
     letter-spacing: 0.3px;
 }
 
-html.dark .new-tag-pink {
+html.dark:not(.enterprise) .new-tag-pink {
     background: rgba(244, 63, 94, 0.2);
     color: #fda4af;
     border-color: rgba(244, 63, 94, 0.35);
@@ -826,22 +826,22 @@ html.dark .new-tag-pink {
     justify-content: center;
     gap: 16px;
     padding: 20px;
-    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #fef3c7 100%);
+    background: #fff7ed;
     color: #9a3412;
 }
 
-html.dark .default-banner {
-    background: linear-gradient(135deg, #2a1b12 0%, #3b2110 60%, #2d2015 100%);
+html.dark:not(.enterprise) .default-banner {
+    background: #2a1b12;
     color: #fdba74;
 }
 
 .default-banner:not(.banner-nghibu) {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 55%, #e0f2fe 100%);
+    background: #eff6ff;
     color: #1e40af;
 }
 
-html.dark .default-banner:not(.banner-nghibu) {
-    background: linear-gradient(135deg, #17253b 0%, #1e3352 60%, #172a45 100%);
+html.dark:not(.enterprise) .default-banner:not(.banner-nghibu) {
+    background: #17253b;
     color: #93c5fd;
 }
 
@@ -866,7 +866,7 @@ html.dark .default-banner:not(.banner-nghibu) {
 
 .cal-top {
     height: 18px;
-    background: linear-gradient(90deg, #f97316, #ea580c);
+    background: #f97316;
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -874,7 +874,7 @@ html.dark .default-banner:not(.banner-nghibu) {
 }
 
 .cat-icon-box .cal-top {
-    background: linear-gradient(90deg, #2563eb, #175fa5);
+    background: #2563eb;
 }
 
 .cal-top span {
@@ -1109,13 +1109,13 @@ html.dark .default-banner:not(.banner-nghibu) {
     font-weight: 700;
 }
 
-html.dark .detail-meta-bar {
+html.dark:not(.enterprise) .detail-meta-bar {
     background: #1a2234;
     border-color: #334155;
     color: #cbd5e1;
 }
 
-html.dark .detail-meta-bar strong {
+html.dark:not(.enterprise) .detail-meta-bar strong {
     color: #f8fafc;
 }
 
@@ -1139,17 +1139,17 @@ html.dark .detail-meta-bar strong {
     color: #1e293b;
 }
 
-html.dark .article-content {
+html.dark:not(.enterprise) .article-content {
     color: #e2e8f0;
 }
 
-html.dark .article-content p,
-html.dark .article-content li,
-html.dark .article-content div,
-html.dark .article-content strong,
-html.dark .article-content b,
-html.dark .article-content em,
-html.dark .article-content i {
+html.dark:not(.enterprise) .article-content p,
+html.dark:not(.enterprise) .article-content li,
+html.dark:not(.enterprise) .article-content div,
+html.dark:not(.enterprise) .article-content strong,
+html.dark:not(.enterprise) .article-content b,
+html.dark:not(.enterprise) .article-content em,
+html.dark:not(.enterprise) .article-content i {
     color: inherit;
 }
 
@@ -1204,25 +1204,25 @@ html.dark .article-content i {
 }
 
 /* Chế độ Tối (Dark mode) cho bảng thông tin chi tiết bài viết */
-html.dark .article-content table {
+html.dark:not(.enterprise) .article-content table {
     border: 1px solid #334155 !important;
 }
 
-html.dark .article-content th {
+html.dark:not(.enterprise) .article-content th {
     background-color: #1a2234 !important;
     color: #e2e8f0 !important;
     font-weight: 600 !important;
     border: 1px solid #334155 !important;
 }
 
-html.dark .article-content td {
+html.dark:not(.enterprise) .article-content td {
     background-color: #0f172a !important;
     color: #f8fafc !important;
     border: 1px solid #334155 !important;
 }
 
-html.dark .article-content td strong,
-html.dark .article-content th strong {
+html.dark:not(.enterprise) .article-content td strong,
+html.dark:not(.enterprise) .article-content th strong {
     color: #ffffff !important;
 }
 
@@ -1504,12 +1504,12 @@ html.light .article-rich-text table tr th:last-child {
 }
 
 .mini-nghibu {
-    background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    background: #fff7ed;
     color: #c2410c;
 }
 
 .mini-default {
-    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    background: #eff6ff;
     color: #1d4ed8;
 }
 

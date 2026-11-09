@@ -13,14 +13,14 @@
             <button onclick="exportMonHocExcel()" class="px-4 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-sm font-semibold text-text-primary flex items-center gap-2">
                 <i data-lucide="download" class="w-4 h-4 text-primary"></i> Xuất Excel
             </button>
-            <button onclick="openMhModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
+            <button onclick="openMhModal()" class="admin-add px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
                 <i data-lucide="plus" class="w-4 h-4"></i> Thêm Môn Học
             </button>
         </div>
     </div>
 
     <!-- Filter & Sort Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
             <input id="mh-search" oninput="renderMhTable(true)" type="text" placeholder="Tìm Mã môn, Tên môn học..."
@@ -47,7 +47,8 @@
     </div>
 
     <!-- Table -->
-    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+    <div class="admin-data-card bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="admin-card-heading">Danh sách môn học</div>
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>

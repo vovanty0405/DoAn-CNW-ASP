@@ -111,13 +111,13 @@
         cursor: pointer;
         transition: background-color 0.14s ease, transform 0.08s ease;
     }
-    html.dark .kqht-btn-primary {
+    html.dark:not(.enterprise) .kqht-btn-primary {
         background: #0284c7;
     }
     .kqht-btn-primary:hover {
         background: #0a2952;
     }
-    html.dark .kqht-btn-primary:hover {
+    html.dark:not(.enterprise) .kqht-btn-primary:hover {
         background: #0369a1;
     }
     .kqht-btn-primary:active {
@@ -220,7 +220,7 @@
         color: #0f766e;
         border: 1px solid rgba(15, 118, 110, 0.35);
     }
-    html.dark .kqht-grad-badge.eligible {
+    html.dark:not(.enterprise) .kqht-grad-badge.eligible {
         background: rgba(20, 184, 166, 0.12);
         color: #2dd4bf;
         border-color: rgba(45, 212, 191, 0.35);
@@ -230,7 +230,7 @@
         color: #b45309;
         border: 1px solid rgba(180, 83, 9, 0.32);
     }
-    html.dark .kqht-grad-badge.not-eligible {
+    html.dark:not(.enterprise) .kqht-grad-badge.not-eligible {
         background: rgba(245, 158, 11, 0.12);
         color: #fbbf24;
         border-color: rgba(251, 191, 36, 0.35);
@@ -370,14 +370,14 @@
         color: var(--color-text-secondary);
         border-left-color: #0f766e;
     }
-    html.dark .kqht-checklist li.ok {
+    html.dark:not(.enterprise) .kqht-checklist li.ok {
         border-left-color: #2dd4bf;
     }
     .kqht-checklist li.warn {
         color: #b45309;
         border-left-color: #d97706;
     }
-    html.dark .kqht-checklist li.warn {
+    html.dark:not(.enterprise) .kqht-checklist li.warn {
         color: #fbbf24;
         border-left-color: #fbbf24;
     }
@@ -586,8 +586,8 @@
         color: #0f766e;
         border: 1px solid rgba(15, 118, 110, 0.28);
     }
-    html.dark .kqht-badge.pass,
-    html.dark .kqht-badge.approved {
+    html.dark:not(.enterprise) .kqht-badge.pass,
+    html.dark:not(.enterprise) .kqht-badge.approved {
         background: rgba(20, 184, 166, 0.14);
         color: #2dd4bf;
         border-color: rgba(45, 212, 191, 0.3);
@@ -598,8 +598,8 @@
         color: #b91c1c;
         border: 1px solid rgba(185, 28, 28, 0.28);
     }
-    html.dark .kqht-badge.fail,
-    html.dark .kqht-badge.rejected {
+    html.dark:not(.enterprise) .kqht-badge.fail,
+    html.dark:not(.enterprise) .kqht-badge.rejected {
         background: rgba(239, 68, 68, 0.14);
         color: #f87171;
         border-color: rgba(248, 113, 113, 0.3);
@@ -609,7 +609,7 @@
         color: #b45309;
         border: 1px solid rgba(180, 83, 9, 0.28);
     }
-    html.dark .kqht-badge.pending {
+    html.dark:not(.enterprise) .kqht-badge.pending {
         background: rgba(245, 158, 11, 0.14);
         color: #fbbf24;
         border-color: rgba(251, 191, 36, 0.3);
@@ -637,7 +637,7 @@
         border-color: #0f3d75;
         color: #ffffff;
     }
-    html.dark .kqht-btn-appeal:hover {
+    html.dark:not(.enterprise) .kqht-btn-appeal:hover {
         background: #0284c7;
         border-color: #0284c7;
         color: #ffffff;
@@ -763,7 +763,7 @@
         color: #0f766e;
         border: 1px solid rgba(15, 118, 110, 0.3);
     }
-    html.dark .kqht-alert-box.success {
+    html.dark:not(.enterprise) .kqht-alert-box.success {
         color: #2dd4bf;
     }
     .kqht-alert-box.error {
@@ -772,7 +772,7 @@
         color: #b91c1c;
         border: 1px solid rgba(185, 28, 28, 0.3);
     }
-    html.dark .kqht-alert-box.error {
+    html.dark:not(.enterprise) .kqht-alert-box.error {
         color: #f87171;
     }
 
@@ -856,12 +856,14 @@
             <h1 class="kqht-title">Hồ sơ Học tập &amp; Xét chuẩn Tốt nghiệp</h1>
             <p class="kqht-subtitle">Bảng điểm tích lũy theo học kỳ, đối chiếu chuẩn đầu ra theo ngành đào tạo, phúc khảo điểm và quản lý thông tin sinh viên.</p>
         </div>
+        @if (!Model.RequiresVerification && !string.IsNullOrEmpty(Model.MaSV))
+        {
         <div class="kqht-header-actions">
-            @if (!User.IsInRole("SinhVien"))
+            @if (!Model.IsOwnRecord)
             {
-                <form method="get" action="/Portal/KetQuaHocTap" style="display:flex; gap:6px; align-items:center; margin:0;">
-                    <input type="text" name="maSV" value="@Model.MaSV" placeholder="Nhập mã SV..." class="kqht-search-input" style="width:140px;" />
-                    <button type="submit" class="kqht-btn-outline">Tra cứu SV</button>
+                <form method="post" action="/Portal/KetQuaHocTap/doi-sinh-vien">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="kqht-btn-outline">🔄 Tra cứu sinh viên khác</button>
                 </form>
             }
             <a href="/portal/tra-cuu-tkb?code=@Uri.EscapeDataString(Model.MaSV)&kind=student" class="kqht-btn-outline">
@@ -871,9 +873,30 @@
                 In bảng điểm
             </button>
         </div>
+        }
     </header>
 
-    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    @if (Model.RequiresVerification)
+    {
+        <section class="transcript-verification" aria-labelledby="transcript-verification-title">
+            <h2 id="transcript-verification-title">Xác thực tài khoản sinh viên tra cứu điểm</h2>
+            <form method="post" action="/Portal/KetQuaHocTap/xac-thuc">
+                @Html.AntiForgeryToken()
+                @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                {
+                    <p class="transcript-verification-error" role="alert">@Model.ErrorMessage</p>
+                }
+                <label for="transcript-account">Tài khoản / Email sinh viên:</label>
+                <input id="transcript-account" name="account" type="text" autocomplete="username" maxlength="255"
+                       placeholder="Nhập mã sinh viên hoặc email" required />
+                <label for="transcript-password">Mật khẩu:</label>
+                <input id="transcript-password" name="password" type="password" autocomplete="current-password" maxlength="256"
+                       placeholder="Nhập mật khẩu" required />
+                <button type="submit">Gửi yêu cầu</button>
+            </form>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
         <div class="kqht-summary-banner" style="border-top-color: #b91c1c;">
             <p style="margin:0; color:#b91c1c; font-weight:600; font-size:13px;">@Model.ErrorMessage</p>
@@ -1001,6 +1024,8 @@
                     onclick="switchPortalKqhtTab('ket-qua')">
                 Kết quả học tập &amp; Xét tốt nghiệp
             </button>
+            @if (Model.IsOwnRecord)
+            {
             <button type="button"
                     class="kqht-tab-btn @(Model.ActiveTab == "khieu-nai" ? "active" : "")"
                     data-tab-target="khieu-nai"
@@ -1013,6 +1038,7 @@
                     onclick="switchPortalKqhtTab('ho-so')">
                 Hồ sơ sinh viên &amp; Bảo mật
             </button>
+            }
         </div>
 
         <!-- TAB PANE 1: BẢNG ĐIỂM CHI TIẾT THEO TỪNG HỌC KỲ -->
@@ -1124,7 +1150,11 @@
                                                 }
                                             </td>
                                             <td class="col-center">
-                                                @if (row.LatestComplaint == null)
+                                                @if (!Model.IsOwnRecord)
+                                                {
+                                                    <span>—</span>
+                                                }
+                                                else if (row.LatestComplaint == null)
                                                 {
                                                     <button type="button"
                                                             class="kqht-btn-appeal"
@@ -1169,11 +1199,31 @@
                                 </tbody>
                             </table>
                         </div>
+                        <details class="semester-summary">
+                            <summary>📊 Xem chi tiết tổng kết học kỳ</summary>
+                            <table class="semester-summary-table">
+                                <tbody>
+                                    <tr><th scope="row">Điểm trung bình học kỳ hệ 10</th><td>@(sem.GPAHe10HK?.ToString("F2") ?? "—")</td></tr>
+                                    <tr><th scope="row">Điểm trung bình học kỳ hệ 4</th><td>@(sem.GPAHe4HK?.ToString("F2") ?? "—")</td></tr>
+                                    <tr><th scope="row">Điểm trung bình tích lũy đến học kỳ này (hệ 10)</th><td>@(sem.GPAHe10TichLuy?.ToString("F2") ?? "—")</td></tr>
+                                    <tr><th scope="row">Điểm trung bình tích lũy đến học kỳ này (hệ 4)</th><td>@(sem.GPAHe4TichLuy?.ToString("F2") ?? "—")</td></tr>
+                                    <tr><th scope="row">Số tín chỉ đăng ký trong học kỳ</th><td>@sem.TinChiDangKyHK</td></tr>
+                                    <tr><th scope="row">Số tín chỉ đã có điểm tổng kết</th><td>@sem.TinChiDaCoDiemHK</td></tr>
+                                    <tr><th scope="row">Số tín chỉ đạt trong học kỳ</th><td>@sem.TinChiDatHK</td></tr>
+                                    <tr><th scope="row">Số tín chỉ chưa đạt trong học kỳ</th><td>@sem.TinChiKhongDatHK</td></tr>
+                                    <tr><th scope="row">Số tín chỉ chưa có điểm tổng kết</th><td>@sem.TinChiChuaCoDiemHK</td></tr>
+                                    <tr><th scope="row">Số tín chỉ tích lũy đến học kỳ này</th><td>@sem.TinChiTichLuy</td></tr>
+                                    <tr><th scope="row">Phân loại điểm trung bình học kỳ</th><td>@sem.XepLoaiHK</td></tr>
+                                </tbody>
+                            </table>
+                        </details>
                     </section>
                 }
             }
         </div>
 
+        @if (Model.IsOwnRecord)
+        {
         <!-- TAB PANE 2: LỊCH SỬ KHIẾU NẠI ĐIỂM CỦA SINH VIÊN -->
         <div id="tab-pane-khieu-nai" class="kqht-tab-pane @(Model.ActiveTab == "khieu-nai" ? "active" : "")">
             <section id="lich-su-khieu-nai" class="kqht-semester-card">
@@ -1386,6 +1436,7 @@
                 </section>
             </div>
         </div>
+        }
     }
 </div>
 
@@ -1492,6 +1543,7 @@
 @section Scripts {
 <script>
     function switchPortalKqhtTab(tabKey) {
+        if (!document.getElementById(`tab-pane-${tabKey}`)) return;
         document.querySelectorAll('.kqht-tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-tab-target') === tabKey);
         });

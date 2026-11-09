@@ -518,7 +518,7 @@
                 ['Số tín chỉ chưa có điểm tổng kết', current.TinChiChuaCoDiem],
                 ['Số tín chỉ tích lũy đến học kỳ này', cumulative.TinChiDat],
                 ['Phân loại điểm trung bình học kỳ', current.XepLoai]
-            ]);
+            ], 1, 1);
         }
         function overallTranscriptSummary(totals) {
             return `<div class="px-6 py-4 bg-surface-header border-b border-surface-hover">
@@ -639,9 +639,12 @@
                                         </tr>
                                     `).join('')}
                                 </tbody>
-                                <tfoot>${semesterSummary(hk)}</tfoot>
                             </table>
                         </div>
+                        <details class="semester-summary">
+                            <summary>📊 Xem chi tiết tổng kết học kỳ</summary>
+                            <table class="semester-summary-table"><tbody>${semesterSummary(hk)}</tbody></table>
+                        </details>
                     </div>
                 `).join('');
                 lucide.createIcons();

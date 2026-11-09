@@ -169,30 +169,67 @@ public class LopHocPhanController : ControllerBase
         });
     }
 
-    [HttpGet("{id}/available-students")]
-    public async Task<IActionResult> GetAvailableStudents(string id)
+    [HttpGet("enrollment-options")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> EnrollmentOptions()
     {
-        var lhp = await _db.LopHocPhans.AsNoTracking().Where(l => l.MaLHP == id)
-            .Select(l => new { l.MaMon, l.MaHK }).FirstOrDefaultAsync();
-        if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
+        var faculties = await _db.Khoas.AsNoTracking().OrderBy(k => k.TenKhoa)
+            .Select(k => new { k.MaKhoa, k.TenKhoa }).ToListAsync(HttpContext.RequestAborted);
+        var classes = await _db.LopHanhChinhs.AsNoTracking().OrderBy(l => l.MaLop)
+            .Select(l => new { l.MaLop, l.TenLop, MaKhoa = l.Nganh!.MaKhoa }).ToListAsync(HttpContext.RequestAborted);
+        return Ok(new { faculties, classes });
+    }
+
+    [HttpGet("{id}/available-students")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAvailableStudents(string id, string? maKhoa = null,
+        string? maLop = null, string? search = null, int page = 1)
+    {
+        var ct = HttpContext.RequestAborted;
+        var lhp = await _db.LopHocPhans.AsNoTracking().FirstOrDefaultAsync(l => l.MaLHP == id, ct);
+        if (lhp == null) return NotFound(new { message = "Không tìm thấy lớp học phần." });
+        var query = await EligibleStudents(lhp, ct);
+        if (!string.IsNullOrWhiteSpace(maKhoa))
+            query = query.Where(s => s.LopHanhChinh!.Nganh!.MaKhoa == maKhoa);
+        if (!string.IsNullOrWhiteSpace(maLop))
+            query = query.Where(s => s.MaLop == maLop);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            query = query.Where(s => s.MaSV.Contains(search) || s.HoTen.Contains(search));
+        }
+        const int pageSize = 50;
+        page = Math.Clamp(page, 1, int.MaxValue / pageSize);
+        var data = await query.OrderBy(s => s.MaSV).Skip((page - 1) * pageSize).Take(pageSize + 1)
+            .Select(s => new { s.MaSV, s.HoTen, s.MaLop }).ToListAsync(ct);
+        return Ok(new { status = "success", data = data.Take(pageSize), hasNext = data.Count > pageSize });
+    }
+
+    [HttpGet("{id}/students")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> EnrollmentRoster(string id)
+    {
+        var ct = HttpContext.RequestAborted;
+        var section = await _db.LopHocPhans.AsNoTracking().Where(l => l.MaLHP == id)
+            .Select(l => new { l.MaLop, l.SiSoToiDa }).FirstOrDefaultAsync(ct);
+        if (section == null) return NotFound(new { message = "Không tìm thấy lớp học phần." });
+        var students = await _db.KetQuaHocTaps.AsNoTracking().Where(k => k.MaLHP == id && k.SinhVien != null)
+            .OrderBy(k => k.MaSV).Select(k => new { k.SinhVien!.MaSV, k.SinhVien.HoTen, k.SinhVien.MaLop }).ToListAsync(ct);
+        return Ok(new { data = new { section.MaLop, section.SiSoToiDa, SiSoHienTai = students.Count, students } });
+    }
+
+    private async Task<IQueryable<SinhVien>> EligibleStudents(LopHocPhan lhp, CancellationToken ct)
+    {
         var prerequisites = await _db.DieuKienMonHocs.AsNoTracking()
             .Where(d => d.MaMon == lhp.MaMon && d.MaMonTienQuyet != null && d.MaMonTienQuyet != "")
-            .Select(d => d.MaMonTienQuyet!).Distinct().ToListAsync();
-        var query = _db.SinhViens.AsNoTracking().Where(s => s.TrangThai != "Thôi học"
+            .Select(d => d.MaMonTienQuyet!).Distinct().ToListAsync(ct);
+        var query = _db.SinhViens.AsNoTracking().Where(s => s.TrangThai == "Đang học"
             && !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == lhp.MaMon && k.LopHocPhan.MaHK == lhp.MaHK));
-        // Preserve existing eligibility semantics, but evaluate using SQL EXISTS instead of loading grades.
-        foreach (var prerequisite in prerequisites)
-        {
-            var code = prerequisite;
+        // Giữ quy tắc lọc hiện có cho các môn tiên quyết chưa có điểm.
+        foreach (var code in prerequisites)
             query = query.Where(s => !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code)
                 || s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code && (k.DiemTongKet == null || k.DiemTongKet >= 4.0)));
-        }
-        var data = await query.OrderBy(s => s.MaSV).Select(s => new
-        {
-            s.MaSV, s.HoTen, s.MaLop,
-            LopHanhChinh = s.LopHanhChinh == null ? null : new { s.LopHanhChinh.MaLop, s.LopHanhChinh.TenLop }
-        }).ToListAsync();
-        return Ok(new { status = "success", data });
+        return query;
     }
 
     public class EnrollDto
@@ -200,51 +237,93 @@ public class LopHocPhanController : ControllerBase
         public List<string> studentIds { get; set; } = new();
     }
 
+    public record ImportStudentRow(int Row, string? MaSV);
+    private record EnrollmentCheck(int Row, string MaSV, string? HoTen, string? MaLop, string? Error);
+
+    [HttpPost("{id}/students/preview")]
+    [Authorize(Roles = "Admin")]
+    [RequestSizeLimit(262144)]
+    public async Task<IActionResult> PreviewStudents(string id, [FromBody] List<ImportStudentRow> rows)
+    {
+        if (rows.Count is < 1 or > 1000)
+            return BadRequest(new { message = "File cần có từ 1 đến 1.000 dòng sinh viên." });
+
+        var ct = HttpContext.RequestAborted;
+        var lhp = await _db.LopHocPhans.AsNoTracking().Include(l => l.LichHocs)
+            .FirstOrDefaultAsync(l => l.MaLHP == id, ct);
+        if (lhp == null) return NotFound(new { message = "Không tìm thấy lớp học phần." });
+        var checks = await CheckEnrollment(lhp, rows, ct);
+        return Ok(new { data = checks, valid = checks.Count(r => r.Error == null), invalid = checks.Count(r => r.Error != null) });
+    }
+
+    private async Task<List<EnrollmentCheck>> CheckEnrollment(LopHocPhan lhp,
+        IEnumerable<ImportStudentRow> rows, CancellationToken ct)
+    {
+        var entries = rows.Select(r => new ImportStudentRow(r.Row, (r.MaSV ?? "").Trim().ToUpperInvariant())).ToList();
+        var ids = entries.Select(r => r.MaSV!).Where(code => code.Length is > 0 and <= 20).Distinct().ToArray();
+        var students = await _db.SinhViens.AsNoTracking().Where(s => ids.Contains(s.MaSV))
+            .Select(s => new { s.MaSV, s.HoTen, s.MaLop, s.TrangThai })
+            .ToDictionaryAsync(s => s.MaSV, StringComparer.OrdinalIgnoreCase, ct);
+        var eligible = await EligibleStudents(lhp, ct);
+        var eligibleIds = (await eligible.Where(s => ids.Contains(s.MaSV)).Select(s => s.MaSV).ToListAsync(ct))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var enrollment = await _db.KetQuaHocTaps.AsNoTracking().Where(k => ids.Contains(k.MaSV!) && k.LopHocPhan!.MaHK == lhp.MaHK)
+            .Select(k => new { k.MaSV, k.MaLHP, k.LopHocPhan!.MaMon }).ToListAsync(ct);
+        var sectionIds = enrollment.Select(k => k.MaLHP).Distinct().ToArray();
+        var schedules = await _db.ClassSchedules.AsNoTracking().Where(s => sectionIds.Contains(s.MaLHP)).ToListAsync(ct);
+        var conflicts = schedules.Where(s => lhp.LichHocs.Any(target => ScheduleRules.Overlaps(s, target)))
+            .Select(s => s.MaLHP).ToHashSet();
+        var byStudent = enrollment.ToLookup(k => k.MaSV, StringComparer.OrdinalIgnoreCase);
+        var occupied = await _db.KetQuaHocTaps.CountAsync(k => k.MaLHP == lhp.MaLHP, ct);
+        var remaining = (lhp.SiSoToiDa ?? 40) - occupied;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var checks = new List<EnrollmentCheck>(entries.Count);
+
+        foreach (var row in entries)
+        {
+            var code = row.MaSV!;
+            students.TryGetValue(code, out var student);
+            var registered = byStudent[code];
+            string? error = null;
+            if (code.Length == 0) error = "Thiếu mã sinh viên.";
+            else if (code.Length > 20) error = "Mã sinh viên vượt quá 20 ký tự.";
+            else if (!seen.Add(code)) error = "Mã sinh viên bị lặp trong danh sách.";
+            else if (student == null) error = "Không tìm thấy sinh viên.";
+            else if (registered.Any(k => k.MaLHP == lhp.MaLHP)) error = "Sinh viên đã ở trong lớp này.";
+            else if (student.TrangThai != "Đang học") error = "Sinh viên không còn ở trạng thái đang học.";
+            else if (registered.Any(k => k.MaMon == lhp.MaMon)) error = "Đã xếp lớp cùng môn trong học kỳ.";
+            else if (!eligibleIds.Contains(code)) error = "Không đạt điều kiện môn tiên quyết.";
+            else if (registered.Any(k => conflicts.Contains(k.MaLHP!))) error = "Trùng lịch với lớp học phần khác.";
+            else if (remaining <= 0) error = "Lớp học phần đã hết chỗ.";
+            else remaining--;
+            checks.Add(new EnrollmentCheck(row.Row, student?.MaSV ?? code, student?.HoTen, student?.MaLop, error));
+        }
+        return checks;
+    }
+
     [HttpPost("{id}/students")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddStudentsToClass(string id, [FromBody] EnrollDto req)
     {
-        await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-        var lhp = await _db.LopHocPhans
-            .Include(l => l.LichHocs)
-            .Include(l => l.KetQuaHocTaps)
-            .FirstOrDefaultAsync(l => l.MaLHP == id);
+        if (req.studentIds is not { Count: > 0 and <= 1000 })
+            return BadRequest(new { message = "Cần chọn từ 1 đến 1.000 sinh viên." });
 
-        if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
+        var ct = HttpContext.RequestAborted;
+        await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var lhp = await _db.LopHocPhans.AsNoTracking().Include(l => l.LichHocs)
+            .FirstOrDefaultAsync(l => l.MaLHP == id, ct);
+        if (lhp == null) return NotFound(new { message = "Không tìm thấy lớp học phần." });
 
-        if (req.studentIds == null || !req.studentIds.Any())
-            return BadRequest(new { status = "error", message = "Danh sách sinh viên trống" });
+        var checks = await CheckEnrollment(lhp, req.studentIds.Select((code, i) => new ImportStudentRow(i + 1, code)), ct);
+        var invalid = checks.FirstOrDefault(r => r.Error != null);
+        if (invalid != null)
+            return BadRequest(new { message = $"{invalid.MaSV}: {invalid.Error}" });
 
-        int currentCount = lhp.KetQuaHocTaps.Count;
-        int maxCount = lhp.SiSoToiDa ?? 40;
-        var existingIds = lhp.KetQuaHocTaps.Select(k => k.MaSV).ToHashSet();
-
-        var newIds = req.studentIds.Where(s => !existingIds.Contains(s)).Distinct().ToList();
-        if (currentCount + newIds.Count > maxCount)
-        {
-            return BadRequest(new { status = "error", message = $"Vượt quá sĩ số tối đa ({maxCount} sinh viên)! Hiện tại: {currentCount}." });
-        }
-
-        if (await _db.SinhViens.CountAsync(x => newIds.Contains(x.MaSV) && x.TrangThai == "Đang học") != newIds.Count)
-            return BadRequest(new { status = "error", message = "Có sinh viên không tồn tại hoặc không còn đang học." });
-        var enrolled = await _db.KetQuaHocTaps.Include(x => x.LopHocPhan).ThenInclude(x => x!.LichHocs)
-            .Where(x => newIds.Contains(x.MaSV!) && x.LopHocPhan!.MaHK == lhp.MaHK).ToListAsync();
-        foreach (var k in enrolled)
-            if (k.LopHocPhan!.MaMon == lhp.MaMon || k.LopHocPhan.LichHocs.Any(a => lhp.LichHocs.Any(b => ScheduleRules.Overlaps(a,b))))
-                return BadRequest(new { status = "error", message = $"Sinh viên {k.MaSV} đã đăng ký môn này hoặc bị trùng lịch." });
-        foreach (var maSV in newIds)
-        {
-            _db.KetQuaHocTaps.Add(new KetQuaHocTap
-            {
-                MaSV = maSV,
-                MaLHP = id
-            });
-        }
-
-        await _db.SaveChangesAsync();
-        await tx.CommitAsync();
-        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xếp lớp học phần", $"Đã thêm {newIds.Count} sinh viên vào lớp {id}");
-        return Ok(new { status = "success", message = $"Đã thêm {newIds.Count} sinh viên vào lớp học phần" });
+        _db.KetQuaHocTaps.AddRange(checks.Select(r => new KetQuaHocTap { MaSV = r.MaSV, MaLHP = lhp.MaLHP }));
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xếp lớp học phần", $"Đã thêm {checks.Count} sinh viên vào lớp {id}");
+        return Ok(new { status = "success", message = $"Đã thêm {checks.Count} sinh viên vào lớp học phần" });
     }
 
     [HttpDelete("{id}/students")]

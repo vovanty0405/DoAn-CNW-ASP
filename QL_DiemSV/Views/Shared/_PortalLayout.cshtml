@@ -14,7 +14,7 @@
             : "/portal/tra-cuu-tkb";
 }
 <!DOCTYPE html>
-<html lang="vi" class="light">
+<html lang="vi" class="light enterprise">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -29,26 +29,28 @@
     <link rel="stylesheet" href="~/css/academic.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="portal-body" id="top">
-    <div class="portal-topline">
-        ACADEMIC LEDGER <span>Kết nối tri thức · Đồng hành cùng người học</span>
-    </div>
-    <header class="portal-header">
+    <div class="university-banner">
         <a href="/portal" class="portal-brand">
             <span class="brand-mark" aria-hidden="true">AL</span>
             <span>
-                <strong>Academic Ledger</strong>
+                <strong>TRƯỜNG ĐẠI HỌC AN GIANG</strong>
                 <small>CỔNG THÔNG TIN ĐÀO TẠO</small>
             </span>
         </a>
+    </div>
+    <header class="portal-header">
         <nav class="portal-nav" aria-label="Điều hướng chính">
             <a href="/portal">Trang chủ</a>
             <a href="/Portal/Articles">Bài viết & Thông báo</a>
             <a href="/portal#curriculum">Đào tạo</a>
             <a href="/portal#regulations">Quy trình - Quy định</a>
             <a href="/portal#documents">Văn bản - Hướng dẫn</a>
-            <a href="/quan-ly-lich-hoc/ma-tran">Lịch phòng học</a>
+            <a href="/Portal/LichPhongHoc">Lịch phòng học</a>
+            <a href="/portal/tra-cuu-tkb">Tra cứu TKB</a>
+            <a href="/Portal/KetQuaHocTap">Kết quả học tập</a>
         </nav>
         <div class="portal-account">
             <button type="button" class="theme-toggle" id="portal-theme" aria-label="Chuyển giao diện Sáng/Tối">◐</button>
@@ -77,7 +79,6 @@
                             <a href="/Portal/KetQuaHocTap">📊 Kết quả học tập &amp; Tốt nghiệp</a>
                             <a href="/Portal/KetQuaHocTap?tab=ho-so">👤 Hồ sơ sinh viên &amp; Đổi mật khẩu</a>
                             <a href="/Portal/KetQuaHocTap?tab=khieu-nai">📝 Lịch sử khiếu nại điểm</a>
-                            <a href="/dang-ky-hoc-phan">📚 Đăng ký học phần</a>
                         }
                         <a href="@tkbPortalUrl">🗓️ Thời khóa biểu cá nhân</a>
                         @if (canManageCurriculum) { <a href="/admin/curriculums">Quản lý Chương trình đào tạo</a> }
@@ -91,9 +92,9 @@
                             <a href="/tra-cuu-diem">🔎 Danh sách tra cứu điểm</a>
                             @if (User.IsInRole("Admin") || User.IsInRole("KhaoThi")) { <a href="/">⚙️ Khu vực quản trị</a> }
                         }
-                        <button id="portal-logout" type="button">Đăng xuất</button>
                     </div>
                 </details>
+                <button id="portal-logout" class="portal-logout-button" type="button">Đăng xuất</button>
             }
             else
             {
@@ -123,17 +124,17 @@
             <h3>Liên kết nhanh</h3>
             <a href="/Portal/Articles">Tất cả bài viết & thông báo</a>
             <a href="/portal/tra-cuu-tkb">Tra cứu thời khóa biểu</a>
-            <a href="/quan-ly-lich-hoc/ma-tran">Lịch phòng học</a>
-            <a href="/dang-ky-hoc-phan">Đăng ký học phần</a>
+            <a href="/Portal/LichPhongHoc">Lịch phòng học</a>
             <a href="/portal#curriculum">Chương trình đào tạo</a>
         </div>
         <div>
             <h3>Đồng hành cùng bạn</h3>
             <p>Thông tin chính xác. Học tập chủ động.</p>
-            <p>© @QL_DiemSV.Services.RoomMatrixRules.Today.Year Academic Ledger</p>
+
             <a href="#top" class="back-top">↑ Về đầu trang</a>
         </div>
     </footer>
+    <div class="university-copyright">© @QL_DiemSV.Services.RoomMatrixRules.Today.Year. Trường Đại học An Giang. All Rights Reserved.</div>
     <script>
         window.PORTAL_USER = {
             isAuthenticated: @(logged ? "true" : "false"),

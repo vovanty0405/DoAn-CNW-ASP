@@ -363,7 +363,7 @@ public class LichHocController(ApplicationDbContext db) : Controller
         return RedirectToAction(nameof(Index),new { id, configHK });
     }
 
-    [AllowAnonymous, HttpGet("ma-tran")]
+    [AllowAnonymous, HttpGet("ma-tran", Name = "AdminRoomSchedule"), HttpGet("/Portal/LichPhongHoc", Name = "PortalRoomSchedule")]
     public async Task<IActionResult> Matrix(string? maHK = null, int? week = null, int? day = null, string viewMode = "week", string scheduleType = "all", string building = "all", DateTime? date = null)
     {
         var terms = await db.HocKys.AsNoTracking().OrderByDescending(x => x.NamHocBatDau).ThenByDescending(x => x.MaHK).ToListAsync();

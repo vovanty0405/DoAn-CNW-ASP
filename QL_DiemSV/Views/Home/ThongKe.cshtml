@@ -15,7 +15,7 @@
     </div>
 
     <!-- Cascading Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
+    <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
         <div>
             <label class="block text-xs text-text-muted mb-1">Khoa</label>
             <select id="f-khoa" onchange="onFilterChange()" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
@@ -89,23 +89,25 @@
         </div>
     </div>
 
+    <p id="report-status" role="status" aria-live="polite" class="text-sm text-text-muted"></p>
+
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-surface border border-surface-hover rounded-2xl p-5">
+        <div class="min-w-0 bg-surface border border-surface-hover rounded-2xl p-5">
             <h3 class="font-bold text-sm text-text-primary mb-4">Phân Bố Học Lực Sinh Viên</h3>
-            <div class="h-64 flex items-center justify-center">
+            <div class="relative h-64 min-w-0">
                 <canvas id="chart-hocluc"></canvas>
             </div>
         </div>
-        <div class="bg-surface border border-surface-hover rounded-2xl p-5">
+        <div class="min-w-0 bg-surface border border-surface-hover rounded-2xl p-5">
             <h3 class="font-bold text-sm text-text-primary mb-4">Phổ Điểm Học Phần (Hệ 10)</h3>
-            <div class="h-64">
+            <div class="relative h-64 min-w-0">
                 <canvas id="chart-phodiem"></canvas>
             </div>
         </div>
-        <div class="bg-surface border border-surface-hover rounded-2xl p-5">
+        <div class="min-w-0 bg-surface border border-surface-hover rounded-2xl p-5">
             <h3 class="font-bold text-sm text-text-primary mb-4">Xu Hướng GPA Qua Các Học Kỳ</h3>
-            <div class="h-64">
+            <div class="relative h-64 min-w-0">
                 <canvas id="chart-xuhuong"></canvas>
             </div>
         </div>
@@ -168,17 +170,56 @@
         let allNganhs = [], allLops = [], allMons = [], allLhps = [];
         let chartHocLuc = null, chartPhoDiem = null, chartXuHuong = null;
         let currentDashboardData = null;
+        let reportRequest;
+        let filtersReady = false;
+        let loadedSectionTerm;
 
-        async function initFilters() {
+        async function runReportRequest(action) {
+            reportRequest?.abort();
+            const request = new AbortController();
+            reportRequest = request;
+            const status = document.getElementById('report-status');
+            status.textContent = 'Đang tải thống kê…';
+            let timedOut = false;
+            const timer = setTimeout(() => {
+                timedOut = true;
+                request.abort();
+            }, 20000);
+
+            try {
+                await action(request.signal);
+                if (reportRequest === request) status.textContent = '';
+            } catch (error) {
+                if (reportRequest !== request || (request.signal.aborted && !timedOut)) return;
+                request.abort();
+                status.textContent = timedOut
+                    ? 'Tải thống kê quá thời gian. Hãy chọn bộ lọc hoặc tải lại trang để thử lại.'
+                    : 'Không tải được thống kê. ' + error.message;
+            } finally {
+                clearTimeout(timer);
+                if (reportRequest === request) reportRequest = null;
+            }
+        }
+
+        window.addEventListener('pagehide', () => {
+            reportRequest?.abort();
+            [chartHocLuc, chartPhoDiem, chartXuHuong].forEach(chart => chart?.stop());
+        });
+        window.addEventListener('pageshow', event => {
+            if (event.persisted) loadDashboard();
+        });
+
+        async function initFilters(signal) {
             const [khoas, nganhs, lops, hks, mons, lhps] = await Promise.all([
-                apiFetch('/api/khoa'),
-                apiFetch('/api/nganh'),
-                apiFetch('/api/lophanhchinh'),
-                apiFetch('/api/hocky'),
-                apiFetch('/api/monhoc'),
-                apiFetch('/api/lophocphan/options')
+                apiFetch('/api/khoa', { signal }),
+                apiFetch('/api/nganh', { signal }),
+                apiFetch('/api/lophanhchinh', { signal }),
+                apiFetch('/api/hocky', { signal }),
+                apiFetch('/api/monhoc', { signal }),
+                apiFetch('/api/lophocphan/options', { signal })
             ]);
 
+            signal.throwIfAborted();
             allNganhs = nganhs.data || [];
             allLops = lops.data || [];
             allMons = mons.data || [];
@@ -190,17 +231,24 @@
             const selHk = document.getElementById('f-hk');
             (hks.data || []).forEach(h => selHk.insertAdjacentHTML('beforeend', `<option value="${h.MaHK}">${h.TenHK} (${h.NamHocBatDau}-${h.NamHocKetThuc})</option>`));
 
-            document.getElementById("f-hk").value = lhps.maHK || "";
+            loadedSectionTerm = lhps.maHK || '';
+            document.getElementById('f-hk').value = loadedSectionTerm;
             populateDependentSelects();
-            await loadDashboard();
+            filtersReady = true;
+            await loadDashboardData(signal);
         }
 
-        async function reloadSectionOptions() {
-            const response = await apiFetch('/api/lophocphan/options?' + new URLSearchParams({ maHK: document.getElementById('f-hk').value }));
-            allLhps = response.data || [];
-            document.getElementById('f-hk').value = response.maHK || '';
-            populateDependentSelects();
-            await loadDashboard();
+        function reloadSectionOptions() {
+            if (!filtersReady) return runReportRequest(initFilters);
+            return runReportRequest(async signal => {
+                const response = await apiFetch('/api/lophocphan/options?' + new URLSearchParams({ maHK: document.getElementById('f-hk').value }), { signal });
+                signal.throwIfAborted();
+                allLhps = response.data || [];
+                loadedSectionTerm = response.maHK || '';
+                document.getElementById('f-hk').value = loadedSectionTerm;
+                populateDependentSelects();
+                await loadDashboardData(signal);
+            });
         }
         function populateDependentSelects() {
             const maKhoa = document.getElementById('f-khoa').value;
@@ -241,7 +289,13 @@
             reloadSectionOptions();
         }
 
-        async function loadDashboard() {
+        function loadDashboard() {
+            if (!filtersReady) return runReportRequest(initFilters);
+            if (document.getElementById('f-hk').value !== loadedSectionTerm) return reloadSectionOptions();
+            return runReportRequest(loadDashboardData);
+        }
+
+        async function loadDashboardData(signal) {
             const params = new URLSearchParams({
                 maKhoa: document.getElementById('f-khoa').value,
                 maNganh: document.getElementById('f-nganh').value,
@@ -251,7 +305,8 @@
                 maLHP: document.getElementById('f-lhp').value
             });
 
-            const res = await apiFetch(`/api/thongke/tong-quan?${params.toString()}`);
+            const res = await apiFetch(`/api/thongke/tong-quan?${params.toString()}`, { signal });
+            signal.throwIfAborted();
             const d = res.data;
             currentDashboardData = d;
 
@@ -262,8 +317,8 @@
             document.getElementById('kpi-fail').textContent = d.summary.tyLeRotMon + '%';
             document.getElementById('kpi-warn').textContent = d.summary.soSVCanhBao;
 
-            renderCharts(d);
             renderTables(d);
+            if (typeof Chart === 'function') renderCharts(d);
         }
 
         function renderCharts(d) {
@@ -281,7 +336,13 @@
                         borderWidth: 0
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af' } } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    resizeDelay: 100,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af' } } }
+                }
             });
 
             chartPhoDiem = new Chart(document.getElementById('chart-phodiem'), {
@@ -297,6 +358,8 @@
                 },
                 options: {
                     responsive: true,
+                    animation: false,
+                    resizeDelay: 100,
                     maintainAspectRatio: false,
                     scales: {
                         x: { ticks: { color: '#9ca3af' } },
@@ -317,6 +380,8 @@
                 },
                 options: {
                     responsive: true,
+                    animation: false,
+                    resizeDelay: 100,
                     maintainAspectRatio: false,
                     scales: {
                         x: { ticks: { color: '#9ca3af' } },
@@ -377,6 +442,6 @@
             window.showToast('Đã xuất báo cáo Excel!');
         }
 
-        initFilters();
+        runReportRequest(initFilters);
     </script>
 }

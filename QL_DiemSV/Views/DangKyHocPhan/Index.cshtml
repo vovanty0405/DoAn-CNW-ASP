@@ -2,6 +2,7 @@
 @using QL_DiemSV.Services
 @using System.Text.Json
 @{
+    Layout = "_PortalLayout";
     ViewData["Title"] = "Đăng ký học phần";
     var all = Model.Sections.Concat(Model.Selected.Select(x => x.LopHocPhan!)).DistinctBy(x => x.MaLHP).ToList();
     var payload = all.Select(x => new { id = x.MaLHP, code = x.MaMon, name = x.MonHoc?.TenMon ?? x.TenLopHP, group = x.NMH, practice = x.TTH, credits = x.STC, feeCredits = x.STCHP, fee = Model.Selected.FirstOrDefault(k => k.MaLHP == x.MaLHP)?.HocPhiDangKy ?? (x.STC == 0 ? 0 : x.STCHP * (Model.HocKy?.DonGiaTinChi ?? 0)), discount = Model.Selected.FirstOrDefault(k => k.MaLHP == x.MaLHP)?.MienGiam ?? 0, saved = Model.Selected.Any(k => k.MaLHP == x.MaLHP), schedules = x.LichHocs.Select(l => new { day = l.Thu, start = l.TietBatDau, count = l.SoTiet, weeks = ScheduleRules.Weeks(l.ChuoiTuanHoc) }) });

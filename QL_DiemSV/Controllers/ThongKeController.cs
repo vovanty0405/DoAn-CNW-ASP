@@ -25,7 +25,8 @@ public class ThongKeController : ControllerBase
         [FromQuery] string? maLop,
         [FromQuery] string? maHK,
         [FromQuery] string? maMon,
-        [FromQuery] string? maLHP)
+        [FromQuery] string? maLHP,
+        CancellationToken cancellationToken = default)
     {
         var svQuery = await StudentLookupScope.StudentsAsync(_db, User);
 
@@ -45,7 +46,7 @@ public class ThongKeController : ControllerBase
                 TenNganh = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null ? s.LopHanhChinh.Nganh.TenNganh : "N/A",
                 TenKhoa = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null && s.LopHanhChinh.Nganh.Khoa != null ? s.LopHanhChinh.Nganh.Khoa.TenKhoa : "N/A"
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         int tongSinhVien = svList.Count;
         var svDict = svList.ToDictionary(s => s.MaSV, StringComparer.OrdinalIgnoreCase);
@@ -60,39 +61,29 @@ public class ThongKeController : ControllerBase
         if (!string.IsNullOrWhiteSpace(maLHP))
             lhpQuery = lhpQuery.Where(l => l.MaLHP == maLHP);
 
-        var lhpDict = await lhpQuery
-            .Select(l => new
+        var grades = await (
+            from grade in _db.KetQuaHocTaps.AsNoTracking()
+            join section in lhpQuery on grade.MaLHP equals section.MaLHP
+            join student in svQuery on grade.MaSV equals student.MaSV
+            where grade.DiemTongKet != null
+            select new
             {
-                l.MaLHP,
-                l.MaMon,
-                l.MaHK,
-                SoTinChi = l.MonHoc!.SoTinChi,
-                TenHK = l.HocKy!.TenHK,
-                NamHocBatDau = l.HocKy.NamHocBatDau,
-                NamHocKetThuc = l.HocKy.NamHocKetThuc
-            })
-            .ToDictionaryAsync(l => l.MaLHP, StringComparer.OrdinalIgnoreCase);
+                student.MaSV,
+                section.MaLHP,
+                DiemTongKet = grade.DiemTongKet!.Value,
+                LHP = new
+                {
+                    section.MaMon, section.MaHK,
+                    SoTinChi = section.MonHoc!.SoTinChi,
+                    TenHK = section.HocKy!.TenHK,
+                    section.HocKy.NamHocBatDau,
+                    section.HocKy.NamHocKetThuc
+                }
+            }).ToListAsync(cancellationToken);
 
-        var kqQuery = _db.KetQuaHocTaps.AsNoTracking()
-            .Where(k => k.MaSV != null && k.MaLHP != null && k.DiemTongKet != null && svQuery.Any(s => s.MaSV == k.MaSV));
-
-        if (!string.IsNullOrWhiteSpace(maLHP))
-            kqQuery = kqQuery.Where(k => k.MaLHP == maLHP);
-
-        var rawKqList = await kqQuery
-            .Select(k => new { k.MaSV, k.MaLHP, DiemTongKet = k.DiemTongKet!.Value })
-            .ToListAsync();
-
-        var kqList = rawKqList
-            .Where(k => svDict.ContainsKey(k.MaSV!) && lhpDict.ContainsKey(k.MaLHP!))
-            .Select(k => new
-            {
-                MaSV = k.MaSV!,
-                MaLHP = k.MaLHP!,
-                k.DiemTongKet,
-                SV = svDict[k.MaSV!],
-                LHP = lhpDict[k.MaLHP!]
-            })
+        cancellationToken.ThrowIfCancellationRequested();
+        var kqList = grades.Where(k => svDict.ContainsKey(k.MaSV))
+            .Select(k => new { k.MaSV, k.MaLHP, k.DiemTongKet, SV = svDict[k.MaSV], k.LHP })
             .ToList();
 
         // Tính GPA cho từng sinh viên dựa trên tập kết quả đã lọc (khử trùng lặp môn học lại bằng cách lấy điểm cao nhất của mỗi môn)

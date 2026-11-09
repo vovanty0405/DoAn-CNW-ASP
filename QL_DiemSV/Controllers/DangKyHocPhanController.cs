@@ -7,7 +7,7 @@ using QL_DiemSV.Services;
 using QL_DiemSV.ViewModels;
 using System.Data;
 namespace QL_DiemSV.Controllers;
-[Authorize(Roles = "SinhVien")]
+[NonController]
 [Route("dang-ky-hoc-phan")]
 public class DangKyHocPhanController(ApplicationDbContext db) : Controller
 {

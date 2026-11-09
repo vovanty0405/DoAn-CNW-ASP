@@ -10,7 +10,7 @@
     var maSV = User.FindFirst("MaSV")?.Value ?? "";
 }
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="enterprise">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -224,8 +224,9 @@
         };
     </script>
 <link rel="stylesheet" href="~/css/sidebar.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="min-h-screen flex bg-canvas text-text-primary selection:bg-primary selection:text-white">
+<body class="enterprise-admin min-h-screen flex bg-canvas text-text-primary selection:bg-primary selection:text-white">
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-2 max-w-sm"></div>
 
@@ -237,24 +238,30 @@
     }
     else
     {
+        <div class="admin-wrapper">
         <!-- Fixed Sidebar -->
-        <aside class="w-64 bg-surface border-r border-surface-hover flex flex-col fixed inset-y-0 left-0 z-40 select-none">
+        <aside class="admin-sidebar w-64 border-r border-surface-hover flex flex-col fixed inset-y-0 left-0 z-40 select-none">
             <!-- Brand Header -->
-            <div class="p-5 border-b border-surface-hover flex items-center gap-3">
+            <div class="sidebar-brand">
                 <div class="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-inner">
                     <i data-lucide="graduation-cap" class="w-6 h-6"></i>
                 </div>
                 <div>
                     <h1 class="font-extrabold text-base tracking-tight text-text-primary leading-tight">Academic Ledger</h1>
-                    <span class="text-[11px] font-medium text-primary">ASP.NET Core MVC</span>
+                    <span class="admin-brand-badge">@roleName</span>
                 </div>
             </div>
 
             <!-- Navigation Menu -->
             <partial name="_SidebarNavigation" />
 
+            <div class="admin-website-links">
+                <p>CẤU HÌNH WEBSITE</p>
+                <a href="/portal">↗ Xem trang Cổng thông tin</a>
+            </div>
+
             <!-- User Footer -->
-            <div class="p-4 border-t border-surface-hover bg-surface-header space-y-3">
+            <div class="admin-sidebar-account p-4 border-t border-surface-hover space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2.5 min-w-0">
                         <div class="w-9 h-9 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center text-sm shrink-0">
@@ -276,15 +283,22 @@
         </aside>
 
         <!-- Main Content Area -->
-        <div class="flex-1 ml-64 flex flex-col min-h-screen min-w-0">
+        <div class="admin-main">
             <!-- Top Header Bar with Notification Bell -->
-            <header class="h-16 bg-surface/80 backdrop-blur-md border-b border-surface-hover px-8 flex items-center justify-between sticky top-0 z-30">
+            <header class="admin-topbar">
                 <div class="flex items-center gap-2 text-sm text-text-muted">
-                    <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
-                    <span>Hệ thống Quản lý Điểm Sinh viên — <strong class="text-text-primary">@ViewData["Title"]</strong></span>
+                    <strong class="admin-page-title">@ViewData["Title"]</strong>
                 </div>
 
-                <div class="flex items-center gap-4">
+                <div class="admin-topbar-actions">
+                    <a href="/portal" class="admin-outline-link">Trang chủ Portal ↗</a>
+                    <details class="admin-account-menu">
+                        <summary>@hoTen</summary>
+                        <div class="admin-account-dropdown">
+                            <span>@roleName · @username</span>
+                            <button type="button" onclick="handleLogout()">Đăng xuất</button>
+                        </div>
+                    </details>
                     <!-- Quick Theme Toggle -->
                     <button onclick="quickToggleTheme()" class="p-2 rounded-lg bg-canvas border border-surface-hover text-text-muted hover:text-primary transition-colors" title="Đổi giao diện Sáng/Tối">
                         <i data-lucide="sun-moon" class="w-4 h-4"></i>
@@ -313,9 +327,11 @@
             </header>
 
             <!-- Page Body -->
-            <main class="flex-1 p-6 md:p-8">
+            <main class="admin-content flex-1">
                 @RenderBody()
             </main>
+        </div>
+
         </div>
 
         <!-- Settings Drawer Modal -->

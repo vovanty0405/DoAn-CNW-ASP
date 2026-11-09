@@ -3,9 +3,10 @@
 @using QL_DiemSV.ViewModels
 @using System.Globalization
 @{
-    Layout=User.IsInRole("Admin")?"_Layout":"_PortalLayout";
-    ViewData["Title"]="Ma trận điều phối phòng học";
-    string MatrixUrl(string? mode=null,string? type=null,string? area=null,DateTime? date=null,bool current=false) => Url.Action("Matrix","LichHoc",new {
+    var portalSchedule = string.Equals(Context.Request.Path.Value?.TrimEnd('/'), "/Portal/LichPhongHoc", StringComparison.OrdinalIgnoreCase) || !User.IsInRole("Admin");
+    Layout = portalSchedule ? "_PortalLayout" : "_Layout";
+    ViewData["Title"] = portalSchedule ? "Lịch phòng học" : "Ma trận điều phối phòng học";
+    string MatrixUrl(string? mode=null,string? type=null,string? area=null,DateTime? date=null,bool current=false) => Url.RouteUrl(portalSchedule ? "PortalRoomSchedule" : "AdminRoomSchedule", new {
         maHK=current?null:Model.HocKy?.MaHK, week=current?(int?)null:Model.Week, day=current?(int?)null:Model.Day,
         viewMode=mode??Model.ViewMode,scheduleType=type??Model.ScheduleType,building=area??Model.Building,
         date=(current?Model.Today:date??(Model.HocKy?.NgayBatDauTuan1.HasValue==true?Model.Date:null))?.ToString("yyyy-MM-dd")
@@ -17,7 +18,7 @@
     var columnWidth=(87m/periods.Count).ToString("0.######",CultureInfo.InvariantCulture)+"%";
 }
 <div class="academic matrix-page @(Model.ViewMode=="compact"?"compact":"")" data-view-mode="@Model.ViewMode">
-<div class="section-heading"><div><p class="muted">Quản lý đào tạo / Sử dụng phòng học</p><h1>Ma trận điều phối phòng học</h1></div>@if(User.IsInRole("Admin")){<a class="button secondary" href="/quan-ly-lich-hoc">Điều phối lịch học</a>}else{<a class="button secondary" href="/portal">Về cổng đào tạo</a>}</div>
+<div class="section-heading"><div><p class="muted">Quản lý đào tạo / Sử dụng phòng học</p><h1>@ViewData["Title"]</h1></div>@if(!portalSchedule){<a class="button secondary" href="/quan-ly-lich-hoc">Điều phối lịch học</a>}else{<a class="button secondary" href="/portal">Về cổng đào tạo</a>}</div>
 <section class="panel matrix-controls">
 <div class="filter-row"><span class="filter-label">Xem theo</span><nav class="pill-group" aria-label="Chế độ xem">@foreach(var item in new[]{("week","Theo tuần"),("day","Theo ngày"),("compact","Rút gọn")}){<a class="pill matrix-tab @(Model.ViewMode==item.Item1?"selected":"")" aria-current="@(Model.ViewMode==item.Item1?"page":null)" data-mode="@item.Item1" href="@MatrixUrl(mode:item.Item1)">@item.Item2</a>}</nav></div>
 <div class="filter-row"><span class="filter-label">Loại lịch</span><nav class="pill-group" aria-label="Loại lịch"><a class="pill @(Model.ScheduleType=="all"?"selected":"")" href="@MatrixUrl(type:"all")">Tất cả</a>@foreach(var type in RoomMatrixRules.ScheduleTypes){<a class="pill @(Model.ScheduleType==type.Key?"selected":"")" href="@MatrixUrl(type:type.Key)">@type.Value</a>}</nav></div>
@@ -59,7 +60,7 @@
             var blocks=byDay[d];
             if(blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){continue;}
             var block=blocks.FirstOrDefault(x=>x.Start==tiet);
-            if(block!=null){<td rowspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons,Model.SectionSizes)" /></td>}
+            if(block!=null){<td rowspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons,Model.SectionSizes,portalSchedule)" /></td>}
             else{<td class="available-cell"><span aria-label="Trống">–</span></td>}
         }
         </tr>
@@ -74,7 +75,7 @@
     <tr><th scope="row" class="room-label"><strong>@room.MaPhong</strong><small>@RoomMatrixRules.Buildings.GetValueOrDefault(room.ToaNha,room.ToaNha) · @room.SucChua chỗ</small><span class="badge @(room.TrangThai=="HoatDong"?"active":room.TrangThai=="BaoTri"?"maintenance":"locked")">@RoomMatrixRules.Statuses.GetValueOrDefault(room.TrangThai,room.TrangThai)</span></th>
     @foreach(var tiet in periods){
         var block=blocks.FirstOrDefault(x=>x.Start==tiet);
-        if(block!=null){<td colspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons,Model.SectionSizes)" /></td>}
+        if(block!=null){<td colspan="@block.Span" class="booking-cell @(block.Lessons.Count>1?"conflict-cell":"")"><partial name="_MatrixBooking" model="new MatrixBookingViewModel(room,block.Lessons,Model.SectionSizes,portalSchedule)" /></td>}
         else if(!blocks.Any(x=>x.Start<tiet&&tiet<x.Start+x.Span)){<td class="available-cell"><span aria-label="Trống">—</span></td>}
     }
     </tr>

@@ -16,7 +16,7 @@
     </div>
 
     <!-- Filter Bar -->
-    <div class="bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
         <input id="log-account" oninput="renderLogs()" placeholder="Tìm theo Tài khoản..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
         <input id="log-action" oninput="renderLogs()" placeholder="Tìm theo Hành động..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
         <select id="log-type" onchange="renderLogs()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
@@ -29,7 +29,8 @@
     </div>
 
     <!-- Table -->
-    <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+    <div class="admin-data-card bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
+        <div class="admin-card-heading">Danh sách nhật ký hệ thống</div>
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>

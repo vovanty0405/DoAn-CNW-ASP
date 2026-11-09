@@ -76,4 +76,4 @@ public class RoomMatrixViewModel : TimetableViewModel
     public List<int> Days => ViewMode == "week" ? Enumerable.Range(2,7).ToList() : new() { Day };
 }
 
-public record MatrixBookingViewModel(PhongHoc Room, List<ClassSchedule> Lessons, IReadOnlyDictionary<string, int>? SectionSizes = null);
+public record MatrixBookingViewModel(PhongHoc Room, List<ClassSchedule> Lessons, IReadOnlyDictionary<string, int>? SectionSizes = null, bool PortalSchedule = false);

@@ -4,7 +4,7 @@
 @foreach(var lesson in Model.Lessons){
     var course=lesson.LopHocPhan;
     var over=course?.SiSoToiDa>Model.Room.SucChua;
-    <a class="booking-card @(over?"over-capacity":"")" href="@(User.IsInRole("Admin")?Url.Action("Index","LichHoc",new{id=lesson.MaLHP}):Url.Action("Timetable","Portal",new{kind="lecturer",code=lesson.MaGV}))">
+    <a class="booking-card @(over?"over-capacity":"")" href="@(!Model.PortalSchedule && User.IsInRole("Admin")?Url.Action("Index","LichHoc",new{id=lesson.MaLHP}):Url.Action("Timetable","Portal",new{kind="lecturer",code=lesson.MaGV}))">
         <div class="booking-top"><strong>@lesson.MaLHP</strong><span class="@(over?"pending":"")">SL: @(Model.SectionSizes?.GetValueOrDefault(lesson.MaLHP)??0)/@(course?.SiSoToiDa??40)</span></div>
         <div class="booking-name">@course?.MonHoc?.TenMon</div>
         <div class="booking-teacher">@lesson.GiangVien?.HoTen</div>

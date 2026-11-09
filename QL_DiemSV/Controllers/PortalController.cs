@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -311,20 +314,98 @@ public class PortalController(ApplicationDbContext db) : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = StudentLookupScope.Roles), HttpGet("KetQuaHocTap")]
-    public async Task<IActionResult> KetQuaHocTap(string? hocKy = null, string? maSV = null, string? tab = null)
+    private const string TranscriptCookie = "QLDiemSV.TranscriptAccess";
+    private const string TranscriptPath = "/Portal/KetQuaHocTap";
+
+    private ITimeLimitedDataProtector TranscriptProtector()
     {
-        if (User.Identity?.IsAuthenticated != true)
+        var viewer = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "guest";
+        return HttpContext.RequestServices.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("Portal.TranscriptAccess.v1", viewer).ToTimeLimitedDataProtector();
+    }
+
+    private CookieOptions TranscriptCookieOptions() => new()
+    {
+        Path = TranscriptPath,
+        HttpOnly = true,
+        Secure = Request.IsHttps,
+        SameSite = SameSiteMode.Strict,
+        IsEssential = true
+    };
+
+    [HttpPost("KetQuaHocTap/xac-thuc"), ValidateAntiForgeryToken, EnableRateLimiting("TranscriptVerification")]
+    public async Task<IActionResult> VerifyTranscript(string? account, string? password)
+    {
+        if (User.IsInRole("SinhVien")) return Redirect(TranscriptPath);
+        Response.Headers.CacheControl = "no-store";
+        Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions());
+        var code = account?.Trim();
+        if (!string.IsNullOrWhiteSpace(code) && code.Length <= 255 && !string.IsNullOrEmpty(password) && password.Length <= 256)
         {
-            return Redirect("/login");
+            var students = User.Identity?.IsAuthenticated == true
+                ? await StudentLookupScope.StudentsAsync(db, User)
+                : db.SinhViens.AsNoTracking();
+            var candidates = await students
+                .Where(s => s.UserAccount != null && s.UserAccount.IsActive && s.UserAccount.Role!.RoleName == "SinhVien"
+                    && (s.MaSV == code || s.Email == code || s.UserAccount.Username == code))
+                .Select(s => new { s.MaSV, s.UserAccount!.PasswordHash }).Take(2).ToListAsync(HttpContext.RequestAborted);
+            if (candidates.Count == 1 && StudentPasswordMatches(password, candidates[0].PasswordHash))
+            {
+                var duration = TimeSpan.FromMinutes(15);
+                var cookie = TranscriptCookieOptions();
+                cookie.MaxAge = duration;
+                Response.Cookies.Append(TranscriptCookie, TranscriptProtector().Protect(candidates[0].MaSV, duration), cookie);
+                return Redirect(TranscriptPath);
+            }
         }
 
-        var students = await StudentLookupScope.StudentsAsync(db, User);
-        var targetMaSV = !User.IsInRole("SinhVien") && !string.IsNullOrWhiteSpace(maSV)
-            ? maSV.Trim()
-            : await students.OrderBy(s => s.MaSV).Select(s => s.MaSV).FirstOrDefaultAsync();
+        return View(nameof(KetQuaHocTap), new PortalKetQuaHocTapViewModel
+        {
+            RequiresVerification = true,
+            ErrorMessage = "Tài khoản hoặc mật khẩu sinh viên không chính xác!"
+        });
+    }
 
-        string normalizedTab = (tab ?? "").Trim().ToLowerInvariant() switch
+    private static bool StudentPasswordMatches(string password, string hash)
+    {
+        if (!hash.StartsWith("$2", StringComparison.Ordinal))
+            return CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(password), System.Text.Encoding.UTF8.GetBytes(hash));
+        try { return BCrypt.Net.BCrypt.Verify(password, hash); }
+        catch (BCrypt.Net.SaltParseException) { return false; }
+        catch (ArgumentException) { return false; }
+    }
+
+    [HttpPost("KetQuaHocTap/doi-sinh-vien"), ValidateAntiForgeryToken]
+    public IActionResult ResetTranscript()
+    {
+        Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions());
+        return Redirect(TranscriptPath);
+    }
+
+    [HttpGet("KetQuaHocTap")]
+    public async Task<IActionResult> KetQuaHocTap(string? hocKy = null, string? tab = null)
+    {
+        Response.Headers.CacheControl = "no-store";
+        bool ownRecord = User.IsInRole("SinhVien");
+        var students = User.Identity?.IsAuthenticated == true
+            ? await StudentLookupScope.StudentsAsync(db, User)
+            : db.SinhViens.AsNoTracking();
+
+        if (!ownRecord)
+        {
+            string? verifiedCode = null;
+            if (Request.Cookies.TryGetValue(TranscriptCookie, out var ticket))
+            {
+                try { verifiedCode = TranscriptProtector().Unprotect(ticket); }
+                catch (CryptographicException) { Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions()); }
+            }
+            if (string.IsNullOrWhiteSpace(verifiedCode))
+                return View(new PortalKetQuaHocTapViewModel { RequiresVerification = true });
+            students = students.Where(s => s.MaSV == verifiedCode && s.UserAccount != null && s.UserAccount.IsActive
+                && s.UserAccount.Role!.RoleName == "SinhVien");
+        }
+
+        string normalizedTab = (ownRecord ? (tab ?? "").Trim().ToLowerInvariant() : "") switch
         {
             "ho-so" or "hoso" or "profile" => "ho-so",
             "khieu-nai" or "khieunai" or "appeals" => "khieu-nai",
@@ -334,14 +415,9 @@ public class PortalController(ApplicationDbContext db) : Controller
         var vm = new PortalKetQuaHocTapViewModel
         {
             SelectedHocKy = string.IsNullOrWhiteSpace(hocKy) ? "all" : hocKy.Trim(),
-            ActiveTab = normalizedTab
+            ActiveTab = normalizedTab,
+            IsOwnRecord = ownRecord
         };
-
-        if (string.IsNullOrWhiteSpace(targetMaSV))
-        {
-            vm.ErrorMessage = "Không xác định được mã sinh viên từ tài khoản đăng nhập.";
-            return View(vm);
-        }
 
         var sv = await students
             .Include(s => s.UserAccount)
@@ -351,14 +427,16 @@ public class PortalController(ApplicationDbContext db) : Controller
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
                     .ThenInclude(n => n!.QuyDinhTotNghiep)
-            .FirstOrDefaultAsync(s => s.MaSV == targetMaSV);
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
 
         if (sv == null)
         {
-            vm.ErrorMessage = $"Không tìm thấy hồ sơ sinh viên với mã {targetMaSV}.";
+            vm.RequiresVerification = !ownRecord;
+            vm.ErrorMessage = "Không tìm thấy hồ sơ sinh viên trong phạm vi tra cứu.";
             return View(vm);
         }
 
+        var targetMaSV = sv.MaSV;
         string maNganh = sv.LopHanhChinh?.MaNganh ?? "";
         var quyDinh = sv.LopHanhChinh?.Nganh?.QuyDinhTotNghiep;
         if (quyDinh == null && !string.IsNullOrEmpty(maNganh))
@@ -448,7 +526,7 @@ public class PortalController(ApplicationDbContext db) : Controller
         }).ToList();
 
         var rawComplaints = await db.DonKhieuNais.AsNoTracking()
-            .Where(d => d.MaSV == targetMaSV)
+            .Where(d => ownRecord && d.MaSV == targetMaSV)
             .OrderByDescending(d => d.NgayGui)
             .Select(d => new PortalComplaintItemViewModel
             {
@@ -659,6 +737,9 @@ public class PortalController(ApplicationDbContext db) : Controller
                 GPAHe4HK = hkStats.GPAHe4,
                 TinChiDangKyHK = hkStats.TinChiDangKy,
                 TinChiDatHK = hkStats.TinChiDat,
+                TinChiDaCoDiemHK = hkStats.TinChiDaCoDiem,
+                TinChiKhongDatHK = hkStats.TinChiKhongDat,
+                TinChiChuaCoDiemHK = hkStats.TinChiChuaCoDiem,
                 XepLoaiHK = hkStats.XepLoai,
                 GPAHe10TichLuy = tlStats.GPAHe10,
                 GPAHe4TichLuy = tlStats.GPAHe4,

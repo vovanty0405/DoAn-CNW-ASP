@@ -9,7 +9,6 @@
  if(admin || (User.IsInRole("DaoTao") && (await Authorization.AuthorizeAsync(User, Context, ContentAccess.ArticleView)).Succeeded))groups[0].Items.Add(("/bai-viet","Bài viết & Thông báo","newspaper"));
  var training=new List<(string,string,string)>();
  if(admin)training.AddRange(new[]{("/sinh-vien","Sinh viên","users"),("/giang-vien","Giảng viên & Khoa","user-check"),("/mon-hoc","Môn học","book-open"),("/khung-dao-tao","Khung đào tạo","layers"),("/lop-hanh-chinh","Lớp hành chính & Ngành","building-2"),("/lop-hoc-phan","Lớp học phần & Học kỳ","calendar-range")});
- if(sv)training.Add(("/dang-ky-hoc-phan","Đăng ký học phần","clipboard-check"));
  if(admin||gv||sv)training.Add(("/thoi-khoa-bieu","Thời khóa biểu","calendar-clock"));
  if(admin)training.Add(("/quan-ly-lich-hoc","Điều phối lịch & Phòng học","school"));
  if(training.Count>0)groups.Add(("training","QUẢN LÝ ĐÀO TẠO",training));
@@ -19,7 +18,7 @@
  bool Active(string url)=>url=="/"?path=="/":path==url||path.StartsWith(url+"/")||(url=="/tai-khoan"&&path.StartsWith("/phan-quyen"));
 }
 <nav class="sidebar-nav flex-1 overflow-y-auto p-3 custom-scrollbar" aria-label="Menu hệ thống">
-<div class="sidebar-heading">TỔNG QUAN</div><a class="sidebar-link @(Active("/")?"active":"")" href="/"><i data-lucide="home"></i><span>Trang chủ</span></a>
+<div class="sidebar-header sidebar-heading">TỔNG QUAN</div><a class="sidebar-link @(Active("/")?"active":"")" href="/"><i data-lucide="home"></i><span>Trang chủ</span></a>
 @if(admin||gv){<a class="sidebar-link @(Active("/thong-ke")?"active":"")" href="/thong-ke"><i data-lucide="bar-chart-3"></i><span>Thống kê & Báo cáo</span></a>}
-@foreach(var g in groups){var active=g.Items.Any(i=>Active(i.Url));<section class="sidebar-group" data-sidebar-group="@g.Key" data-active="@active.ToString().ToLowerInvariant()"><button type="button" class="sidebar-heading sidebar-toggle" aria-expanded="true" aria-controls="sidebar-@g.Key">@g.Title<span class="sidebar-chevron" aria-hidden="true">⌄</span></button><div id="sidebar-@g.Key" class="sidebar-collapse"><div class="sidebar-inner">@foreach(var i in g.Items){<a class="sidebar-link @(Active(i.Url)?"active":"")" aria-current="@(Active(i.Url)?"page":null)" href="@i.Url"><i data-lucide="@i.Icon"></i><span>@i.Label</span></a>}</div></div></section>}
+@foreach(var g in groups){var active=g.Items.Any(i=>Active(i.Url));<section class="sidebar-group" data-sidebar-group="@g.Key" data-active="@active.ToString().ToLowerInvariant()"><button type="button" class="sidebar-header sidebar-heading sidebar-toggle" aria-expanded="true" aria-controls="sidebar-@g.Key">@g.Title<span class="sidebar-chevron" aria-hidden="true">⌄</span></button><div id="sidebar-@g.Key" class="sidebar-collapse"><div class="sidebar-inner">@foreach(var i in g.Items){<a class="sidebar-link @(Active(i.Url)?"active":"")" aria-current="@(Active(i.Url)?"page":null)" href="@i.Url"><i data-lucide="@i.Icon"></i><span>@i.Label</span></a>}</div></div></section>}
 </nav>
