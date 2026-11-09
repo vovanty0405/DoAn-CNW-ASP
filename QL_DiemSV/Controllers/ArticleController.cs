@@ -10,13 +10,12 @@ using QL_DiemSV.ViewModels;
 
 namespace QL_DiemSV.Controllers;
 
-[Authorize(Roles = "Admin,GiangVien")]
+[Authorize(Policy = ContentAccess.ArticleView)]
 [Route("bai-viet")]
 [Route("AdminArticle")]
 public class ArticleController(ApplicationDbContext db, IWebHostEnvironment environment) : Controller
 {
     private int AuthorId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int id) ? id : 0;
-    private bool CanEdit(Article article) => User.IsInRole("Admin") || article.NguoiDangId == AuthorId;
 
     private async Task<List<string>> GetDepartmentsListAsync()
     {
@@ -48,8 +47,6 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         pageSize = pageSize is 10 or 20 or 50 ? pageSize : 10;
 
         var baseQuery = db.Articles.AsNoTracking().AsQueryable();
-        if (!User.IsInRole("Admin"))
-            baseQuery = baseQuery.Where(x => x.NguoiDangId == AuthorId);
 
         var summaryCounts = await baseQuery
             .GroupBy(x => 1)
@@ -122,25 +119,14 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         });
     }
 
+    [Authorize(Policy = ContentAccess.Articles + ":CREATE")]
     [HttpGet("them")]
     [HttpGet("Create")]
     public async Task<IActionResult> Create()
     {
-        var defaultUnit = "Phòng Đào tạo Đại học";
-        if (User.IsInRole("GiangVien"))
-        {
-            var maGV = User.FindFirst("MaGV")?.Value;
-            if (!string.IsNullOrEmpty(maGV))
-            {
-                var gv = await db.GiangViens.AsNoTracking().Include(g => g.Khoa).FirstOrDefaultAsync(g => g.MaGV == maGV);
-                if (!string.IsNullOrEmpty(gv?.Khoa?.TenKhoa))
-                    defaultUnit = gv.Khoa.TenKhoa;
-            }
-        }
-
         return View("~/Views/Article/Edit.cshtml", new ArticleEditViewModel
         {
-            DonViDang = defaultUnit,
+            DonViDang = "Phòng Đào tạo Đại học",
             HeDaoTao = "Đại học chính quy",
             TrangThai = "DaXuatBan",
             NgayDang = PortalRules.Local(DateTime.UtcNow),
@@ -148,13 +134,13 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         });
     }
 
+    [Authorize(Policy = ContentAccess.Articles + ":EDIT")]
     [HttpGet("{id:int}/sua")]
     [HttpGet("Edit/{id:int}")]
     public async Task<IActionResult> Edit(int id)
     {
         var a = await db.Articles.FindAsync(id);
         if (a == null) return NotFound();
-        if (!CanEdit(a)) return Forbid();
 
         return View("~/Views/Article/Edit.cshtml", new ArticleEditViewModel
         {
@@ -180,7 +166,7 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
     public async Task<IActionResult> GetArticleJson(int id)
     {
         var a = await db.Articles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
-        if (a == null || !CanEdit(a)) return NotFound();
+        if (a == null) return NotFound();
         return Json(new
         {
             id = a.Id,
@@ -203,9 +189,9 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
     [ValidateAntiForgeryToken, RequestSizeLimit(10 * 1024 * 1024)]
     public async Task<IActionResult> Save(ArticleEditViewModel vm)
     {
+        if (!await ContentAccess.AllowsAsync(db, User, ContentAccess.Articles, vm.Id == 0 ? "CREATE" : "EDIT")) return Forbid();
         var a = vm.Id == 0 ? new Article { NguoiDangId = AuthorId } : await db.Articles.FindAsync(vm.Id);
         if (a == null) return NotFound();
-        if (!CanEdit(a)) return Forbid();
         if (!await db.UserAccounts.AnyAsync(x => x.UserID == AuthorId && x.IsActive)) return Forbid();
 
         if (!PortalRules.Categories.ContainsKey(vm.DanhMuc ?? ""))
@@ -344,18 +330,19 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = ContentAccess.Articles + ":EDIT")]
     [HttpPost("{id:int}/ghim"), ValidateAntiForgeryToken]
     public async Task<IActionResult> Pin(int id)
     {
         var a = await db.Articles.FindAsync(id);
         if (a == null) return NotFound();
-        if (!CanEdit(a)) return Forbid();
         a.GhimDauTrang = !a.GhimDauTrang;
         await db.SaveChangesAsync();
         TempData["Message"] = a.GhimDauTrang ? "Đã ghim bài viết lên đầu trang." : "Đã bỏ ghim bài viết.";
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = ContentAccess.Articles + ":DELETE")]
     [HttpPost("{id:int}/xoa")]
     [HttpPost("Delete/{id:int}")]
     [ValidateAntiForgeryToken]
@@ -363,7 +350,6 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
     {
         var a = await db.Articles.FindAsync(id);
         if (a == null) return NotFound();
-        if (!CanEdit(a)) return Forbid();
         db.Articles.Remove(a);
         await db.SaveChangesAsync();
         DeleteStoredFile(a.FileDinhKemUrl);
@@ -371,12 +357,13 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = ContentAccess.Articles + ":DELETE")]
     [HttpPost("xoa-nhieu"), ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteMultiple([FromForm] List<int> ids)
     {
         if (ids == null || ids.Count == 0) return RedirectToAction(nameof(Index));
         var items = await db.Articles.Where(a => ids.Contains(a.Id)).ToListAsync();
-        var allowed = items.Where(CanEdit).ToList();
+        var allowed = items;
         foreach (var item in allowed)
         {
             db.Articles.Remove(item);
@@ -392,7 +379,7 @@ public class ArticleController(ApplicationDbContext db, IWebHostEnvironment envi
     {
         if (!ValidStorageName(name)) return NotFound();
         var a = await db.Articles.AsNoTracking().FirstOrDefaultAsync(x => x.FileDinhKemUrl == "/portal-files/" + name);
-        if (a == null || (a.TrangThai != "DaXuatBan" && !CanEdit(a))) return NotFound();
+        if (a == null || (a.TrangThai != "DaXuatBan" && !await ContentAccess.AllowsAsync(db, User, ContentAccess.Articles, "VIEW"))) return NotFound();
         var path = Path.Combine(environment.ContentRootPath, "App_Data", "PortalFiles", name);
         if (!System.IO.File.Exists(path)) return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";

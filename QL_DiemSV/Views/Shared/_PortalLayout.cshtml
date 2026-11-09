@@ -1,8 +1,12 @@
+@using QL_DiemSV.Services
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService Authorization
 @using System.Security.Claims
 @inject IConfiguration Configuration
 @{
     var logged = User.Identity?.IsAuthenticated == true;
-    var canWrite = User.IsInRole("Admin") || User.IsInRole("GiangVien");
+    var canWrite = User.IsInRole("Admin") || (User.IsInRole("DaoTao") && (await Authorization.AuthorizeAsync(User, Context, ContentAccess.ArticleView)).Succeeded);
+    var canManageCurriculum = User.IsInRole("Admin") || (User.IsInRole("DaoTao") && (await Authorization.AuthorizeAsync(User, Context, ContentAccess.CurriculumView)).Succeeded);
     var tkbPortalUrl = User.IsInRole("SinhVien")
         ? $"/portal/tra-cuu-tkb?code={Uri.EscapeDataString(User.FindFirst("MaSV")?.Value ?? User.Identity?.Name ?? "")}&kind=student"
         : User.IsInRole("GiangVien")
@@ -76,14 +80,16 @@
                             <a href="/dang-ky-hoc-phan">📚 Đăng ký học phần</a>
                         }
                         <a href="@tkbPortalUrl">🗓️ Thời khóa biểu cá nhân</a>
+                        @if (canManageCurriculum) { <a href="/admin/curriculums">Quản lý Chương trình đào tạo</a> }
                         @if (canWrite)
                         {
                             <a href="/bai-viet">📰 Quản lý bài viết</a>
                         }
-                        @if (User.IsInRole("Admin") || User.IsInRole("GiangVien") || User.IsInRole("KhaoThi"))
+                        @if (User.IsInRole("Admin") || User.IsInRole("GiangVien") || User.IsInRole("KhaoThi") || User.IsInRole("GiaoVuKhoa"))
                         {
                             <a href="/Portal/KetQuaHocTap">📊 Tra cứu KQHT &amp; Tốt nghiệp</a>
-                            <a href="/">⚙️ Khu vực quản trị</a>
+                            <a href="/tra-cuu-diem">🔎 Danh sách tra cứu điểm</a>
+                            @if (User.IsInRole("Admin") || User.IsInRole("KhaoThi")) { <a href="/">⚙️ Khu vực quản trị</a> }
                         }
                         <button id="portal-logout" type="button">Đăng xuất</button>
                     </div>

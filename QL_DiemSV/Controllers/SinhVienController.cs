@@ -9,7 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin,GiangVien,KhaoThi")]
+[Authorize(Roles = "Admin,GiangVien,KhaoThi,GiaoVuKhoa")]
 public class SinhVienController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -24,7 +24,7 @@ public class SinhVienController : ControllerBase
         string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null, string? sort = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var query = _db.SinhViens.AsNoTracking();
+        var query = await StudentLookupScope.StudentsAsync(_db, User);
         if (!string.IsNullOrWhiteSpace(maLop)) query = query.Where(s => s.MaLop == maLop);
         if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(s => s.LopHanhChinh!.MaNganh == maNganh);
         if (!string.IsNullOrWhiteSpace(maKhoa)) query = query.Where(s => s.LopHanhChinh!.Nganh!.MaKhoa == maKhoa);
@@ -71,7 +71,8 @@ public class SinhVienController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var item = await _db.SinhViens
+        var students = await StudentLookupScope.StudentsAsync(_db, User);
+        var item = await students
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
                     .ThenInclude(n => n!.Khoa)

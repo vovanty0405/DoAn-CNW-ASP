@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using QL_DiemSV.Services;
 using Microsoft.AspNetCore.Mvc;
 using QL_DiemSV.Models;
 using System.Diagnostics;
@@ -9,7 +11,7 @@ public class HomeController : Controller
     [HttpGet("/")]
     public IActionResult Index()
     {
-        if (User.Identity?.IsAuthenticated != true || User.IsInRole("SinhVien") || User.IsInRole("GiangVien")) return Redirect("/portal");
+        if (User.Identity?.IsAuthenticated != true || User.IsInRole("SinhVien") || (User.IsInRole("GiangVien") || User.IsInRole("DaoTao") || User.IsInRole("GiaoVuKhoa"))) return Redirect("/portal");
         ViewData["Title"] = "Trang chủ & Tổng quan";
         return View("Index");
     }
@@ -86,7 +88,7 @@ public class HomeController : Controller
         return View("DiemSo");
     }
 
-    [HttpGet("/tra-cuu-diem")]
+    [Authorize(Roles = StudentLookupScope.Roles), HttpGet("/tra-cuu-diem")]
     public IActionResult TraCuuDiem()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -102,7 +104,7 @@ public class HomeController : Controller
         return View("KhieuNai");
     }
 
-    [HttpGet("/tai-khoan")]
+    [Authorize(Roles = "Admin"), HttpGet("/tai-khoan")]
     public IActionResult TaiKhoan()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -110,7 +112,7 @@ public class HomeController : Controller
         return View("TaiKhoan");
     }
 
-    [HttpGet("/phan-quyen-chi-tiet/{id?}")]
+    [Authorize(Roles = "Admin"), HttpGet("/phan-quyen-chi-tiet/{id?}")]
     public IActionResult PhanQuyenChiTiet(int? id)
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");

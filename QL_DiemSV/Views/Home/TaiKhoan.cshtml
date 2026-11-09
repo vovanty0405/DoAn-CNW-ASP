@@ -70,6 +70,9 @@
 
     <!-- Tab 2: Roles -->
     <div id="tab-role" class="hidden space-y-4">
+        <div class="flex justify-end">
+            <button type="button" onclick="openRoleModal()" class="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold">+ Thêm nhóm quyền</button>
+        </div>
         <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
@@ -85,6 +88,23 @@
             </table>
         </div>
     </div>
+</div>
+
+<div id="role-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <form id="role-form" onsubmit="saveRole(event)" class="w-full max-w-md bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
+        @Html.AntiForgeryToken()
+        <h3 id="role-title" class="font-bold text-text-primary">Thêm nhóm quyền</h3>
+        <label class="block text-sm">Mã nhóm quyền
+            <input id="role-name" required maxlength="50" pattern="[A-Za-z][A-Za-z0-9_]*" placeholder="VD: DaoTao" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2" />
+        </label>
+        <label class="block text-sm">Mô tả
+            <textarea id="role-description" maxlength="255" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2"></textarea>
+        </label>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="document.getElementById('role-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-surface-hover">Hủy</button>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-white font-bold">Lưu nhóm quyền</button>
+        </div>
+    </form>
 </div>
 
 <!-- Modal Tài khoản -->
@@ -105,8 +125,13 @@
             </div>
             <div>
                 <label class="block text-xs text-text-muted mb-1">Nhóm Quyền</label>
-                <select id="u-roleid" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
+                <select id="u-roleid" onchange="updateFacultyField()" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary"></select>
             </div>
+            <label id="faculty-field" class="hidden block text-xs text-text-muted">Khoa phụ trách của giáo vụ
+                <select id="u-faculty" class="mt-1 w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary">
+                    <option value="">Chọn khoa</option>
+                </select>
+            </label>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Loại đối tượng liên kết</label>
@@ -146,7 +171,7 @@
         </div>
         <form onsubmit="handlePwdConfirmSubmit(event)" class="p-6 space-y-4">
             <p class="text-xs text-text-muted leading-relaxed">
-                Hành động này mang tính chất quan trọng và không thể hoàn tác. Để tiếp tục xóa tài khoản <span id="pwd-confirm-item-name" class="font-bold text-text-primary"></span>, vui lòng nhập mật khẩu tài khoản của bạn để xác thực:
+                Hành động này mang tính chất quan trọng và không thể hoàn tác. Để tiếp tục xóa <span id="pwd-confirm-item-name" class="font-bold text-text-primary"></span>, vui lòng nhập mật khẩu tài khoản của bạn để xác thực:
             </p>
             <div>
                 <label class="block text-xs font-semibold text-text-muted mb-1.5">Mật khẩu tài khoản *</label>
@@ -174,13 +199,61 @@
         let accounts = [], roles = [], editingAccId = null;
         let accCurrentPage = 1, accPageSize = 10;
         let pendingDeleteAction = null;
+        let editingRoleId = null;
+        function roleText(value) {
+            const span = document.createElement('span');
+            span.textContent = value ?? '';
+            return span.innerHTML;
+        }
+        function roleRequestHeaders() {
+            return { RequestVerificationToken: document.querySelector('#role-form input[name="__RequestVerificationToken"]').value };
+        }
+        function openRoleModal(id = null) {
+            const role = roles.find(r => r.id === id);
+            editingRoleId = role?.id ?? null;
+            document.getElementById('role-title').textContent = role ? 'Sửa nhóm quyền' : 'Thêm nhóm quyền';
+            const name = document.getElementById('role-name');
+            name.value = role?.name ?? '';
+            name.readOnly = role?.systemRole === true;
+            document.getElementById('role-description').value = role?.description ?? '';
+            document.getElementById('role-modal').classList.remove('hidden');
+            (name.readOnly ? document.getElementById('role-description') : name).focus();
+        }
+        async function saveRole(event) {
+            event.preventDefault();
+            const url = '/api/phanquyen/roles' + (editingRoleId == null ? '' : '/' + editingRoleId);
+            try {
+                await apiFetch(url, { method: editingRoleId == null ? 'POST' : 'PUT', headers: roleRequestHeaders(),
+                    body: JSON.stringify({ Name: document.getElementById('role-name').value.trim(),
+                        Description: document.getElementById('role-description').value.trim() }) });
+                document.getElementById('role-modal').classList.add('hidden');
+                showToast('Đã lưu nhóm quyền.');
+                await initPage();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+        function deleteRole(id) {
+            const role = roles.find(r => r.id === id);
+            if (!role || role.systemRole || role.userCount > 0) return;
+            requestSecureDelete('Nhóm quyền ' + role.name, async () => {
+                await apiFetch('/api/phanquyen/roles/' + id, { method: 'DELETE', headers: roleRequestHeaders() });
+                showToast('Đã xóa nhóm quyền.');
+                await initPage();
+            });
+        }
+        function updateFacultyField() {
+            const role = roles.find(r => r.id === Number(document.getElementById('u-roleid').value));
+            document.getElementById('faculty-field').classList.toggle('hidden', role?.name !== 'GiaoVuKhoa');
+        }
 
         async function initPage() {
-            const resRoles = await apiFetch('/api/phanquyen/roles');
+            const [resRoles, faculties] = await Promise.all([apiFetch('/api/phanquyen/roles'), apiFetch('/api/khoa')]);
+            const facultySelect = document.getElementById('u-faculty');
+            facultySelect.replaceChildren(new Option('Chọn khoa', ''));
+            for (const faculty of faculties.data || []) facultySelect.add(new Option(faculty.TenKhoa, faculty.MaKhoa));
             roles = resRoles.data || [];
 
-            document.getElementById('acc-role').innerHTML = '<option value="">Tất cả Nhóm quyền</option>' + roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-            document.getElementById('u-roleid').innerHTML = roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+            document.getElementById('acc-role').innerHTML = '<option value="">Tất cả Nhóm quyền</option>' + roles.map(r => `<option value="${r.id}">${roleText(r.name)}</option>`).join('');
+            document.getElementById('u-roleid').innerHTML = roles.map(r => `<option value="${r.id}">${roleText(r.name)}</option>`).join('');
 
             renderRoles();
             await loadAccounts();
@@ -228,7 +301,7 @@
                     <tr class="hover:bg-surface-hover/40 transition-colors">
                         <td class="px-5 py-3.5 text-text-muted">${a.id}</td>
                         <td class="px-5 py-3.5 font-bold text-primary">${a.username}</td>
-                        <td class="px-5 py-3.5"><span class="px-2.5 py-1 rounded-md bg-surface-hover text-xs font-semibold">${a.role}</span></td>
+                        <td class="px-5 py-3.5"><span class="px-2.5 py-1 rounded-md bg-surface-hover text-xs font-semibold">${roleText(a.role)}</span></td>
                         <td class="px-5 py-3.5 text-text-muted">${a.refId || '--'}</td>
                         <td class="px-5 py-3.5 text-center">
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${a.status ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${a.status ? 'Hoạt động' : 'Đã khóa'}</span>
@@ -304,13 +377,17 @@
             document.getElementById('role-tbody').innerHTML = roles.map(r => `
                 <tr class="hover:bg-surface-hover/40 transition-colors">
                     <td class="px-5 py-4 text-text-muted">${r.id}</td>
-                    <td class="px-5 py-4 font-bold text-primary">${r.name}</td>
-                    <td class="px-5 py-4 text-text-muted">${r.description}</td>
+                    <td class="px-5 py-4 font-bold text-primary">${roleText(r.name)}</td>
+                    <td class="px-5 py-4 text-text-muted">${roleText(r.description)}</td>
                     <td class="px-5 py-4 text-center font-bold">${r.userCount} user(s)</td>
                     <td class="px-5 py-4 text-right">
                         <a href="/phan-quyen-chi-tiet/${r.id}" class="px-3.5 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5">
                             <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Cấu hình Ma trận Quyền
                         </a>
+                        <button type="button" onclick="openRoleModal(${r.id})" class="ml-2 px-3 py-1.5 rounded-lg border border-surface-hover text-xs font-bold">Sửa</button>
+                        <button type="button" onclick="deleteRole(${r.id})" ${r.systemRole || r.userCount > 0 ? 'disabled' : ''}
+                            title="${r.systemRole ? 'Nhóm quyền hệ thống' : r.userCount > 0 ? 'Nhóm đang có tài khoản' : 'Xóa nhóm quyền'}"
+                            class="ml-2 px-3 py-1.5 rounded-lg text-red-500 bg-red-500/10 text-xs font-bold disabled:opacity-40">Xóa</button>
                     </td>
                 </tr>
             `).join('');
@@ -330,6 +407,8 @@
             document.getElementById('u-roleid').value = acc ? (acc.roleId || roles[0]?.id) : (roles[0]?.id || 1);
             document.getElementById('u-reftype').value = acc ? (acc.rawRefType || '') : '';
             document.getElementById('u-refid').value = acc ? (acc.rawRefId || '') : '';
+            document.getElementById('u-faculty').value = acc?.maKhoa ?? '';
+            updateFacultyField();
             document.getElementById('u-active').checked = acc ? acc.status : true;
             document.getElementById('acc-modal').classList.remove('hidden');
         }
@@ -340,6 +419,7 @@
                 username: document.getElementById('u-username').value.trim(),
                 password: document.getElementById('u-password').value,
                 roleId: Number(document.getElementById('u-roleid').value),
+                maKhoa: document.getElementById('u-faculty').value,
                 refType: document.getElementById('u-reftype').value,
                 refId: document.getElementById('u-refid').value.trim(),
                 isActive: document.getElementById('u-active').checked

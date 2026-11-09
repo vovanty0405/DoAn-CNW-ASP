@@ -20,11 +20,9 @@ public class PortalController(ApplicationDbContext db) : Controller
     [HttpGet("CurriculumDetail/{id:int}")]
     public async Task<IActionResult> CurriculumDetail(int id) {
       var c=await db.Curriculums.AsNoTracking().Include(x=>x.NganhHoc).Include(x=>x.Sections).FirstOrDefaultAsync(x=>x.Id==id);
-      if(c==null||(!c.TrangThai&&!User.IsInRole("Admin")))return NotFound();
+      if(c==null||(!c.TrangThai&&!await ContentAccess.AllowsAsync(db,User,ContentAccess.Curriculums,"VIEW")))return NotFound();
       return View(new CurriculumDetailViewModel{Curriculum=c,Alternatives=await db.Curriculums.AsNoTracking().Where(x=>x.TrangThai&&x.NganhHocId==c.NganhHocId&&x.HeDaoTao==c.HeDaoTao).OrderByDescending(x=>x.KhoaHoc).ToListAsync()});
     }
-    private int CurrentUserId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int id) ? id : 0;
-    private bool CanPreviewDraft(Article a) => User.IsInRole("Admin") || (CurrentUserId > 0 && a.NguoiDangId == CurrentUserId);
 
     [HttpGet("")]
     public async Task<IActionResult> Index(string category = "all", string? search = null, int page = 1)
@@ -180,7 +178,7 @@ public class PortalController(ApplicationDbContext db) : Controller
     public async Task<IActionResult> ArticleDetail(int id)
     {
         var article = await db.Articles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
-        if (article == null || (article.TrangThai != "DaXuatBan" && !CanPreviewDraft(article)))
+        if (article == null || (article.TrangThai != "DaXuatBan" && !await ContentAccess.AllowsAsync(db, User, ContentAccess.Articles, "VIEW")))
             return NotFound();
 
         var sameCategory = await db.Articles.AsNoTracking()
@@ -313,7 +311,7 @@ public class PortalController(ApplicationDbContext db) : Controller
         return View(vm);
     }
 
-    [Authorize, HttpGet("KetQuaHocTap")]
+    [Authorize(Roles = StudentLookupScope.Roles), HttpGet("KetQuaHocTap")]
     public async Task<IActionResult> KetQuaHocTap(string? hocKy = null, string? maSV = null, string? tab = null)
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -321,17 +319,10 @@ public class PortalController(ApplicationDbContext db) : Controller
             return Redirect("/login");
         }
 
-        string? targetMaSV = null;
-        if (User.IsInRole("SinhVien"))
-        {
-            targetMaSV = (User.FindFirstValue("MaSV") ?? User.Identity?.Name)?.Trim();
-        }
-        else
-        {
-            targetMaSV = !string.IsNullOrWhiteSpace(maSV)
-                ? maSV.Trim()
-                : (User.FindFirstValue("MaSV") ?? await db.SinhViens.AsNoTracking().OrderBy(s => s.MaSV).Select(s => s.MaSV).FirstOrDefaultAsync());
-        }
+        var students = await StudentLookupScope.StudentsAsync(db, User);
+        var targetMaSV = !User.IsInRole("SinhVien") && !string.IsNullOrWhiteSpace(maSV)
+            ? maSV.Trim()
+            : await students.OrderBy(s => s.MaSV).Select(s => s.MaSV).FirstOrDefaultAsync();
 
         string normalizedTab = (tab ?? "").Trim().ToLowerInvariant() switch
         {
@@ -352,7 +343,7 @@ public class PortalController(ApplicationDbContext db) : Controller
             return View(vm);
         }
 
-        var sv = await db.SinhViens.AsNoTracking()
+        var sv = await students
             .Include(s => s.UserAccount)
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
@@ -738,7 +729,7 @@ public class PortalController(ApplicationDbContext db) : Controller
         public string? DiaChi { get; set; }
     }
 
-    [Authorize, HttpPut("CapNhatHoSo")]
+    [Authorize(Roles = "Admin,SinhVien"), HttpPut("CapNhatHoSo")]
     public async Task<IActionResult> CapNhatHoSo([FromBody] UpdateStudentProfileDto req)
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -755,7 +746,9 @@ public class PortalController(ApplicationDbContext db) : Controller
             return BadRequest(new { status = "error", message = "Không xác định được mã sinh viên cần cập nhật!" });
         }
 
-        var sv = await db.SinhViens.FirstOrDefaultAsync(s => s.MaSV == targetMaSV);
+        int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId);
+        var sv = await db.SinhViens.FirstOrDefaultAsync(s => s.MaSV == targetMaSV
+            && (User.IsInRole("Admin") || s.UserID == accountId));
         if (sv == null)
         {
             return NotFound(new { status = "error", message = "Không tìm thấy hồ sơ sinh viên trong hệ thống!" });

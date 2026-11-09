@@ -21,7 +21,7 @@ public static class AcademicSchemaUpgrade
         try
         {
             schemaReady = db.Database.SqlQueryRaw<int>(
-                "SELECT CASE WHEN OBJECT_ID('CurriculumSections','U') IS NOT NULL AND COL_LENGTH('LopHocPhan','TyLeThiKetThuc') IS NOT NULL AND COL_LENGTH('Article','HeDaoTao') IS NOT NULL THEN 1 ELSE 0 END AS [Value]")
+                "SELECT CASE WHEN OBJECT_ID('CurriculumSections','U') IS NOT NULL AND COL_LENGTH('LopHocPhan','TyLeThiKetThuc') IS NOT NULL AND COL_LENGTH('Article','HeDaoTao') IS NOT NULL AND COL_LENGTH('dbo.UserAccounts','MaKhoa') IS NOT NULL THEN 1 ELSE 0 END AS [Value]")
                 .AsEnumerable()
                 .FirstOrDefault() == 1;
         }
@@ -35,6 +35,7 @@ public static class AcademicSchemaUpgrade
                 using var tx = db.Database.BeginTransaction();
                 db.Database.ExecuteSqlRaw("""
                     EXEC sp_getapplock @Resource=N'AcademicLedger.Schema', @LockMode='Exclusive', @LockOwner='Transaction';
+                    IF COL_LENGTH('dbo.UserAccounts','MaKhoa') IS NULL ALTER TABLE dbo.UserAccounts ADD MaKhoa nvarchar(20) NULL;
                     IF COL_LENGTH('LopHocPhan','NMH') IS NULL ALTER TABLE LopHocPhan ADD NMH nvarchar(10) NOT NULL CONSTRAINT DF_LHP_NMH DEFAULT '01';
                     IF COL_LENGTH('LopHocPhan','TTH') IS NULL ALTER TABLE LopHocPhan ADD TTH nvarchar(10) NULL;
                     IF COL_LENGTH('LopHocPhan','STC') IS NULL BEGIN

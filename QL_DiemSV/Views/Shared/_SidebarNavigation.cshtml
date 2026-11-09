@@ -1,9 +1,12 @@
+@using QL_DiemSV.Services
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService Authorization
 @{
  var path=Context.Request.Path.Value?.ToLowerInvariant()??"/";var admin=User.IsInRole("Admin");var gv=User.IsInRole("GiangVien");var sv=User.IsInRole("SinhVien");
  var groups=new List<(string Key,string Title,List<(string Url,string Label,string Icon)> Items)>();
  groups.Add(("portal","QUẢN LÝ PORTAL",new(){("/portal","Cổng thông tin đào tạo","globe")}));
- if(admin)groups[0].Items.Add(("/admin/curriculums","Quản lý Chương trình đào tạo","graduation-cap"));
- if(admin||gv)groups[0].Items.Add(("/bai-viet","Bài viết & Thông báo","newspaper"));
+ if(admin || (User.IsInRole("DaoTao") && (await Authorization.AuthorizeAsync(User, Context, ContentAccess.CurriculumView)).Succeeded))groups[0].Items.Add(("/admin/curriculums","Quản lý Chương trình đào tạo","graduation-cap"));
+ if(admin || (User.IsInRole("DaoTao") && (await Authorization.AuthorizeAsync(User, Context, ContentAccess.ArticleView)).Succeeded))groups[0].Items.Add(("/bai-viet","Bài viết & Thông báo","newspaper"));
  var training=new List<(string,string,string)>();
  if(admin)training.AddRange(new[]{("/sinh-vien","Sinh viên","users"),("/giang-vien","Giảng viên & Khoa","user-check"),("/mon-hoc","Môn học","book-open"),("/khung-dao-tao","Khung đào tạo","layers"),("/lop-hanh-chinh","Lớp hành chính & Ngành","building-2"),("/lop-hoc-phan","Lớp học phần & Học kỳ","calendar-range")});
  if(sv)training.Add(("/dang-ky-hoc-phan","Đăng ký học phần","clipboard-check"));
@@ -11,7 +14,7 @@
  if(admin)training.Add(("/quan-ly-lich-hoc","Điều phối lịch & Phòng học","school"));
  if(training.Count>0)groups.Add(("training","QUẢN LÝ ĐÀO TẠO",training));
  var grades=new List<(string,string,string)>();if(admin||gv||User.IsInRole("KhaoThi"))grades.Add(("/diem-so","Quản lý Điểm số","file-spreadsheet"));
- grades.Add(("/tra-cuu-diem","Tra cứu điểm & Tốt nghiệp","award"));if(admin||gv)grades.Add(("/khieu-nai","Khiếu nại & Phúc khảo","message-square-warning"));groups.Add(("grades","ĐIỂM SỐ & PHÚC KHẢO",grades));
+ if(admin||gv||sv||User.IsInRole("GiaoVuKhoa")||User.IsInRole("KhaoThi")) grades.Add(("/tra-cuu-diem","Tra cứu điểm & Tốt nghiệp","award"));if(admin||gv)grades.Add(("/khieu-nai","Khiếu nại & Phúc khảo","message-square-warning"));groups.Add(("grades","ĐIỂM SỐ & PHÚC KHẢO",grades));
  if(admin)groups.Add(("system","QUẢN TRỊ HỆ THỐNG",new(){("/tai-khoan","Tài khoản & Phân quyền","shield-check"),("/nhat-ky-he-thong","Nhật ký hệ thống","history")}));
  bool Active(string url)=>url=="/"?path=="/":path==url||path.StartsWith(url+"/")||(url=="/tai-khoan"&&path.StartsWith("/phan-quyen"));
 }

@@ -5,75 +5,139 @@
 }
 
 <style>
+    /* =========================================================================
+       SWISS MODERNISM 2.0 + DATA-DENSE ENTERPRISE ACADEMIC SYSTEM
+       Base Unit: 8px | Grid: 12 Columns | Typography: Inter + JetBrains Mono
+       ========================================================================= */
     .kqht-page {
-        padding: 28px 0 64px;
+        padding: 16px 0 48px;
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     }
+
+    /* Breadcrumb & Page Header */
     .kqht-breadcrumb {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 13px;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
         color: var(--color-text-muted);
-        margin-bottom: 20px;
+        margin-bottom: 12px;
     }
     .kqht-breadcrumb a {
         color: var(--color-primary);
         font-weight: 600;
+        transition: color 0.12s ease;
     }
+    .kqht-breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
     .kqht-header-bar {
         display: flex;
         flex-wrap: wrap;
-        align-items: flex-start;
+        align-items: flex-end;
         justify-content: space-between;
         gap: 16px;
-        margin-bottom: 24px;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--color-border);
     }
     .kqht-title {
-        font-size: 26px;
+        font-size: 22px;
         font-weight: 800;
-        letter-spacing: -0.02em;
-        margin: 0 0 6px;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        margin: 0 0 4px;
         color: var(--color-text-primary);
     }
     .kqht-subtitle {
-        font-size: 14px;
-        color: var(--color-text-secondary);
+        font-size: 13px;
+        color: var(--color-text-muted);
         margin: 0;
+        max-width: 720px;
     }
     .kqht-header-actions {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
+
+    /* Standardized Enterprise Controls & Micro-interactions */
     .kqht-btn-outline {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 9px 15px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.28);
+        justify-content: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
         background: var(--color-surface);
         color: var(--color-text-primary);
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.18s ease;
+        transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
+        user-select: none;
     }
     .kqht-btn-outline:hover {
         border-color: var(--color-primary);
         color: var(--color-primary);
-        background: var(--color-surface-hover);
+        background: var(--color-surface-header);
+    }
+    .kqht-btn-outline:active {
+        transform: translateY(1px);
+    }
+    .kqht-btn-outline:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
     }
 
-    /* Summary Banner */
+    .kqht-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 16px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: #0f3d75;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.14s ease, transform 0.08s ease;
+    }
+    html.dark .kqht-btn-primary {
+        background: #0284c7;
+    }
+    .kqht-btn-primary:hover {
+        background: #0a2952;
+    }
+    html.dark .kqht-btn-primary:hover {
+        background: #0369a1;
+    }
+    .kqht-btn-primary:active {
+        transform: translateY(1px);
+    }
+    .kqht-btn-primary:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* 1. Executive Summary Ledger Banner (Swiss 12-Col Grid) */
     .kqht-summary-banner {
         background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 28px;
-        box-shadow: 0 10px 30px -15px rgba(2, 6, 23, 0.35);
+        border: 1px solid var(--color-border);
+        border-top: 3px solid var(--color-primary);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: var(--portal-shadow);
     }
     .kqht-banner-top {
         display: flex;
@@ -81,274 +145,373 @@
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-        margin-bottom: 22px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--color-border-subtle);
+        margin-bottom: 16px;
     }
     .kqht-student-profile {
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 14px;
     }
     .kqht-avatar {
-        width: 56px;
-        height: 56px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-        color: #fff;
+        width: 46px;
+        height: 46px;
+        border-radius: 6px;
+        background: #0f3d75;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        font-size: 18px;
         font-weight: 800;
+        letter-spacing: -0.03em;
         flex-shrink: 0;
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
     }
     .kqht-student-name {
-        font-size: 19px;
-        font-weight: 800;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.015em;
         color: var(--color-text-primary);
         margin: 0 0 4px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
     }
     .kqht-mssv-pill {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 12px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 11.5px;
         font-weight: 700;
-        padding: 3px 9px;
-        border-radius: 6px;
-        background: rgba(59, 130, 246, 0.15);
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: var(--color-surface-header);
         color: var(--color-primary);
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        border: 1px solid var(--color-border);
     }
     .kqht-student-meta {
-        font-size: 13px;
-        color: var(--color-text-secondary);
+        font-size: 12.5px;
+        color: var(--color-text-muted);
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
+        gap: 6px 16px;
     }
+    .kqht-student-meta strong {
+        color: var(--color-text-secondary);
+        font-weight: 600;
+    }
+
+    /* Institutional Status Stamp */
     .kqht-grad-badge {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        padding: 11px 18px;
-        border-radius: 12px;
-        font-size: 13px;
-        font-weight: 800;
-        letter-spacing: 0.02em;
+        gap: 8px;
+        padding: 7px 14px;
+        border-radius: 4px;
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
     }
     .kqht-grad-badge.eligible {
-        background: rgba(16, 185, 129, 0.14);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.35);
+        background: rgba(15, 118, 110, 0.1);
+        color: #0f766e;
+        border: 1px solid rgba(15, 118, 110, 0.35);
+    }
+    html.dark .kqht-grad-badge.eligible {
+        background: rgba(20, 184, 166, 0.12);
+        color: #2dd4bf;
+        border-color: rgba(45, 212, 191, 0.35);
     }
     .kqht-grad-badge.not-eligible {
-        background: rgba(245, 158, 11, 0.14);
-        color: #f59e0b;
-        border: 1px solid rgba(245, 158, 11, 0.35);
+        background: rgba(180, 83, 9, 0.09);
+        color: #b45309;
+        border: 1px solid rgba(180, 83, 9, 0.32);
+    }
+    html.dark .kqht-grad-badge.not-eligible {
+        background: rgba(245, 158, 11, 0.12);
+        color: #fbbf24;
+        border-color: rgba(251, 191, 36, 0.35);
     }
 
-    /* Metrics Grid inside Banner */
+    /* 12-Column Swiss KPI Grid */
     .kqht-metrics-grid {
         display: grid;
-        grid-template-columns: 1.5fr 1fr 1fr;
-        gap: 20px;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 16px;
         align-items: stretch;
     }
-    @@media (max-width: 992px) {
-        .kqht-metrics-grid {
-            grid-template-columns: 1fr;
-        }
-    }
     .kqht-metric-box {
-        background: var(--color-surface-header);
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 14px;
-        padding: 18px 20px;
+        grid-column: span 4;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 6px;
+        padding: 14px 16px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
+    @@media (max-width: 1024px) {
+        .kqht-metric-box {
+            grid-column: span 12;
+        }
+    }
     .kqht-metric-header {
         display: flex;
-        align-items: center;
+        align-items: baseline;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .kqht-metric-label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         color: var(--color-text-muted);
     }
     .kqht-metric-value-lg {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 24px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 20px;
         font-weight: 800;
         color: var(--color-text-primary);
     }
     .kqht-progress-track {
         width: 100%;
-        height: 12px;
-        background: rgba(148, 163, 184, 0.18);
-        border-radius: 999px;
+        height: 6px;
+        background: var(--color-surface-header);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 3px;
         overflow: hidden;
-        margin: 10px 0 14px;
+        margin: 8px 0 12px;
     }
     .kqht-progress-fill {
         height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #2563eb, #10b981);
-        transition: width 0.5s ease;
+        background: var(--color-primary);
+        transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .kqht-credit-breakdown {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 8px;
     }
     .kqht-credit-subitem {
-        background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 10px;
-        padding: 9px 12px;
-        font-size: 12.5px;
+        background: var(--color-surface-header);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 4px;
+        padding: 8px 10px;
     }
     .kqht-credit-subitem .sub-label {
+        font-size: 11px;
         color: var(--color-text-muted);
         display: block;
-        margin-bottom: 3px;
+        margin-bottom: 2px;
     }
     .kqht-credit-subitem .sub-val {
-        font-family: "JetBrains Mono", monospace;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
         font-weight: 700;
-        font-size: 14px;
+        font-size: 13px;
         color: var(--color-text-primary);
     }
+
+    /* GPA Cards */
     .kqht-gpa-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin: 8px 0 12px;
+        gap: 8px;
+        margin: 6px 0 10px;
     }
     .kqht-gpa-card {
-        background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 10px;
-        padding: 12px;
-        text-align: center;
+        background: var(--color-surface-header);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 4px;
+        padding: 10px 12px;
+        text-align: left;
     }
     .kqht-gpa-card .gpa-num {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 26px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 22px;
         font-weight: 800;
         color: var(--color-primary);
         line-height: 1.15;
     }
     .kqht-gpa-card .gpa-scale {
-        font-size: 11.5px;
+        font-size: 11px;
         color: var(--color-text-muted);
-        margin-top: 4px;
+        margin-top: 3px;
     }
+
+    /* Audit Checklist */
     .kqht-checklist {
         list-style: none;
         padding: 0;
-        margin: 6px 0 0;
+        margin: 4px 0 0;
         display: flex;
         flex-direction: column;
-        gap: 7px;
-        font-size: 12.5px;
+        gap: 4px;
+        font-size: 12px;
     }
     .kqht-checklist li {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 5px 9px;
-        border-radius: 7px;
-        background: var(--color-surface);
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 3px;
+        background: var(--color-surface-header);
+        border-left: 2px solid transparent;
+        font-weight: 500;
     }
     .kqht-checklist li.ok {
-        color: #10b981;
+        color: var(--color-text-secondary);
+        border-left-color: #0f766e;
+    }
+    html.dark .kqht-checklist li.ok {
+        border-left-color: #2dd4bf;
     }
     .kqht-checklist li.warn {
-        color: #f59e0b;
+        color: #b45309;
+        border-left-color: #d97706;
+    }
+    html.dark .kqht-checklist li.warn {
+        color: #fbbf24;
+        border-left-color: #fbbf24;
     }
 
-    /* Filter Bar */
+    /* Segmented Enterprise Tabs Bar */
+    .kqht-tabs-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--color-border);
+        padding: 0;
+        background: transparent;
+    }
+    .kqht-tab-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 10px 16px;
+        border: none;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        color: var(--color-text-muted);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: color 0.14s ease, background-color 0.14s ease, border-color 0.14s ease;
+        margin-bottom: -1px;
+    }
+    .kqht-tab-btn:hover {
+        color: var(--color-text-primary);
+        background: var(--color-surface-header);
+    }
+    .kqht-tab-btn:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: -2px;
+    }
+    .kqht-tab-btn.active {
+        color: var(--color-primary);
+        border-bottom-color: var(--color-primary);
+        font-weight: 700;
+        background: transparent;
+    }
+    .kqht-tab-pane {
+        display: none;
+    }
+    .kqht-tab-pane.active {
+        display: block;
+    }
+
+    /* Compact Filter Toolbar */
     .kqht-filter-bar {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        gap: 12px;
         background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        border-radius: 14px;
-        padding: 14px 18px;
-        margin-bottom: 22px;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
     }
     .kqht-filter-group {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
     }
-    .kqht-select, .kqht-search-input {
-        background: var(--color-surface-header);
+    .kqht-select,
+    .kqht-search-input {
+        height: 34px;
+        background: var(--color-surface);
         color: var(--color-text-primary);
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 9px;
-        padding: 8px 13px;
-        font-size: 13.5px;
+        border: 1px solid var(--color-border);
+        border-radius: 5px;
+        padding: 0 11px;
+        font-size: 13px;
+        transition: border-color 0.14s ease, box-shadow 0.14s ease;
+    }
+    .kqht-select:hover,
+    .kqht-search-input:hover {
+        border-color: var(--color-text-muted);
+    }
+    .kqht-select:focus,
+    .kqht-search-input:focus {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
         outline: none;
     }
-    .kqht-select:focus, .kqht-search-input:focus {
-        border-color: var(--color-primary);
-    }
 
-    /* Semester Card & Grade Table */
+    /* Data-Dense Semester Transcript Card & Table */
     .kqht-semester-card {
         background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 14px;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
         overflow: hidden;
-        margin-bottom: 24px;
+        margin-bottom: 18px;
+        box-shadow: var(--portal-shadow);
     }
     .kqht-semester-header {
         background: var(--color-surface-header);
-        padding: 14px 20px;
+        padding: 10px 16px;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        border-bottom: 1px solid var(--color-border);
     }
     .kqht-semester-title {
-        font-size: 15.5px;
-        font-weight: 800;
+        font-size: 13.5px;
+        font-weight: 700;
         color: var(--color-text-primary);
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         margin: 0;
     }
     .kqht-semester-stats {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
-        font-size: 12.5px;
-        color: var(--color-text-secondary);
+        gap: 6px 14px;
+        font-size: 12px;
+        color: var(--color-text-muted);
     }
     .kqht-semester-stats strong {
-        font-family: "JetBrains Mono", monospace;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
         color: var(--color-text-primary);
+        font-weight: 700;
     }
+
     .kqht-table-wrap {
         width: 100%;
         overflow-x: auto;
@@ -356,117 +519,268 @@
     .kqht-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 13.5px;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
     }
     .kqht-table th {
-        background: rgba(148, 163, 184, 0.06);
+        background: var(--color-surface);
         color: var(--color-text-muted);
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
-        padding: 12px 14px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        letter-spacing: 0.05em;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--color-border);
         white-space: nowrap;
         text-align: left;
     }
     .kqht-table td {
-        padding: 12px 14px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--color-border-subtle);
         color: var(--color-text-primary);
         vertical-align: middle;
+        line-height: 1.4;
+    }
+    .kqht-table tbody tr {
+        transition: background-color 0.1s ease;
     }
     .kqht-table tbody tr:hover {
-        background: var(--color-surface-hover);
+        background: var(--color-surface-header);
+    }
+    .kqht-table tbody tr:last-child td {
+        border-bottom: none;
     }
     .kqht-table .col-center {
         text-align: center;
     }
     .kqht-table .col-mono {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 13px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 12.5px;
+    }
+    .kqht-course-meta {
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+        margin-top: 2px;
+    }
+    .kqht-course-meta strong {
+        color: var(--color-text-secondary);
+        font-weight: 600;
     }
 
-    /* Status & Grade Badges */
+    /* Semantic Status Badges */
     .kqht-badge {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 3px 9px;
-        border-radius: 6px;
-        font-size: 11.5px;
-        font-weight: 700;
+        justify-content: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
         white-space: nowrap;
     }
-    .kqht-badge.pass {
-        background: rgba(16, 185, 129, 0.14);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.3);
+    .kqht-badge.pass,
+    .kqht-badge.approved {
+        background: rgba(15, 118, 110, 0.1);
+        color: #0f766e;
+        border: 1px solid rgba(15, 118, 110, 0.28);
     }
-    .kqht-badge.fail {
+    html.dark .kqht-badge.pass,
+    html.dark .kqht-badge.approved {
+        background: rgba(20, 184, 166, 0.14);
+        color: #2dd4bf;
+        border-color: rgba(45, 212, 191, 0.3);
+    }
+    .kqht-badge.fail,
+    .kqht-badge.rejected {
+        background: rgba(185, 28, 28, 0.09);
+        color: #b91c1c;
+        border: 1px solid rgba(185, 28, 28, 0.28);
+    }
+    html.dark .kqht-badge.fail,
+    html.dark .kqht-badge.rejected {
         background: rgba(239, 68, 68, 0.14);
-        color: #ef4444;
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #f87171;
+        border-color: rgba(248, 113, 113, 0.3);
     }
     .kqht-badge.pending {
-        background: rgba(245, 158, 11, 0.15);
-        color: #f59e0b;
-        border: 1px solid rgba(245, 158, 11, 0.35);
+        background: rgba(180, 83, 9, 0.09);
+        color: #b45309;
+        border: 1px solid rgba(180, 83, 9, 0.28);
     }
-    .kqht-badge.approved {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.35);
-    }
-    .kqht-badge.rejected {
-        background: rgba(239, 68, 68, 0.15);
-        color: #ef4444;
-        border: 1px solid rgba(239, 68, 68, 0.35);
+    html.dark .kqht-badge.pending {
+        background: rgba(245, 158, 11, 0.14);
+        color: #fbbf24;
+        border-color: rgba(251, 191, 36, 0.3);
     }
 
-    /* Action Buttons in Table */
+    /* Table Action Buttons */
     .kqht-btn-appeal {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 11px;
-        border-radius: 7px;
-        font-size: 12px;
+        justify-content: center;
+        gap: 5px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 4px;
+        font-size: 11.5px;
         font-weight: 600;
-        background: rgba(59, 130, 246, 0.12);
+        background: var(--color-surface);
         color: var(--color-primary);
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        border: 1px solid var(--color-border);
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
     }
     .kqht-btn-appeal:hover {
-        background: var(--color-primary);
-        color: #fff;
+        background: #0f3d75;
+        border-color: #0f3d75;
+        color: #ffffff;
     }
+    html.dark .kqht-btn-appeal:hover {
+        background: #0284c7;
+        border-color: #0284c7;
+        color: #ffffff;
+    }
+    .kqht-btn-appeal:active {
+        transform: translateY(1px);
+    }
+
     .kqht-btn-feedback {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 4px 9px;
-        border-radius: 6px;
-        font-size: 11.5px;
+        justify-content: center;
+        gap: 4px;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 4px;
+        font-size: 11px;
         font-weight: 600;
-        background: var(--color-surface-header);
+        background: var(--color-surface);
         color: var(--color-text-secondary);
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        border: 1px solid var(--color-border);
         cursor: pointer;
+        transition: border-color 0.12s ease, color 0.12s ease, background-color 0.12s ease;
     }
     .kqht-btn-feedback:hover {
         border-color: var(--color-primary);
         color: var(--color-primary);
+        background: var(--color-surface-header);
     }
 
-    /* Modal Overlay */
+    /* Profile & Password Grid */
+    .kqht-profile-grid {
+        display: grid;
+        grid-template-columns: 7fr 5fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @@media (max-width: 960px) {
+        .kqht-profile-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-readonly-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 16px;
+        padding: 14px 16px;
+        border-radius: 6px;
+        background: var(--color-surface-header);
+        border: 1px solid var(--color-border-subtle);
+        margin-bottom: 18px;
+    }
+    @@media (max-width: 640px) {
+        .kqht-readonly-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-readonly-item span {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-text-muted);
+        margin-bottom: 2px;
+    }
+    .kqht-readonly-item strong {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-text-primary);
+    }
+    .kqht-form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    @@media (max-width: 640px) {
+        .kqht-form-row-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+    .kqht-form-group {
+        margin-bottom: 14px;
+    }
+    .kqht-form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-text-secondary);
+        margin-bottom: 5px;
+    }
+    .kqht-form-control {
+        width: 100%;
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border);
+        border-radius: 5px;
+        padding: 8px 11px;
+        font-size: 13px;
+        transition: border-color 0.14s ease, box-shadow 0.14s ease;
+    }
+    .kqht-form-control[readonly] {
+        background: var(--color-surface-header);
+        color: var(--color-text-secondary);
+    }
+    .kqht-form-control:focus {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        outline: none;
+    }
+
+    .kqht-alert-box {
+        display: none;
+        padding: 9px 12px;
+        border-radius: 5px;
+        font-size: 12.5px;
+        font-weight: 600;
+        margin-top: 12px;
+    }
+    .kqht-alert-box.success {
+        display: block;
+        background: rgba(15, 118, 110, 0.1);
+        color: #0f766e;
+        border: 1px solid rgba(15, 118, 110, 0.3);
+    }
+    html.dark .kqht-alert-box.success {
+        color: #2dd4bf;
+    }
+    .kqht-alert-box.error {
+        display: block;
+        background: rgba(185, 28, 28, 0.1);
+        color: #b91c1c;
+        border: 1px solid rgba(185, 28, 28, 0.3);
+    }
+    html.dark .kqht-alert-box.error {
+        color: #f87171;
+    }
+
+    /* Enterprise Modal Dialog */
     .kqht-modal-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(2, 6, 23, 0.72);
-        backdrop-filter: blur(4px);
+        background: rgba(15, 23, 42, 0.65);
         z-index: 9999;
         display: none;
         align-items: center;
@@ -478,240 +792,105 @@
     }
     .kqht-modal {
         background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        border-radius: 16px;
+        border: 1px solid var(--color-border);
+        border-top: 3px solid var(--color-primary);
+        border-radius: 8px;
         width: 100%;
-        max-width: 520px;
+        max-width: 500px;
         overflow: hidden;
-        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 20px 38px -10px rgba(15, 23, 42, 0.35);
     }
     .kqht-modal-header {
-        padding: 16px 20px;
+        padding: 12px 18px;
         background: var(--color-surface-header);
-        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        border-bottom: 1px solid var(--color-border);
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
     .kqht-modal-header h3 {
         margin: 0;
-        font-size: 16px;
-        font-weight: 800;
+        font-size: 14.5px;
+        font-weight: 700;
         color: var(--color-text-primary);
     }
     .kqht-modal-close {
         background: transparent;
         border: none;
         color: var(--color-text-muted);
-        font-size: 20px;
+        font-size: 18px;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
         cursor: pointer;
-        line-height: 1;
-    }
-    .kqht-modal-body {
-        padding: 20px;
-    }
-    .kqht-form-group {
-        margin-bottom: 15px;
-    }
-    .kqht-form-group label {
-        display: block;
-        font-size: 12.5px;
-        font-weight: 700;
-        color: var(--color-text-secondary);
-        margin-bottom: 6px;
-    }
-    .kqht-form-control {
-        width: 100%;
-        background: var(--color-surface-header);
-        color: var(--color-text-primary);
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 9px;
-        padding: 9px 12px;
-        font-size: 13.5px;
-        outline: none;
-    }
-    .kqht-form-control:focus {
-        border-color: var(--color-primary);
-    }
-    .kqht-modal-footer {
-        padding: 14px 20px;
-        background: var(--color-surface-header);
-        border-top: 1px solid rgba(148, 163, 184, 0.16);
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-    .kqht-btn-primary {
-        background: #2563eb;
-        color: #fff;
-        border: none;
-        border-radius: 9px;
-        padding: 9px 18px;
-        font-size: 13.5px;
-        font-weight: 700;
-        cursor: pointer;
-    }
-    .kqht-btn-primary:hover {
-        background: #1d4ed8;
-    }
-
-    /* Tabs Bar */
-    .kqht-tabs-bar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 24px;
-        padding: 6px;
-        background: var(--color-surface);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 14px;
-    }
-    .kqht-tab-btn {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 10px 18px;
-        border-radius: 10px;
-        border: none;
-        background: transparent;
-        color: var(--color-text-secondary);
-        font-size: 13.5px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.16s ease;
+        justify-content: center;
     }
-    .kqht-tab-btn:hover {
-        color: var(--color-text-primary);
+    .kqht-modal-close:hover {
         background: var(--color-surface-hover);
-    }
-    .kqht-tab-btn.active {
-        background: #2563eb;
-        color: #ffffff;
-        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
-    }
-    .kqht-tab-pane {
-        display: none;
-    }
-    .kqht-tab-pane.active {
-        display: block;
-    }
-
-    /* Profile & Password Grid */
-    .kqht-profile-grid {
-        display: grid;
-        grid-template-columns: 1.35fr 1fr;
-        gap: 24px;
-        align-items: start;
-    }
-    @@media (max-width: 960px) {
-        .kqht-profile-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    .kqht-readonly-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        padding: 16px;
-        border-radius: 12px;
-        background: var(--color-surface-header);
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        margin-bottom: 20px;
-    }
-    @@media (max-width: 640px) {
-        .kqht-readonly-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    .kqht-readonly-item span {
-        display: block;
-        font-size: 11.5px;
-        color: var(--color-text-muted);
-        margin-bottom: 2px;
-    }
-    .kqht-readonly-item strong {
-        font-size: 13.5px;
         color: var(--color-text-primary);
     }
-    .kqht-form-row-2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
+    .kqht-modal-body {
+        padding: 18px;
     }
-    @@media (max-width: 640px) {
-        .kqht-form-row-2 {
-            grid-template-columns: 1fr;
-        }
-    }
-    .kqht-alert-box {
-        display: none;
-        padding: 10px 14px;
-        border-radius: 9px;
-        font-size: 13px;
-        font-weight: 600;
-        margin-top: 12px;
-    }
-    .kqht-alert-box.success {
-        display: block;
-        background: rgba(16, 185, 129, 0.14);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.35);
-    }
-    .kqht-alert-box.error {
-        display: block;
-        background: rgba(239, 68, 68, 0.14);
-        color: #ef4444;
-        border: 1px solid rgba(239, 68, 68, 0.35);
+    .kqht-modal-footer {
+        padding: 12px 18px;
+        background: var(--color-surface-header);
+        border-top: 1px solid var(--color-border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
     }
 </style>
 
 <div class="portal-shell kqht-page">
     <nav class="kqht-breadcrumb" aria-label="Breadcrumb">
         <a href="/portal">Cổng thông tin</a>
-        <span>/</span>
-        <span>Kết quả học tập, Xét tốt nghiệp &amp; Hồ sơ sinh viên</span>
+        <span aria-hidden="true">/</span>
+        <span>Học vụ &amp; Xét tốt nghiệp</span>
     </nav>
 
-    <div class="kqht-header-bar">
+    <header class="kqht-header-bar">
         <div>
-            <h1 class="kqht-title">Cổng Học Vụ Sinh Viên</h1>
-            <p class="kqht-subtitle">Tra cứu bảng điểm học kỳ, theo dõi tiến độ xét tốt nghiệp chuẩn ngành, gửi phúc khảo điểm và quản lý hồ sơ cá nhân.</p>
+            <h1 class="kqht-title">Hồ sơ Học tập &amp; Xét chuẩn Tốt nghiệp</h1>
+            <p class="kqht-subtitle">Bảng điểm tích lũy theo học kỳ, đối chiếu chuẩn đầu ra theo ngành đào tạo, phúc khảo điểm và quản lý thông tin sinh viên.</p>
         </div>
         <div class="kqht-header-actions">
             @if (!User.IsInRole("SinhVien"))
             {
-                <form method="get" action="/Portal/KetQuaHocTap" style="display:flex; gap:8px; align-items:center;">
-                    <input type="text" name="maSV" value="@Model.MaSV" placeholder="Nhập mã SV..." class="kqht-search-input" style="width:150px;" />
-                    <button type="submit" class="kqht-btn-outline">Xem SV</button>
+                <form method="get" action="/Portal/KetQuaHocTap" style="display:flex; gap:6px; align-items:center; margin:0;">
+                    <input type="text" name="maSV" value="@Model.MaSV" placeholder="Nhập mã SV..." class="kqht-search-input" style="width:140px;" />
+                    <button type="submit" class="kqht-btn-outline">Tra cứu SV</button>
                 </form>
             }
             <a href="/portal/tra-cuu-tkb?code=@Uri.EscapeDataString(Model.MaSV)&kind=student" class="kqht-btn-outline">
-                🗓️ Thời khóa biểu cá nhân
+                Thời khóa biểu cá nhân
             </a>
             <button type="button" onclick="window.print()" class="kqht-btn-outline">
-                🖨️ In bảng điểm
+                In bảng điểm
             </button>
         </div>
-    </div>
+    </header>
 
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
-        <div class="kqht-summary-banner" style="border-color: rgba(239,68,68,0.4);">
-            <p style="margin:0; color:#ef4444; font-weight:700;">⚠️ @Model.ErrorMessage</p>
+        <div class="kqht-summary-banner" style="border-top-color: #b91c1c;">
+            <p style="margin:0; color:#b91c1c; font-weight:600; font-size:13px;">@Model.ErrorMessage</p>
         </div>
     }
     else
     {
-        <!-- 1. THẺ TÓM TẮT TIẾN ĐỘ & ĐIỀU KIỆN TỐT NGHIỆP -->
+        <!-- 1. EXECUTIVE SUMMARY BANNER: TIẾN ĐỘ & ĐIỀU KIỆN TỐT NGHIỆP -->
         <section class="kqht-summary-banner" aria-label="Tóm tắt tiến độ và điều kiện tốt nghiệp">
             <div class="kqht-banner-top">
                 <div class="kqht-student-profile">
-                    <div class="kqht-avatar">
+                    <div class="kqht-avatar" aria-hidden="true">
                         @(string.IsNullOrEmpty(Model.HoTen) ? "SV" : Model.HoTen.Trim().Split(' ').Last()[0].ToString().ToUpper())
                     </div>
                     <div>
                         <h2 class="kqht-student-name">
-                            @Model.HoTen
+                            <span>@Model.HoTen</span>
                             <span class="kqht-mssv-pill">@Model.MaSV</span>
                         </h2>
                         <div class="kqht-student-meta">
@@ -723,7 +902,7 @@
                             }
                             @if (!string.IsNullOrWhiteSpace(Model.KhoaHoc))
                             {
-                                <span><strong>Khóa:</strong> @Model.KhoaHoc</span>
+                                <span><strong>Niên khóa:</strong> @Model.KhoaHoc</span>
                             }
                         </div>
                     </div>
@@ -732,15 +911,15 @@
                 <div>
                     @if (Model.DuDieuKienTotNghiep)
                     {
-                        <div class="kqht-grad-badge eligible">
-                            <span>🎓</span>
+                        <div class="kqht-grad-badge eligible" role="status">
+                            <span>✓</span>
                             <span>@Model.TrangThaiTotNghiepText</span>
                         </div>
                     }
                     else
                     {
-                        <div class="kqht-grad-badge not-eligible">
-                            <span>⏳</span>
+                        <div class="kqht-grad-badge not-eligible" role="status">
+                            <span>●</span>
                             <span>@Model.TrangThaiTotNghiepText</span>
                         </div>
                     }
@@ -748,12 +927,12 @@
             </div>
 
             <div class="kqht-metrics-grid">
-                <!-- Cột 1: Thanh tiến độ tích lũy tín chỉ động theo QuyDinhTotNghiep -->
+                <!-- KPI 1: Tiến độ tích lũy tín chỉ động theo QuyDinhTotNghiep -->
                 <div class="kqht-metric-box">
                     <div>
                         <div class="kqht-metric-header">
-                            <span class="kqht-metric-label">Tiến độ tích lũy tín chỉ (Chuẩn ngành @Model.MaNganh)</span>
-                            <span class="kqht-metric-value-lg">@Model.TongTinChiTichLuy / @Model.TongTTC <small style="font-size:13px; font-weight:600;">TC</small></span>
+                            <span class="kqht-metric-label">Tiến độ tín chỉ (@Model.MaNganh)</span>
+                            <span class="kqht-metric-value-lg">@Model.TongTinChiTichLuy / @Model.TongTTC <small style="font-size:11.5px; font-weight:600; color:var(--color-text-muted);">TC</small></span>
                         </div>
                         <div class="kqht-progress-track" title="Hoàn thành @Model.PhanTramTichLuy%">
                             <div class="kqht-progress-fill" style="width: @(Model.PhanTramTichLuy.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
@@ -772,36 +951,36 @@
                     </div>
                 </div>
 
-                <!-- Cột 2: Điểm trung bình tích lũy (GPA Hệ 4 & Hệ 10) -->
+                <!-- KPI 2: Điểm trung bình tích lũy (GPA Hệ 4 & Hệ 10) -->
                 <div class="kqht-metric-box">
                     <div class="kqht-metric-header">
                         <span class="kqht-metric-label">Điểm TB tích lũy (GPA)</span>
                         <span class="kqht-badge @(Model.GPAHe4 >= Model.MinGPA ? "pass" : "pending")">
-                            Xếp loại: @Model.XepLoai
+                            Học lực: @Model.XepLoai
                         </span>
                     </div>
 
                     <div class="kqht-gpa-row">
                         <div class="kqht-gpa-card">
                             <div class="gpa-num">@(Model.GPAHe4?.ToString("F2") ?? "0.00")</div>
-                            <div class="gpa-scale">GPA Hệ 4.0 (Chuẩn ≥ @Model.MinGPA.ToString("F2"))</div>
+                            <div class="gpa-scale">Hệ 4.0 (Chuẩn ≥ @Model.MinGPA.ToString("F2"))</div>
                         </div>
                         <div class="kqht-gpa-card">
-                            <div class="gpa-num" style="color: #10b981;">@(Model.GPAHe10?.ToString("F2") ?? "0.00")</div>
-                            <div class="gpa-scale">GPA Hệ 10.0</div>
+                            <div class="gpa-num">@(Model.GPAHe10?.ToString("F2") ?? "0.00")</div>
+                            <div class="gpa-scale">Hệ 10.0 tích lũy</div>
                         </div>
                     </div>
 
-                    <div style="font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
-                        <span>Tổng TC đã đăng ký: <strong>@Model.TongTinChiDangKy TC</strong></span>
-                        <span>Môn nợ hiện tại: <strong style="color:@(Model.SoMonNo > 0 ? "#ef4444" : "#10b981")">@Model.SoMonNo môn</strong></span>
+                    <div style="font-size:11.5px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
+                        <span>TC đăng ký: <strong style="color:var(--color-text-primary);">@Model.TongTinChiDangKy TC</strong></span>
+                        <span>Học phần nợ: <strong style="color:@(Model.SoMonNo > 0 ? "#b91c1c" : "var(--color-text-primary)")">@Model.SoMonNo môn</strong></span>
                     </div>
                 </div>
 
-                <!-- Cột 3: Checklist điều kiện xét tốt nghiệp tự động -->
+                <!-- KPI 3: Checklist đối chiếu chuẩn đầu ra -->
                 <div class="kqht-metric-box">
                     <div class="kqht-metric-header" style="margin-bottom:4px;">
-                        <span class="kqht-metric-label">Chi tiết điều kiện xét tốt nghiệp</span>
+                        <span class="kqht-metric-label">Đối chiếu điều kiện tốt nghiệp</span>
                     </div>
                     <ul class="kqht-checklist">
                         @foreach (var item in Model.ChiTietDieuKien)
@@ -814,25 +993,25 @@
             </div>
         </section>
 
-        <!-- THANH CHUYỂN TAB (3 TABS: BẢNG ĐIỂM | LỊCH SỬ KHIẾU NẠI | HỒ SƠ SINH VIÊN) -->
-        <div class="kqht-tabs-bar" role="tablist">
+        <!-- 2. THANH CHUYỂN TAB (3 TABS: BẢNG ĐIỂM | LỊCH SỬ KHIẾU NẠI | HỒ SƠ SINH VIÊN) -->
+        <div class="kqht-tabs-bar" role="tablist" aria-label="Phân mục học vụ">
             <button type="button"
                     class="kqht-tab-btn @(Model.ActiveTab == "ket-qua" ? "active" : "")"
                     data-tab-target="ket-qua"
                     onclick="switchPortalKqhtTab('ket-qua')">
-                📊 Kết quả học tập &amp; Xét tốt nghiệp
+                Kết quả học tập &amp; Xét tốt nghiệp
             </button>
             <button type="button"
                     class="kqht-tab-btn @(Model.ActiveTab == "khieu-nai" ? "active" : "")"
                     data-tab-target="khieu-nai"
                     onclick="switchPortalKqhtTab('khieu-nai')">
-                📝 Lịch sử khiếu nại điểm (@Model.Complaints.Count)
+                Lịch sử khiếu nại điểm (@Model.Complaints.Count)
             </button>
             <button type="button"
                     class="kqht-tab-btn @(Model.ActiveTab == "ho-so" ? "active" : "")"
                     data-tab-target="ho-so"
                     onclick="switchPortalKqhtTab('ho-so')">
-                👤 Hồ sơ sinh viên &amp; Đổi mật khẩu
+                Hồ sơ sinh viên &amp; Bảo mật
             </button>
         </div>
 
@@ -840,7 +1019,7 @@
         <div id="tab-pane-ket-qua" class="kqht-tab-pane @(Model.ActiveTab == "ket-qua" ? "active" : "")">
             <div class="kqht-filter-bar">
                 <div class="kqht-filter-group">
-                    <label for="semesterFilter" style="font-size:13px; font-weight:700; color:var(--color-text-secondary);">Học kỳ:</label>
+                    <label for="semesterFilter" style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-text-muted);">Học kỳ:</label>
                     <form id="semesterFilterForm" method="get" action="/Portal/KetQuaHocTap" style="margin:0; display:inline-flex; gap:8px;">
                         @if (!User.IsInRole("SinhVien") && !string.IsNullOrEmpty(Model.MaSV))
                         {
@@ -851,7 +1030,7 @@
                             @foreach (var hk in Model.AvailableSemesters)
                             {
                                 <option value="@hk.MaHK" selected="@(string.Equals(Model.SelectedHocKy, hk.MaHK, StringComparison.OrdinalIgnoreCase))">
-                                    @hk.TenHK - Năm học @hk.NamHoc (@hk.MaHK)
+                                    @hk.TenHK — Năm học @hk.NamHoc (@hk.MaHK)
                                 </option>
                             }
                         </select>
@@ -859,14 +1038,14 @@
                 </div>
 
                 <div class="kqht-filter-group">
-                    <input type="search" id="courseQuickSearch" class="kqht-search-input" placeholder="Tìm nhanh mã môn, tên môn hoặc giảng viên..." oninput="filterPortalGradeRows(this.value)" style="min-width: 270px;" />
+                    <input type="search" id="courseQuickSearch" class="kqht-search-input" placeholder="Lọc theo mã môn, tên môn hoặc giảng viên..." oninput="filterPortalGradeRows(this.value)" style="min-width: 280px;" />
                 </div>
             </div>
 
             @if (!Model.Semesters.Any())
             {
-                <div class="kqht-summary-banner" style="text-align:center; padding:40px 20px;">
-                    <p style="margin:0; color:var(--color-text-muted); font-size:15px;">Chưa có dữ liệu kết quả học tập cho học kỳ được chọn.</p>
+                <div class="kqht-semester-card" style="text-align:center; padding:36px 20px;">
+                    <p style="margin:0; color:var(--color-text-muted); font-size:13.5px;">Chưa có dữ liệu kết quả học tập cho học kỳ được chọn.</p>
                 </div>
             }
             else
@@ -876,8 +1055,8 @@
                     <section class="kqht-semester-card" data-semester="@sem.MaHK">
                         <div class="kqht-semester-header">
                             <h3 class="kqht-semester-title">
-                                <span>📅 @sem.TenHK — Năm học @sem.NamHoc</span>
-                                <span class="kqht-mssv-pill" style="font-weight:600;">@sem.MaHK</span>
+                                <span>@sem.TenHK — Năm học @sem.NamHoc</span>
+                                <span class="kqht-mssv-pill">@sem.MaHK</span>
                             </h3>
                             <div class="kqht-semester-stats">
                                 <span>TC đạt HK: <strong>@sem.TinChiDatHK/@sem.TinChiDangKyHK</strong></span>
@@ -892,17 +1071,17 @@
                             <table class="kqht-table">
                                 <thead>
                                     <tr>
-                                        <th class="col-center" style="width:50px;">STT</th>
-                                        <th style="width:105px;">Mã MH</th>
-                                        <th>Tên môn học &amp; Giảng viên</th>
-                                        <th class="col-center" style="width:70px;">Số TC</th>
-                                        <th class="col-center" style="width:85px;">Điểm QT</th>
-                                        <th class="col-center" style="width:85px;">Thi L1</th>
-                                        <th class="col-center" style="width:85px;">Thi L2</th>
-                                        <th class="col-center" style="width:110px;">Điểm Tổng kết</th>
-                                        <th class="col-center" style="width:85px;">Điểm Chữ</th>
-                                        <th class="col-center" style="width:110px;">Kết quả</th>
-                                        <th class="col-center" style="width:190px;">Thao tác</th>
+                                        <th class="col-center" style="width:48px;">STT</th>
+                                        <th style="width:100px;">Mã MH</th>
+                                        <th>Học phần &amp; Giảng viên giảng dạy</th>
+                                        <th class="col-center" style="width:68px;">Số TC</th>
+                                        <th class="col-center" style="width:82px;">Điểm QT</th>
+                                        <th class="col-center" style="width:82px;">Thi L1</th>
+                                        <th class="col-center" style="width:82px;">Thi L2</th>
+                                        <th class="col-center" style="width:105px;">Tổng kết</th>
+                                        <th class="col-center" style="width:80px;">Điểm chữ</th>
+                                        <th class="col-center" style="width:105px;">Kết quả</th>
+                                        <th class="col-center" style="width:175px;">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -912,22 +1091,22 @@
                                             ? row.TenGV
                                             : $"{row.TenGV} ({row.MaGV})";
                                         <tr class="kqht-course-row" data-search="@($"{row.MaMon} {row.TenMon} {row.MaLHP} {row.TenGV} {row.MaGV}".ToLowerInvariant())">
-                                            <td class="col-center col-mono">@row.STT</td>
+                                            <td class="col-center col-mono" style="color:var(--color-text-muted);">@row.STT</td>
                                             <td class="col-mono" style="font-weight:700; color:var(--color-primary);">@row.MaMon</td>
                                             <td>
-                                                <div style="font-weight:600;">@row.TenMon</div>
-                                                <div style="font-size:11.5px; color:var(--color-text-muted); margin-top:2px;">
-                                                    LHP: <span class="col-mono">@row.MaLHP</span> • @(row.BatBuoc ? "Bắt buộc" : "Tự chọn") • <strong>GV:</strong> @gvText
+                                                <div style="font-weight:600; color:var(--color-text-primary);">@row.TenMon</div>
+                                                <div class="kqht-course-meta">
+                                                    LHP: <span class="col-mono">@row.MaLHP</span> · @(row.BatBuoc ? "Bắt buộc" : "Tự chọn") · <strong>GV:</strong> @gvText
                                                 </div>
                                             </td>
                                             <td class="col-center col-mono">@row.SoTC</td>
                                             <td class="col-center col-mono">@(row.DiemQT?.ToString("F1") ?? "-")</td>
                                             <td class="col-center col-mono">@(row.DiemThiL1?.ToString("F1") ?? "-")</td>
                                             <td class="col-center col-mono">@(row.DiemThiL2?.ToString("F1") ?? "-")</td>
-                                            <td class="col-center col-mono" style="font-weight:800;">
+                                            <td class="col-center col-mono" style="font-weight:700;">
                                                 @(row.DiemTongKet?.ToString("F1") ?? "-")
                                             </td>
-                                            <td class="col-center col-mono" style="font-weight:800; color:@(row.IsPassed ? "#10b981" : (row.DiemTongKet.HasValue ? "#ef4444" : "var(--color-text-muted)"));">
+                                            <td class="col-center col-mono" style="font-weight:700;">
                                                 @row.DiemChu
                                             </td>
                                             <td class="col-center">
@@ -937,11 +1116,11 @@
                                                 }
                                                 else if (row.IsPassed)
                                                 {
-                                                    <span class="kqht-badge pass">✓ Đạt</span>
+                                                    <span class="kqht-badge pass">Đạt</span>
                                                 }
                                                 else
                                                 {
-                                                    <span class="kqht-badge fail">✗ Học lại</span>
+                                                    <span class="kqht-badge fail">Học lại</span>
                                                 }
                                             </td>
                                             <td class="col-center">
@@ -950,7 +1129,7 @@
                                                     <button type="button"
                                                             class="kqht-btn-appeal"
                                                             onclick="openPortalComplaintModal('@Model.MaSV', '@row.MaLHP', '@Html.Raw(row.MaMon.Replace("'", "\\'"))', '@Html.Raw(row.TenMon.Replace("'", "\\'"))', '@Html.Raw(gvText.Replace("'", "\\'"))')">
-                                                        📝 Khiếu nại điểm
+                                                        Khiếu nại điểm
                                                     </button>
                                                 }
                                                 else
@@ -962,7 +1141,7 @@
                                                         "rejected" => "rejected",
                                                         _ => "pending"
                                                     };
-                                                    <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                                                    <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;">
                                                         <span class="kqht-badge @statusCls">@cp.TrangThaiLabel</span>
                                                         <button type="button"
                                                                 class="kqht-btn-feedback"
@@ -980,7 +1159,7 @@
                                                                 data-cp-masv="@Model.MaSV"
                                                                 data-cp-mamon="@row.MaMon"
                                                                 data-cp-tenmon="@row.TenMon">
-                                                            💬 Xem phản hồi
+                                                            Phản hồi
                                                         </button>
                                                     </div>
                                                 }
@@ -1000,7 +1179,7 @@
             <section id="lich-su-khieu-nai" class="kqht-semester-card">
                 <div class="kqht-semester-header">
                     <h3 class="kqht-semester-title">
-                        <span>📝 Lịch sử khiếu nại &amp; phúc khảo điểm</span>
+                        <span>Danh sách đơn khiếu nại &amp; phúc khảo điểm</span>
                         <span class="kqht-mssv-pill">@Model.Complaints.Count đơn</span>
                     </h3>
                 </div>
@@ -1009,12 +1188,12 @@
                         <thead>
                             <tr>
                                 <th style="width:110px;">Mã LHP</th>
-                                <th>Học phần &amp; Giảng viên</th>
+                                <th>Học phần &amp; Giảng viên phụ trách</th>
                                 <th style="width:135px;">Cột điểm</th>
-                                <th>Lý do khiếu nại</th>
+                                <th>Nội dung khiếu nại</th>
                                 <th style="width:135px;">Ngày gửi</th>
                                 <th class="col-center" style="width:115px;">Trạng thái</th>
-                                <th>Phản hồi của Giảng viên</th>
+                                <th>Phản hồi từ Giảng viên</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1022,7 +1201,7 @@
                             {
                                 <tr>
                                     <td colspan="7" class="col-center" style="padding:28px; color:var(--color-text-muted);">
-                                        Bạn chưa gửi đơn khiếu nại điểm nào.
+                                        Sinh viên chưa gửi đơn khiếu nại điểm nào.
                                     </td>
                                 </tr>
                             }
@@ -1043,13 +1222,13 @@
                                         <td class="col-mono" style="font-weight:700; color:var(--color-primary);">@item.MaLHP</td>
                                         <td>
                                             <div style="font-weight:600;">@item.TenMon</div>
-                                            <div style="font-size:11.5px; color:var(--color-text-muted);">
-                                                @item.TenHK (@item.NamHoc) • <strong>GV:</strong> @gvItemText
+                                            <div class="kqht-course-meta">
+                                                @item.TenHK (@item.NamHoc) · <strong>GV:</strong> @gvItemText
                                             </div>
                                         </td>
                                         <td>@item.LoaiDiemLabel</td>
-                                        <td style="max-width:250px;">@item.LyDo</td>
-                                        <td class="col-mono" style="font-size:12px;">@item.NgayGui.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td style="max-width:260px;">@item.LyDo</td>
+                                        <td class="col-mono" style="font-size:12px; color:var(--color-text-muted);">@item.NgayGui.ToString("dd/MM/yyyy HH:mm")</td>
                                         <td class="col-center">
                                             <span class="kqht-badge @badgeCls">@item.TrangThaiLabel</span>
                                         </td>
@@ -1060,7 +1239,7 @@
                                             }
                                             else
                                             {
-                                                <span style="color:var(--color-text-muted); font-style:italic;">Đang chờ giảng viên (@gvItemText) phản hồi...</span>
+                                                <span style="color:var(--color-text-muted);">Đang chờ giảng viên (@gvItemText) xử lý</span>
                                             }
                                         </td>
                                     </tr>
@@ -1079,11 +1258,11 @@
                 <section class="kqht-semester-card" style="margin-bottom:0;">
                     <div class="kqht-semester-header">
                         <h3 class="kqht-semester-title">
-                            <span>👤 Thông tin Hồ sơ Sinh viên</span>
+                            <span>Thông tin Hồ sơ Sinh viên</span>
                             <span class="kqht-mssv-pill">@Model.MaSV</span>
                         </h3>
                     </div>
-                    <div style="padding:20px;">
+                    <div style="padding:18px;">
                         <div class="kqht-readonly-grid">
                             <div class="kqht-readonly-item">
                                 <span>Mã sinh viên</span>
@@ -1106,11 +1285,13 @@
                                 <strong>@(string.IsNullOrWhiteSpace(Model.TenKhoa) ? "Đang cập nhật" : Model.TenKhoa)</strong>
                             </div>
                             <div class="kqht-readonly-item">
-                                <span>Trạng thái học tập</span>
-                                <strong style="color:#10b981;">@Model.TrangThaiHocTap</strong>
+                                <span>Trạng thái học vụ</span>
+                                <strong>@Model.TrangThaiHocTap</strong>
                             </div>
                         </div>
 
+                        @if (User.IsInRole("SinhVien") || User.IsInRole("Admin"))
+                        {
                         <form id="portalProfileForm" onsubmit="submitStudentProfileUpdate(event)">
                             <input type="hidden" id="pfMaSV" value="@Model.MaSV" />
 
@@ -1132,7 +1313,7 @@
                             <div class="kqht-form-row-2">
                                 <div class="kqht-form-group">
                                     <label for="pfCCCD">Số CCCD / CMND</label>
-                                    <input type="text" id="pfCCCD" class="kqht-form-control" value="@Model.CCCD" placeholder="Nhập số CCCD..." maxlength="20" />
+                                    <input type="text" id="pfCCCD" class="kqht-form-control" value="@Model.CCCD" placeholder="Nhập số căn cước công dân..." maxlength="20" />
                                 </div>
                                 <div class="kqht-form-group">
                                     <label for="pfSDT">Số điện thoại liên hệ</label>
@@ -1141,23 +1322,24 @@
                             </div>
 
                             <div class="kqht-form-group">
-                                <label for="pfEmail">Email cá nhân / học vụ</label>
+                                <label for="pfEmail">Email liên hệ</label>
                                 <input type="email" id="pfEmail" class="kqht-form-control" value="@Model.Email" placeholder="example@student.edu.vn" maxlength="255" />
                             </div>
 
                             <div class="kqht-form-group">
-                                <label for="pfDiaChi">Địa chỉ liên hệ</label>
-                                <textarea id="pfDiaChi" rows="2" class="kqht-form-control" placeholder="Nhập địa chỉ thường trú hoặc nơi ở hiện tại..." maxlength="255">@Model.DiaChi</textarea>
+                                <label for="pfDiaChi">Địa chỉ thường trú / liên hệ</label>
+                                <textarea id="pfDiaChi" rows="2" class="kqht-form-control" placeholder="Nhập địa chỉ liên hệ hiện tại..." maxlength="255">@Model.DiaChi</textarea>
                             </div>
 
                             <div id="pfAlertBox" class="kqht-alert-box"></div>
 
-                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                            <div style="display:flex; justify-content:flex-end; margin-top:14px;">
                                 <button type="submit" id="pfSubmitBtn" class="kqht-btn-primary">
-                                    💾 Lưu thông tin cá nhân
+                                    Lưu thông tin cá nhân
                                 </button>
                             </div>
                         </form>
+                        }
                     </div>
                 </section>
 
@@ -1165,13 +1347,13 @@
                 <section class="kqht-semester-card" style="margin-bottom:0;">
                     <div class="kqht-semester-header">
                         <h3 class="kqht-semester-title">
-                            <span>🔒 Bảo mật &amp; Đổi mật khẩu</span>
+                            <span>Bảo mật &amp; Đổi mật khẩu</span>
                         </h3>
                     </div>
-                    <div style="padding:20px;">
-                        <div class="kqht-readonly-grid" style="grid-template-columns:1fr; margin-bottom:18px;">
+                    <div style="padding:18px;">
+                        <div class="kqht-readonly-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
                             <div class="kqht-readonly-item">
-                                <span>Tài khoản đăng nhập hiện tại</span>
+                                <span>Tài khoản đăng nhập</span>
                                 <strong class="col-mono" style="color:var(--color-primary);">@Model.Username</strong>
                             </div>
                         </div>
@@ -1194,9 +1376,9 @@
 
                             <div id="pwAlertBox" class="kqht-alert-box"></div>
 
-                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                            <div style="display:flex; justify-content:flex-end; margin-top:14px;">
                                 <button type="submit" id="pwSubmitBtn" class="kqht-btn-primary">
-                                    🔑 Cập nhật mật khẩu
+                                    Cập nhật mật khẩu
                                 </button>
                             </div>
                         </form>
@@ -1211,8 +1393,8 @@
 <div id="portalComplaintModal" class="kqht-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="complaintModalTitle">
     <div class="kqht-modal">
         <div class="kqht-modal-header">
-            <h3 id="complaintModalTitle">📝 Gửi đơn khiếu nại điểm</h3>
-            <button type="button" class="kqht-modal-close" onclick="closePortalComplaintModal()">&times;</button>
+            <h3 id="complaintModalTitle">Đơn phúc khảo / khiếu nại điểm học phần</h3>
+            <button type="button" class="kqht-modal-close" onclick="closePortalComplaintModal()" aria-label="Đóng">&times;</button>
         </div>
         <form id="portalComplaintForm" onsubmit="submitPortalComplaint(event)">
             <div class="kqht-modal-body">
@@ -1231,11 +1413,11 @@
 
                 <div class="kqht-form-group">
                     <label>Giảng viên phụ trách học phần</label>
-                    <input type="text" id="cpLecturerDisplay" class="kqht-form-control" readonly style="font-weight:700; color:var(--color-primary);" />
+                    <input type="text" id="cpLecturerDisplay" class="kqht-form-control" readonly style="font-weight:600; color:var(--color-primary);" />
                 </div>
 
                 <div class="kqht-form-group">
-                    <label for="cpLoaiDiem">Cột điểm cần phúc khảo / khiếu nại *</label>
+                    <label for="cpLoaiDiem">Cột điểm đề nghị phúc khảo *</label>
                     <select id="cpLoaiDiem" class="kqht-form-control" required>
                         <option value="quatrinh">Điểm quá trình (Chuyên cần / Giữa kỳ)</option>
                         <option value="thiLan1" selected>Điểm thi kết thúc học phần (Thi L1)</option>
@@ -1245,13 +1427,13 @@
                 </div>
 
                 <div class="kqht-form-group" style="margin-bottom:0;">
-                    <label for="cpLyDo">Nội dung / Lý do khiếu nại chi tiết *</label>
-                    <textarea id="cpLyDo" rows="4" class="kqht-form-control" required placeholder="Nêu rõ thắc mắc về điểm số hoặc minh chứng bài thi/bài kiểm tra của bạn..."></textarea>
+                    <label for="cpLyDo">Lý do khiếu nại chi tiết *</label>
+                    <textarea id="cpLyDo" rows="4" class="kqht-form-control" required placeholder="Nêu rõ thắc mắc về điểm số hoặc minh chứng bài thi/bài kiểm tra..."></textarea>
                 </div>
-                <div id="cpErrorMsg" style="display:none; margin-top:10px; color:#ef4444; font-size:12.5px; font-weight:600;"></div>
+                <div id="cpErrorMsg" style="display:none; margin-top:10px; color:#b91c1c; font-size:12.5px; font-weight:600;"></div>
             </div>
             <div class="kqht-modal-footer">
-                <button type="button" class="kqht-btn-outline" onclick="closePortalComplaintModal()">Hủy</button>
+                <button type="button" class="kqht-btn-outline" onclick="closePortalComplaintModal()">Hủy bỏ</button>
                 <button type="submit" id="cpSubmitBtn" class="kqht-btn-primary">Gửi khiếu nại</button>
             </div>
         </form>
@@ -1262,42 +1444,42 @@
 <div id="portalFeedbackModal" class="kqht-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
     <div class="kqht-modal">
         <div class="kqht-modal-header">
-            <h3 id="feedbackModalTitle">💬 Chi tiết phản hồi đơn khiếu nại</h3>
-            <button type="button" class="kqht-modal-close" onclick="closePortalFeedbackModal()">&times;</button>
+            <h3 id="feedbackModalTitle">Chi tiết phản hồi đơn khiếu nại</h3>
+            <button type="button" class="kqht-modal-close" onclick="closePortalFeedbackModal()" aria-label="Đóng">&times;</button>
         </div>
         <div class="kqht-modal-body">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; font-size:13px;">
-                <div>
-                    <span style="color:var(--color-text-muted); display:block;">Lớp học phần:</span>
+            <div class="kqht-readonly-grid" style="margin-bottom:14px;">
+                <div class="kqht-readonly-item">
+                    <span>Lớp học phần</span>
                     <strong id="fbMaLHP" class="col-mono"></strong>
                 </div>
-                <div>
-                    <span style="color:var(--color-text-muted); display:block;">Trạng thái:</span>
+                <div class="kqht-readonly-item">
+                    <span>Trạng thái xử lý</span>
                     <strong id="fbStatus"></strong>
                 </div>
-                <div>
-                    <span style="color:var(--color-text-muted); display:block;">Cột điểm:</span>
+                <div class="kqht-readonly-item">
+                    <span>Cột điểm</span>
                     <strong id="fbLoaiDiem"></strong>
                 </div>
-                <div>
-                    <span style="color:var(--color-text-muted); display:block;">Thời gian gửi:</span>
+                <div class="kqht-readonly-item">
+                    <span>Thời gian gửi</span>
                     <strong id="fbNgayGui" class="col-mono"></strong>
                 </div>
             </div>
 
             <div class="kqht-form-group">
                 <label>Học phần &amp; Giảng viên phụ trách</label>
-                <div id="fbTenMon" style="padding:9px 12px; border-radius:8px; background:var(--color-surface-header); font-weight:600; font-size:13.5px;"></div>
+                <div id="fbTenMon" style="padding:8px 11px; border-radius:5px; border:1px solid var(--color-border-subtle); background:var(--color-surface-header); font-weight:600; font-size:13px;"></div>
             </div>
 
             <div class="kqht-form-group">
-                <label>Lý do khiếu nại của bạn</label>
-                <div id="fbLyDo" style="padding:10px 12px; border-radius:8px; background:var(--color-surface-header); font-size:13.5px; white-space:pre-wrap;"></div>
+                <label>Nội dung khiếu nại của sinh viên</label>
+                <div id="fbLyDo" style="padding:9px 11px; border-radius:5px; border:1px solid var(--color-border-subtle); background:var(--color-surface-header); font-size:13px; white-space:pre-wrap;"></div>
             </div>
 
             <div class="kqht-form-group" style="margin-bottom:0;">
                 <label style="color:var(--color-primary);">Phản hồi từ Giảng viên / Khoa</label>
-                <div id="fbPhanHoi" style="padding:12px; border-radius:8px; background:rgba(59,130,246,0.09); border:1px solid rgba(59,130,246,0.28); font-size:13.5px; font-weight:600; white-space:pre-wrap;"></div>
+                <div id="fbPhanHoi" style="padding:10px 12px; border-radius:5px; background:var(--color-surface-header); border-left:3px solid var(--color-primary); font-size:13px; font-weight:600; white-space:pre-wrap;"></div>
             </div>
         </div>
         <div class="kqht-modal-footer">
@@ -1477,7 +1659,7 @@
             alertBox.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
         } finally {
             btn.disabled = false;
-            btn.textContent = '💾 Lưu thông tin cá nhân';
+            btn.textContent = 'Lưu thông tin cá nhân';
         }
     }
 
@@ -1521,7 +1703,7 @@
             alertBox.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
         } finally {
             btn.disabled = false;
-            btn.textContent = '🔑 Cập nhật mật khẩu';
+            btn.textContent = 'Cập nhật mật khẩu';
         }
     }
 </script>

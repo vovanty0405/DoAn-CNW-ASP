@@ -9,7 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,GiangVien,KhaoThi,GiaoVuKhoa")]
 public class LopHanhChinhController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -22,7 +22,7 @@ public class LopHanhChinhController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maNganh, [FromQuery] string? sort = null)
     {
-        var query = _db.LopHanhChinhs.AsNoTracking();
+        var query = await StudentLookupScope.ClassesAsync(_db, User);
         if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(l => l.MaNganh == maNganh);
 
         query = (sort?.Trim().ToLowerInvariant()) switch
@@ -56,7 +56,8 @@ public class LopHanhChinhController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var item = await _db.LopHanhChinhs.AsNoTracking().AsSplitQuery()
+        var classes = await StudentLookupScope.ClassesAsync(_db, User);
+        var item = await classes.AsSplitQuery()
             .Include(l => l.Nganh)
                 .ThenInclude(n => n!.Khoa)
             .Include(l => l.GiangVien)

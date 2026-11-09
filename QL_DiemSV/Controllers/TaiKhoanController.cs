@@ -70,6 +70,7 @@ public class TaiKhoanController : ControllerBase
                 UserID = u.UserID,
                 username = u.Username,
                 roleId = u.RoleID,
+                maKhoa = u.MaKhoa,
                 role = u.Role?.RoleName ?? "Chưa phân quyền",
                 refId = refObj,
                 rawRefType,
@@ -88,9 +89,19 @@ public class TaiKhoanController : ControllerBase
         public string? username { get; set; }
         public string? password { get; set; }
         public int? roleId { get; set; }
+        public string? maKhoa { get; set; }
         public string? refType { get; set; }
         public string? refId { get; set; }
         public bool isActive { get; set; } = true;
+    }
+
+    private async Task<string?> ValidateAssignment(int? roleId, string? faculty)
+    {
+        var role = await _db.Roles.FindAsync(roleId ?? 0);
+        if (role == null) return "Nhóm quyền không tồn tại.";
+        if (!string.IsNullOrWhiteSpace(faculty) && !await _db.Khoas.AnyAsync(k => k.MaKhoa == faculty))
+            return "Khoa được chọn không tồn tại.";
+        return null;
     }
 
     [HttpPost]
@@ -103,11 +114,17 @@ public class TaiKhoanController : ControllerBase
         if (await _db.UserAccounts.AnyAsync(u => u.Username == uname))
             return BadRequest(new { status = "error", message = $"Tài khoản {uname} đã tồn tại!" });
 
+        var roleId = req.roleId ?? await _db.Roles.Where(r => r.RoleName == "SinhVien").Select(r => r.RoleID).SingleAsync();
+        var faculty = string.IsNullOrWhiteSpace(req.maKhoa) ? null : req.maKhoa.Trim();
+        var error = await ValidateAssignment(roleId, faculty);
+        if (error != null) return BadRequest(new { message = error });
+
         var ua = new UserAccount
         {
             Username = uname,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password),
-            RoleID = req.roleId ?? 3,
+            RoleID = roleId,
+            MaKhoa = faculty,
             IsActive = req.isActive,
             MaGV = req.refType == "Giảng Viên" ? req.refId : null,
             NgayTao = DateTime.Now
@@ -141,6 +158,10 @@ public class TaiKhoanController : ControllerBase
         var ua = await _db.UserAccounts.FindAsync(id);
         if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
 
+        var faculty = req.maKhoa == null ? ua.MaKhoa : (string.IsNullOrWhiteSpace(req.maKhoa) ? null : req.maKhoa.Trim());
+        var error = await ValidateAssignment(req.roleId ?? ua.RoleID, faculty);
+        if (error != null) return BadRequest(new { message = error });
+        ua.MaKhoa = faculty;
         if (!string.IsNullOrWhiteSpace(req.username)) ua.Username = req.username.Trim();
         if (!string.IsNullOrWhiteSpace(req.password)) ua.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password);
         if (req.roleId != null) ua.RoleID = req.roleId;

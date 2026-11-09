@@ -21,7 +21,7 @@ public class KhieuNaiController : ControllerBase
         _db = db;
     }
 
-    [HttpGet]
+    [Authorize(Roles = "Admin,GiangVien,KhaoThi,SinhVien"), HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maSV, [FromQuery] string? maGV)
     {
         var query = _db.DonKhieuNais.AsNoTracking()
@@ -35,13 +35,13 @@ public class KhieuNaiController : ControllerBase
         var currentMaGV = User.FindFirstValue("MaGV");
         var currentMaSV = User.FindFirstValue("MaSV") ?? (role == "SinhVien" ? User.Identity?.Name : null);
 
-        if (role == "SinhVien" && !string.IsNullOrWhiteSpace(currentMaSV))
+        if (role == "SinhVien")
         {
-            query = query.Where(d => d.MaSV == currentMaSV);
+            query = query.Where(d => !string.IsNullOrEmpty(currentMaSV) && d.MaSV == currentMaSV);
         }
-        else if (role == "GiangVien" && !string.IsNullOrWhiteSpace(currentMaGV))
+        else if (role == "GiangVien")
         {
-            query = query.Where(d => d.LopHocPhan != null && d.LopHocPhan.MaGV == currentMaGV);
+            query = query.Where(d => !string.IsNullOrEmpty(currentMaGV) && d.LopHocPhan != null && d.LopHocPhan.MaGV == currentMaGV);
         }
         else if (!string.IsNullOrWhiteSpace(maSV))
         {
@@ -107,10 +107,10 @@ public class KhieuNaiController : ControllerBase
         public string? LyDo { get; set; }
     }
 
-    [HttpPost]
+    [Authorize(Roles = "Admin,SinhVien"), HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateKhieuNaiDto req)
     {
-        var maSV = req.MaSV ?? User.FindFirst("MaSV")?.Value ?? User.Identity?.Name ?? "";
+        var maSV = (User.IsInRole("Admin") ? req.MaSV : User.FindFirstValue("MaSV"))?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(maSV) || string.IsNullOrWhiteSpace(req.MaLHP) || string.IsNullOrWhiteSpace(req.LyDo))
         {
             return BadRequest(new { status = "error", message = "Vui lòng nhập đầy đủ thông tin đơn khiếu nại!" });

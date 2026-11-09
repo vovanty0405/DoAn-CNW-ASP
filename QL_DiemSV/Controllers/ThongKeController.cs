@@ -27,7 +27,7 @@ public class ThongKeController : ControllerBase
         [FromQuery] string? maMon,
         [FromQuery] string? maLHP)
     {
-        var svQuery = _db.SinhViens.AsNoTracking().AsQueryable();
+        var svQuery = await StudentLookupScope.StudentsAsync(_db, User);
 
         if (!string.IsNullOrWhiteSpace(maLop))
             svQuery = svQuery.Where(s => s.MaLop == maLop);
@@ -74,7 +74,7 @@ public class ThongKeController : ControllerBase
             .ToDictionaryAsync(l => l.MaLHP, StringComparer.OrdinalIgnoreCase);
 
         var kqQuery = _db.KetQuaHocTaps.AsNoTracking()
-            .Where(k => k.MaSV != null && k.MaLHP != null && k.DiemTongKet != null);
+            .Where(k => k.MaSV != null && k.MaLHP != null && k.DiemTongKet != null && svQuery.Any(s => s.MaSV == k.MaSV));
 
         if (!string.IsNullOrWhiteSpace(maLHP))
             kqQuery = kqQuery.Where(k => k.MaLHP == maLHP);

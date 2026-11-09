@@ -111,6 +111,8 @@ public class DiemController : ControllerBase
 
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
+        if (!CanManageSection(lhp)) return Forbid();
+
         var kqList = (await _db.KetQuaHocTaps.AsNoTracking()
             .Where(k => k.MaLHP == maLHP)
             .Select(k => new

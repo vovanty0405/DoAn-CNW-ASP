@@ -6,7 +6,7 @@ using QL_DiemSV.Models;
 using QL_DiemSV.Services;
 using QL_DiemSV.ViewModels;
 namespace QL_DiemSV.Controllers;
-[Authorize(Roles="Admin"),Route("admin/curriculums")]
+[Authorize(Policy=ContentAccess.CurriculumView),Route("admin/curriculums")]
 public class AdminCurriculumController(ApplicationDbContext db):Controller {
  [HttpGet("")]
  public async Task<IActionResult> Index(string? system, int? year, string? major, string? program, bool? active, int page = 1, int pageSize = 20)
@@ -38,8 +38,10 @@ public class AdminCurriculumController(ApplicationDbContext db):Controller {
          Page = page, PageSize = pageSize, Total = total });
  }
  [HttpGet("edit/{id:int?}")] public async Task<IActionResult> Edit(int? id) {
+ if (!await ContentAccess.AllowsAsync(db, User, ContentAccess.Curriculums, id.HasValue ? "EDIT" : "CREATE")) return Forbid();
  var vm=new CurriculumEditViewModel();if(id.HasValue){var c=await db.Curriculums.AsNoTracking().AsSplitQuery().Include(x=>x.Sections).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return NotFound();vm.Id=c.Id;vm.HeDaoTao=c.HeDaoTao;vm.KhoaHoc=c.KhoaHoc;vm.NganhHocId=c.NganhHocId;vm.TenChuongTrinh=c.TenChuongTrinh;vm.TrangThai=c.TrangThai;vm.Contents=Enumerable.Range(1,11).Select(n=>c.Sections.FirstOrDefault(s=>s.ThuTu==n)?.NoiDung??"").ToList();}vm.Majors=await db.Nganhs.AsNoTracking().OrderBy(x=>x.TenNganh).Select(x=>new Nganh { MaNganh=x.MaNganh, TenNganh=x.TenNganh }).ToListAsync();return View(vm); }
  [HttpPost("save"),ValidateAntiForgeryToken,RequestSizeLimit(268435456),RequestFormLimits(ValueLengthLimit=8388608)] public async Task<IActionResult> Save(CurriculumEditViewModel vm) {
+ if (!await ContentAccess.AllowsAsync(db, User, ContentAccess.Curriculums, vm.Id == 0 ? "CREATE" : "EDIT")) return Forbid();
  var c=vm.Id==0?new Curriculum():await db.Curriculums.Include(x=>x.Sections).FirstOrDefaultAsync(x=>x.Id==vm.Id);if(c==null)return NotFound();
  if(vm.Id>0){vm.HeDaoTao=c.HeDaoTao;vm.KhoaHoc=c.KhoaHoc;vm.NganhHocId=c.NganhHocId;vm.TenChuongTrinh=c.TenChuongTrinh;ModelState.Remove(nameof(vm.HeDaoTao));ModelState.Remove(nameof(vm.KhoaHoc));ModelState.Remove(nameof(vm.NganhHocId));ModelState.Remove(nameof(vm.TenChuongTrinh));}
  vm.HeDaoTao=(vm.HeDaoTao??"").Trim();vm.TenChuongTrinh=(vm.TenChuongTrinh??"").Trim();
@@ -54,7 +56,7 @@ public class AdminCurriculumController(ApplicationDbContext db):Controller {
  c.TrangThai=vm.TrangThai;c.NgayCapNhat=DateTime.UtcNow;
  for(int i=1;i<=11;i++){var section=c.Sections.FirstOrDefault(x=>x.ThuTu==i);if(section==null){section=new CurriculumSection{ThuTu=i};c.Sections.Add(section);}section.TieuDeMuc=CurriculumRules.Titles[i-1];if(i<=vm.Contents.Count)section.NoiDung=PortalRules.SanitizeHtml(vm.Contents[i-1]);}
  if(vm.Id==0)db.Curriculums.Add(c);try{await db.SaveChangesAsync();}catch(DbUpdateException){ModelState.AddModelError("","Không thể lưu; kiểm tra trùng hệ/khóa/ngành/tên chương trình.");vm.Majors=await db.Nganhs.ToListAsync();return View("Edit",vm);}TempData["Message"]="Đã lưu CTĐT.";return RedirectToAction(nameof(Index)); }
- [HttpPost("delete/{id:int}"),ValidateAntiForgeryToken] public async Task<IActionResult> Delete(int id){var c=await db.Curriculums.FindAsync(id);if(c==null)return NotFound();db.Curriculums.Remove(c);await db.SaveChangesAsync();return RedirectToAction(nameof(Index));}
- [HttpPost("clone/{id:int}"),ValidateAntiForgeryToken] public async Task<IActionResult> Clone(int id,int year){var c=await db.Curriculums.AsNoTracking().Include(x=>x.Sections).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return NotFound();if(year<1900||year>2200||await db.Curriculums.AnyAsync(x=>x.HeDaoTao==c.HeDaoTao&&x.NganhHocId==c.NganhHocId&&x.TenChuongTrinh==c.TenChuongTrinh&&x.KhoaHoc==year)){TempData["Message"]="Khóa không hợp lệ hoặc CTĐT đã tồn tại.";return RedirectToAction(nameof(Index));}
+ [Authorize(Policy=ContentAccess.Curriculums + ":DELETE"), HttpPost("delete/{id:int}"),ValidateAntiForgeryToken] public async Task<IActionResult> Delete(int id){var c=await db.Curriculums.FindAsync(id);if(c==null)return NotFound();db.Curriculums.Remove(c);await db.SaveChangesAsync();return RedirectToAction(nameof(Index));}
+ [Authorize(Policy=ContentAccess.Curriculums + ":CREATE"), HttpPost("clone/{id:int}"),ValidateAntiForgeryToken] public async Task<IActionResult> Clone(int id,int year){var c=await db.Curriculums.AsNoTracking().Include(x=>x.Sections).FirstOrDefaultAsync(x=>x.Id==id);if(c==null)return NotFound();if(year<1900||year>2200||await db.Curriculums.AnyAsync(x=>x.HeDaoTao==c.HeDaoTao&&x.NganhHocId==c.NganhHocId&&x.TenChuongTrinh==c.TenChuongTrinh&&x.KhoaHoc==year)){TempData["Message"]="Khóa không hợp lệ hoặc CTĐT đã tồn tại.";return RedirectToAction(nameof(Index));}
  var copy=new Curriculum{HeDaoTao=c.HeDaoTao,KhoaHoc=year,NganhHocId=c.NganhHocId,TenChuongTrinh=c.TenChuongTrinh,TrangThai=false,Sections=Enumerable.Range(1,11).Select(n=>new CurriculumSection{ThuTu=n,TieuDeMuc=CurriculumRules.Titles[n-1],NoiDung=PortalRules.SanitizeHtml(c.Sections.FirstOrDefault(s=>s.ThuTu==n)?.NoiDung)}).ToList()};db.Curriculums.Add(copy);try{await db.SaveChangesAsync();}catch(DbUpdateException){TempData["Message"]="CTĐT khóa đích đã tồn tại.";return RedirectToAction(nameof(Index));}return RedirectToAction(nameof(Edit),new{id=copy.Id}); }
 }

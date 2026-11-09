@@ -28,6 +28,9 @@ public class UserAccount
     [MaxLength(20)]
     public string? MaGV { get; set; }
 
+    [MaxLength(20)]
+    public string? MaKhoa { get; set; }
+
     [ForeignKey("RoleID")]
     public virtual Role? Role { get; set; }
 

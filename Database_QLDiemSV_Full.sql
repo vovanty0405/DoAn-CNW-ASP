@@ -153,6 +153,7 @@ CREATE TABLE [UserAccounts] (
     [IsActive] bit NOT NULL,
     [NgayTao] datetime2 NOT NULL,
     [MaGV] nvarchar(20) NULL,
+    [MaKhoa] nvarchar(20) NULL,
     CONSTRAINT [PK_UserAccounts] PRIMARY KEY ([UserID]),
     CONSTRAINT [FK_UserAccounts_Roles_RoleID] FOREIGN KEY ([RoleID]) REFERENCES [Roles] ([RoleID])
 );

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using QL_DiemSV.Services;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +22,42 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.AccessDeniedPath = "/";
         options.Cookie.Name = "QLDiemSV.Auth";
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api")) context.Response.StatusCode = 401;
+            else context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api")) context.Response.StatusCode = 403;
+            else context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var principal = context.Principal;
+            var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+            if (int.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
+                && int.TryParse(principal.FindFirstValue("RoleID"), out var roleId)
+                && await db.UserAccounts.AnyAsync(u => u.UserID == id && u.IsActive
+                    && (u.RoleID ?? 0) == roleId
+                    && (u.Role == null ? "SinhVien" : u.Role.RoleName) == principal.FindFirstValue(ClaimTypes.Role)))
+                return;
+            context.RejectPrincipal();
+            await Microsoft.AspNetCore.Authentication.AuthenticationHttpContextExtensions.SignOutAsync(
+                context.HttpContext, CookieAuthenticationDefaults.AuthenticationScheme);
+        };
     });
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var module in new[] { ContentAccess.Articles, ContentAccess.Curriculums })
+    foreach (var action in new[] { "VIEW", "CREATE", "EDIT", "DELETE" })
+        options.AddPolicy(module + ":" + action, policy => policy.RequireAuthenticatedUser()
+            .RequireAssertion(context => context.Resource is HttpContext http
+                ? ContentAccess.AllowsAsync(http.RequestServices.GetRequiredService<ApplicationDbContext>(), context.User, module, action)
+                : Task.FromResult(false)));
+});
 
 // 3. Add ControllersWithViews + JSON PascalCase / camelCase compatibility
 builder.Services.AddControllersWithViews()
@@ -43,6 +80,7 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
         DbInitializer.Initialize(context);
+        RoleSetup.Initialize(context);
     }
     catch (Exception ex)
     {

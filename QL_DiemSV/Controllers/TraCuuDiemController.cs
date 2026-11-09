@@ -9,7 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize]
+[Authorize(Roles = StudentLookupScope.Roles)]
 public class TraCuuDiemController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -32,7 +32,8 @@ public class TraCuuDiemController : ControllerBase
             }
         }
 
-        var sv = await _db.SinhViens.AsNoTracking()
+        var students = await StudentLookupScope.StudentsAsync(_db, User);
+        var sv = await students
             .Include(s => s.LopHanhChinh)
                 .ThenInclude(l => l!.Nganh)
                     .ThenInclude(n => n!.Khoa)
