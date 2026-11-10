@@ -8,6 +8,12 @@
         <div>
             <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Chuẩn đầu ra &amp; Tín chỉ</div>
             <h1 class="text-2xl font-bold text-text-primary">Khung Chương Trình Đào Tạo &amp; Quy Định Tốt Nghiệp</h1>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel khung đào tạo<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importCurriculumWorkbook(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="academicExcel.exportFile(currentKhungList, 'KhungDaoTao', ['MaMon', 'HocKyDuKien', 'LoaiMon'])">Xuất Excel khung đào tạo</button>
+
         </div>
         <div class="flex flex-wrap items-center gap-3 bg-surface border border-surface-hover rounded-2xl px-4 py-2.5 shadow-sm">
             <div class="flex items-center gap-2">
@@ -255,6 +261,46 @@
         let kdtBatchSortCol = 'mamon', kdtBatchSortDir = 'asc';
         let semesterSortCol = 'mamon', semesterSortDir = 'asc', semesterSortParam = 'mamon_asc';
         let curriculumRequest;
+
+        function importCurriculumWorkbook(input) {
+            const major = document.getElementById('kdt-nganh').value;
+            const seen = new Set(currentKhungList.map(row => row.MaMon.toUpperCase()));
+            return academicExcel.importFile(input, {
+                title: `Xem trước khung đào tạo · ${major}`,
+                map(row) {
+                    const MaMon = String(row.MaMon ?? '').trim().toUpperCase();
+                    const HocKyDuKien = Number(row.HocKyDuKien);
+                    const LoaiMon = String(row.LoaiMon ?? '').trim();
+                    if (!MaMon || seen.has(MaMon)) throw new Error('Mã môn bị thiếu hoặc đã có trong danh sách.');
+                    if (!Number.isInteger(HocKyDuKien) || HocKyDuKien < 1 || HocKyDuKien > 12)
+                        throw new Error('Học kỳ dự kiến phải từ 1 đến 12.');
+                    if (!['Bắt buộc', 'Tự chọn'].includes(LoaiMon)) throw new Error('Loại môn phải là Bắt buộc hoặc Tự chọn.');
+                    seen.add(MaMon);
+                    return { MaMon, HocKyDuKien, LoaiMon };
+                },
+                async save(rows) {
+                    if (!major || major !== document.getElementById('kdt-nganh').value)
+                        throw new Error('Ngành đang chọn đã thay đổi.');
+                    const groups = new Map();
+                    for (const row of rows) {
+                        if (!groups.has(row.HocKyDuKien)) groups.set(row.HocKyDuKien, []);
+                        groups.get(row.HocKyDuKien).push(row);
+                    }
+                    const results = [];
+                    for (const [HocKy, items] of groups) {
+                        try {
+                            const result = await apiFetch('/api/khungchuongtrinh/batch', {
+                                method: 'POST', body: JSON.stringify({ MaNganh: major, HocKy,
+                                    MaMonList: items.map(row => row.MaMon), Items: items })
+                            });
+                            results.push(`HK ${HocKy}: ${result.message}`);
+                        } catch (err) { results.push(`HK ${HocKy}: ${err.message}`); }
+                    }
+                    return { message: results.join(' · ') };
+                },
+                refresh: loadCurriculum
+            });
+        }
 
         async function initPage() {
             try {

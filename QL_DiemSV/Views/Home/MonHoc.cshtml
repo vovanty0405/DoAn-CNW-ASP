@@ -8,6 +8,10 @@
         <div>
             <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Học phần & Tiên quyết</div>
             <h1 class="text-2xl font-bold text-text-primary">Quản Lý Môn Học</h1>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel môn học<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importMonHocWorkbook(this)" /></label>
+            }
         </div>
         <div class="flex flex-wrap gap-2.5">
             <button onclick="exportMonHocExcel()" class="px-4 py-2 rounded-xl bg-surface border border-surface-hover hover:border-primary text-sm font-semibold text-text-primary flex items-center gap-2">
@@ -247,6 +251,10 @@
 
 @section Scripts {
     <script>
+        function importMonHocWorkbook(input) {
+            return academicExcel.bulk(input, "Xem trước môn học", "/api/monhoc/bulk", ["MaMon", "TenMon", "MaKhoa", "SoTinChi", "SoTietLyThuyet", "SoTietThucHanh"], ["MaMon", "TenMon"], ["SoTinChi", "SoTietLyThuyet", "SoTietThucHanh"], loadData);
+        }
+
         let mhList = [], khoas = [], editingMaMon = null;
         let mhCurrentPage = 1, mhPageSize = 10;
         let mhSortCol = 'mamon', mhSortDir = 'asc';

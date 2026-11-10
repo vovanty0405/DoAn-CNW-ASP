@@ -119,6 +119,19 @@ public class SinhVienController : ControllerBase
         return Ok(new { status = "success", message = "Thêm sinh viên và tạo tài khoản thành công", data = model });
     }
 
+    [HttpPost("bulk/existing")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetExistingImportCodes([FromBody] List<string> codes, CancellationToken cancellationToken)
+    {
+        if (codes.Count > 1000)
+            return BadRequest(new { message = "Tối đa 1.000 mã sinh viên mỗi lần kiểm tra." });
+
+        var data = await _db.SinhViens.AsNoTracking()
+            .Where(s => codes.Contains(s.MaSV))
+            .Select(s => s.MaSV).ToListAsync(cancellationToken);
+        return Ok(new { data });
+    }
+
     [HttpPost("bulk")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<SinhVien> list)

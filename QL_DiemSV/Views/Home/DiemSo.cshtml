@@ -4,6 +4,18 @@
     var userMaGV = User.FindFirst("MaGV")?.Value ?? "";
 }
 
+<style>
+    .gradebook-seed { color: #fff; background-color: #6d28d9; border-color: #6d28d9; }
+    .gradebook-seed:hover { background-color: #5b21b6; border-color: #5b21b6; }
+    .gradebook-seed:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+    .gradebook-open { color: #065f46; background-color: #d1fae5; border-color: #6ee7b7; }
+    .gradebook-locked { color: #991b1b; background-color: #fee2e2; border-color: #fca5a5; }
+    .gradebook-pending { color: #92400e; background-color: #fef3c7; border-color: #fcd34d; }
+    html.dark .gradebook-open { color: #a7f3d0; background-color: #064e3b; border-color: #059669; }
+    html.dark .gradebook-locked { color: #fecaca; background-color: #450a0a; border-color: #dc2626; }
+    html.dark .gradebook-pending { color: #fde68a; background-color: #451a03; border-color: #b45309; }
+</style>
+
 <div class="space-y-6 animate-fade-in">
 
     <!-- ========================================================================= -->
@@ -29,7 +41,7 @@
                 @if (userRole == "Admin" || userRole == "KhaoThi")
                 {
                     <button type="button" onclick="autoSeedAllSections()"
-                            class="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
+                            class="gradebook-seed px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
                         <i data-lucide="sparkles" class="w-4 h-4"></i>
                         <span>⚡ Tạo điểm mẫu tự động</span>
                     </button>
@@ -39,15 +51,15 @@
                     <span class="text-xs text-text-muted">Tổng lớp:</span>
                     <span id="stat-total-lhp" class="text-sm font-bold text-text-primary">0</span>
                 </div>
-                <div class="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="text-xs text-emerald-300">Đang nhập:</span>
-                    <span id="stat-open-lhp" class="text-sm font-bold text-emerald-400">0</span>
+                <div class="px-3.5 py-2 rounded-xl gradebook-open border flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-current"></span>
+                    <span class="text-xs font-medium">Đang nhập:</span>
+                    <span id="stat-open-lhp" class="text-sm font-bold">0</span>
                 </div>
-                <div class="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
-                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-400"></i>
-                    <span class="text-xs text-amber-300">Đã khóa sổ:</span>
-                    <span id="stat-locked-lhp" class="text-sm font-bold text-amber-400">0</span>
+                <div class="px-3.5 py-2 rounded-xl gradebook-locked border flex items-center gap-2">
+                    <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                    <span class="text-xs font-medium">Đã khóa sổ:</span>
+                    <span id="stat-locked-lhp" class="text-sm font-bold">0</span>
                 </div>
             </div>
         </div>
@@ -160,7 +172,7 @@
             <!-- Cụm nút chức năng góc phải -->
             <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
                 <button type="button" id="btn-seed-section" onclick="autoSeedCurrentSection()"
-                        class="btn bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                        class="gradebook-seed px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
                     <i data-lucide="sparkles" class="w-4 h-4"></i>
                     <span>Tạo điểm mẫu lớp này</span>
                 </button>
@@ -177,6 +189,9 @@
                     <span id="btn-config-cols-label">Cấu hình cột QT (100%)</span>
                 </button>
 
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel bảng điểm
+                    <input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importGradeWorkbook(this)" />
+                </label>
                 <button type="button" onclick="exportBangDiemExcel()"
                         class="btn bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
@@ -249,7 +264,7 @@
             </div>
 
             <div id="lhp-info-bar" class="flex flex-wrap items-center gap-3 text-sm">
-                <span id="lhp-status-badge" class="badge badge-info">Đang nhập</span>
+                <span id="lhp-status-badge" class="badge gradebook-open border">Đang nhập</span>
             </div>
         </div>
 
@@ -782,17 +797,17 @@
             let cardAccent = 'hover:border-primary/60 hover:shadow-primary/10';
 
             if (st === 'Đã khóa') {
-                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold gradebook-locked border flex items-center gap-1">
                     <i data-lucide="lock" class="w-3 h-3"></i> Đã khóa sổ
                 </span>`;
                 cardAccent = 'hover:border-amber-500/60 hover:shadow-amber-500/10';
             } else if (st === 'Chờ mở khóa') {
-                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1">
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold gradebook-pending border flex items-center gap-1">
                     <i data-lucide="clock" class="w-3 h-3"></i> Chờ mở khóa
                 </span>`;
             } else {
-                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Đang nhập
+                statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold gradebook-open border flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span> Đang nhập
                 </span>`;
             }
 
@@ -1011,13 +1026,13 @@
         const st = currentLHPInfo?.trangThaiNhapDiem || 'Đang nhập';
 
         if (st === 'Đã khóa') {
-            badge.className = 'badge badge-warning';
+            badge.className = 'badge gradebook-locked border';
             badge.innerHTML = '<i data-lucide="lock" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: Đã khóa';
         } else if (st === 'Chờ mở khóa') {
-            badge.className = 'badge badge-danger';
+            badge.className = 'badge gradebook-pending border';
             badge.innerHTML = '<i data-lucide="clock" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: Chờ mở khóa';
         } else {
-            badge.className = 'badge badge-success';
+            badge.className = 'badge gradebook-open border';
             badge.innerHTML = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1"></i> Trạng thái sổ điểm: ' + st;
         }
 
@@ -1659,6 +1674,55 @@
         } catch (err) {
             showToast('Lỗi kết nối máy chủ', 'error');
         }
+    }
+
+    function importGradeWorkbook(input) {
+        const section = currentMaLHP;
+        if (!section || ['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem)) {
+            input.value = '';
+            return showToast('Sổ điểm chưa mở để nhập.', 'warning');
+        }
+        const students = new Map(currentRows.map(row => [String(row.maSV).toUpperCase(), row]));
+        const seen = new Set();
+        const columns = currentCauHinh.map(col => [`${col.name} (${col.weight}%)`, col.id]);
+        const exam = `Thi Lần 1 (${currentTyLeThi}%)`;
+        return academicExcel.importFile(input, {
+            title: 'Xem trước bảng điểm Excel',
+            map(row) {
+                const code = String(row['Mã SV'] ?? row.MaSV ?? '').trim().toUpperCase();
+                if (!students.has(code)) throw new Error('Mã sinh viên không thuộc lớp.');
+                if (seen.has(code)) throw new Error('Mã sinh viên bị trùng trong tệp.');
+                const value = { MaSV: code };
+                for (const field of [...columns.map(c => c[0]), exam, 'Thi Lần 2']) {
+                    if (!(field in row)) continue;
+                    const raw = String(row[field] ?? '').trim();
+                    if (!raw) continue;
+                    const score = Number(raw);
+                    if (!Number.isFinite(score) || score < 0 || score > 10)
+                        throw new Error(`Điểm ở cột ${field} phải từ 0 đến 10.`);
+                    value[field] = score;
+                }
+                if (Object.keys(value).length === 1) throw new Error('Không có điểm ở cột khớp với bảng điểm hiện tại.');
+                seen.add(code);
+                return value;
+            },
+            save(values) {
+                if (section !== currentMaLHP || !currentRows.length)
+                    throw new Error('Lớp đang xem đã thay đổi. Hãy mở lại bảng xem trước.');
+                for (const value of values) {
+                    const row = students.get(value.MaSV);
+                    row.chiTietDiemQT ??= {};
+                    for (const [field, id] of columns) {
+                        if (field in value) row.chiTietDiemQT[id] = value[field];
+                    }
+                    if (exam in value) row.diemThiLan1 = value[exam];
+                    if ('Thi Lần 2' in value) row.diemThiLan2 = value['Thi Lần 2'];
+                }
+                renderGradeTable();
+                for (const value of values) onScoreInput(currentRows.indexOf(students.get(value.MaSV)));
+                return { message: `Đã đưa ${values.length} dòng vào bảng điểm đang chỉnh sửa. Bấm Lưu bảng điểm và xác nhận mật khẩu để ghi vào hệ thống.` };
+            }
+        });
     }
 
     function exportBangDiemExcel() {

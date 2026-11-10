@@ -8,6 +8,11 @@
         <div>
             <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Đội ngũ Giảng viên</div>
             <h1 class="text-2xl font-bold text-text-primary">Quản Lý Giảng Viên & Khoa</h1>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel khoa<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="import_khoa_excel(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="export_khoa_excel()">Xuất Excel khoa</button>
         </div>
         <div class="flex flex-wrap gap-2.5">
             <button onclick="openKhoaModal()" class="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-sm font-bold flex items-center gap-2 transition-all">
@@ -260,6 +265,14 @@
 
 @section Scripts {
     <script>
+        function import_khoa_excel(input) {
+            return academicExcel.bulk(input, 'Xem trước khoa', '/api/khoa', ["MaKhoa", "TenKhoa", "TruongKhoa"], ["MaKhoa", "TenKhoa"], [], loadData, true);
+        }
+
+        function export_khoa_excel() {
+            academicExcel.exportFile(khoas, 'khoa', ["MaKhoa", "TenKhoa", "TruongKhoa"]);
+        }
+
         let gvList = [], khoas = [], editingMaGV = null, editingMaKhoa = null;
         let gvCurrentPage = 1, gvPageSize = 10;
         let gvSortCol = 'magv', gvSortDir = 'asc';
@@ -650,19 +663,8 @@
         }
 
         function importGvExcel(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                try {
-                    const res = await apiFetch('/api/giangvien/bulk', { method: 'POST', body: JSON.stringify(json) });
-                    showToast(res.message);
-                    await loadData();
-                } catch (err) { showToast(err.message, 'error'); }
-            };
-            reader.readAsBinaryString(file);
+            return academicExcel.bulk(e.target, 'Xem trước danh sách giảng viên', '/api/giangvien/bulk',
+                ['MaGV', 'HoTen', 'HocVi', 'MaKhoa', 'Email', 'SDT'], ['MaGV', 'HoTen'], [], loadData);
         }
 
         loadData();

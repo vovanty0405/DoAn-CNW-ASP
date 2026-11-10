@@ -570,33 +570,23 @@
         }
 
         function handleExcelUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(ws);
-                const mapped = json.map(r => ({
-                    MaSV: String(r.MaSV || r['Mã SV'] || '').trim(),
-                    HoTen: String(r.HoTen || r['Họ Tên'] || '').trim(),
-                    GioiTinh: r.GioiTinh || r['Giới tính'] || 'Nam',
-                    MaLop: String(r.MaLop || r['Mã Lớp'] || lops[0]?.MaLop || '').trim(),
-                    Email: r.Email || '',
-                    SDT: String(r.SDT || ''),
-                    TrangThai: r.TrangThai || 'Đang học'
-                })).filter(x => x.MaSV && x.HoTen);
-
-                try {
-                    const res = await apiFetch('/api/sinhvien/bulk', { method: 'POST', body: JSON.stringify(mapped) });
-                    showToast(res.message || 'Nhập Excel thành công!');
-                    await loadData();
-                } catch (err) {
-                    showToast(err.message, 'error');
-                }
-            };
-            reader.readAsBinaryString(file);
-            e.target.value = '';
+            return academicExcel.importFile(e.target, {
+                title: 'Xem trước danh sách sinh viên',
+                key: 'MaSV',
+                existingKeys: async codes => (await apiFetch('/api/sinhvien/bulk/existing', {
+                    method: 'POST', body: JSON.stringify(codes)
+                })).data,
+                map: row => {
+                    const MaSV = String(row.MaSV || row['Mã SV'] || '').trim();
+                    const HoTen = String(row.HoTen || row['Họ Tên'] || '').trim();
+                    const MaLop = String(row.MaLop || row['Mã Lớp'] || '').trim();
+                    if (!MaSV || !HoTen || !MaLop) throw new Error('Cần mã sinh viên, họ tên và mã lớp.');
+                    return { MaSV, HoTen, MaLop, GioiTinh: row.GioiTinh || row['Giới tính'] || 'Nam',
+                        Email: String(row.Email || ''), SDT: String(row.SDT || ''), TrangThai: row.TrangThai || 'Đang học' };
+                },
+                save: rows => apiFetch('/api/sinhvien/bulk', { method: 'POST', body: JSON.stringify(rows) }),
+                refresh: loadData
+            });
         }
 
         loadData();

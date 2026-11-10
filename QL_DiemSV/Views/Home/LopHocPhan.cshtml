@@ -8,6 +8,16 @@
         <div>
             <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Xếp lớp & Học kỳ</div>
             <h1 class="text-2xl font-bold text-text-primary">Quản Lý Lớp Học Phần & Đăng Ký Sinh Viên</h1>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel học kỳ<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="import_hocky_excel(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="export_hocky_excel()">Xuất Excel học kỳ</button>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel lớp học phần<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importLopHocPhanWorkbook(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="exportLopHocPhanWorkbook()">Xuất Excel lớp học phần (trang hiện tại)</button>
         </div>
         <div class="flex flex-wrap gap-2.5">
             <button onclick="document.getElementById('hk-modal').classList.remove('hidden')" class="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-sm font-bold flex items-center gap-2">
@@ -340,6 +350,21 @@
 
 @section Scripts {
     <script>
+        function import_hocky_excel(input) {
+            return academicExcel.bulk(input, 'Xem trước học kỳ', '/api/hocky', ["MaHK", "TenHK", "NamHocBatDau", "NamHocKetThuc"], ["MaHK", "TenHK", "NamHocBatDau", "NamHocKetThuc"], ["NamHocBatDau", "NamHocKetThuc"], loadData, true);
+        }
+
+        function export_hocky_excel() {
+            academicExcel.exportFile(hks, 'hocky', ["MaHK", "TenHK", "NamHocBatDau", "NamHocKetThuc"]);
+        }
+
+        function importLopHocPhanWorkbook(input) {
+            return academicExcel.bulk(input, "Xem trước lớp học phần", "/api/lophocphan/bulk", ["MaLHP", "TenLopHP", "MaMon", "MaHK", "MaGV", "PhongHoc", "SiSoToiDa"], ["MaLHP", "TenLopHP", "MaMon", "MaHK"], ["SiSoToiDa"], loadData);
+        }
+        function exportLopHocPhanWorkbook() {
+            academicExcel.exportFile(lhpList, "LopHocPhan", ["MaLHP", "TenLopHP", "MaMon", "MaHK", "MaGV", "PhongHoc", "SiSoToiDa"]);
+        }
+
         let lhpList = [], hks = [], mons = [], gvs = [], editingMaLHP = null, activeEnrollLHP = null, editingMaHK = null;
         let lhpCurrentPage = 1, lhpPageSize = 10;
         let lhpSortCol = 'malhp', lhpSortDir = 'asc', lhpSortParam = 'malhp_asc';

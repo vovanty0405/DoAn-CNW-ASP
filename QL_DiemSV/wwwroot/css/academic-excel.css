@@ -1,0 +1,23 @@
+.academic-excel-dialog {
+    width: min(1320px, 97vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 1rem;
+    border: 1px solid #94a3b8;
+    border-radius: .75rem;
+    background: #fff;
+    color: #172339;
+}
+html.dark .academic-excel-dialog { background: #182332; color: #e2e8f0; }
+.academic-excel-dialog::backdrop { background: rgb(15 23 42 / .65); }
+.academic-excel-dialog h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: .75rem; }
+.academic-excel-grid { max-height: 52vh; overflow: auto; }
+.academic-excel-dialog table { width: 100%; border-collapse: collapse; }
+.academic-excel-dialog th, .academic-excel-dialog td { border: 1px solid #94a3b8; padding: .3rem .5rem; text-align: left; white-space: nowrap; font-size: .8125rem; }
+.academic-excel-dialog p { margin: .65rem 0; font-size: .875rem; }
+.academic-excel-dialog th { position: sticky; top: 0; background: #eef2f7; }
+html.dark .academic-excel-dialog th { background: #243449; }
+.academic-excel-dialog footer { display: flex; justify-content: flex-end; gap: .5rem; }
+.academic-excel-dialog button { border: 1px solid #94a3b8; border-radius: .4rem; padding: .45rem .85rem; }
+.academic-excel-dialog button:last-child { background: #1d4ed8; color: white; }
+.academic-excel-dialog button:disabled { opacity: .5; }

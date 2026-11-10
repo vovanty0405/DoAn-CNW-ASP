@@ -8,6 +8,16 @@
         <div>
             <div class="text-xs text-text-muted font-medium mb-1">Quản lý Đào tạo &gt; Lớp Sinh viên & Chuyên ngành</div>
             <h1 class="text-2xl font-bold text-text-primary">Quản Lý Lớp Hành Chính & Ngành Học</h1>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel ngành<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="import_nganh_excel(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="export_nganh_excel()">Xuất Excel ngành</button>
+            @if (User.IsInRole("Admin"))
+            {
+                <label class="btn btn-secondary cursor-pointer">Nhập Excel lớp hành chính<input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importLopHanhChinhWorkbook(this)" /></label>
+            }
+            <button type="button" class="btn btn-secondary" onclick="exportLopHanhChinhWorkbook()">Xuất Excel lớp hành chính</button>
         </div>
         <div class="flex flex-wrap gap-2.5">
             <button onclick="document.getElementById('nganh-modal').classList.remove('hidden')" class="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 text-sm font-bold flex items-center gap-2">
@@ -262,6 +272,21 @@
 
 @section Scripts {
     <script>
+        function import_nganh_excel(input) {
+            return academicExcel.bulk(input, 'Xem trước ngành', '/api/nganh', ["MaNganh", "TenNganh", "MaKhoa", "HeDaoTao"], ["MaNganh", "TenNganh", "MaKhoa"], [], loadData, true);
+        }
+
+        function export_nganh_excel() {
+            academicExcel.exportFile(nganhs, 'nganh', ["MaNganh", "TenNganh", "MaKhoa", "HeDaoTao"]);
+        }
+
+        function importLopHanhChinhWorkbook(input) {
+            return academicExcel.bulk(input, "Xem trước lớp hành chính", "/api/lophanhchinh/bulk", ["MaLop", "TenLop", "NienKhoa", "MaNganh", "MaGVCN"], ["MaLop", "TenLop", "MaNganh"], [], loadData);
+        }
+        function exportLopHanhChinhWorkbook() {
+            academicExcel.exportFile(lhcList, "LopHanhChinh", ["MaLop", "TenLop", "NienKhoa", "MaNganh", "MaGVCN"]);
+        }
+
         let lhcList = [], nganhs = [], gvs = [], khoas = [], editingMaLop = null, editingMaNganh = null;
         let lhcCurrentPage = 1, lhcPageSize = 10;
         let lhcSortCol = 'malop', lhcSortDir = 'asc';
