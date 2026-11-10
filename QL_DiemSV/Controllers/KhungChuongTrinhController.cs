@@ -15,12 +15,81 @@ public class KhungChuongTrinhController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly CourseCatalogCache _catalog;
 
+    // Phạm vi gốc từ #Courses trong SeedData_QuanLyDiemSV.sql, độc lập với các dòng đã gán vào khung.
+    private static readonly (string Scope, string Codes)[] SeedCourseGroups =
+    [
+        ("ALL", "PHI104 MAX309 MAX310 VRP505 HCM101 LAW101 ENG110 ENG111 ENG302 COS101"),
+        ("faculty:CNTT", "COS104 SEE101 MAT104 PHY118 MAT113 COS106 CON301 MAT105 COS108 COS330"),
+        ("faculty:CNTT", "COS304 COS303 COS107 MAT106 COS310 COS311 COS313 COS309 SEE301 PRS302"),
+        ("faculty:CNTT", "COS503 CON503 IMS301 COS504 SEE910 SEE527 TIE501 IMS302 SEE529 COS508"),
+        ("faculty:CNTT", "COS525 IMS912 MOR514 IMS501 CON915 SEE505 SEE530 SEE512 CON502 COS529"),
+        ("faculty:CNTT", "COS521 COS526 SEE528 CON511 COS527 SEE531 COS528 TIE903 TIE913 SEE919"),
+        ("faculty:CNTT", "SEE920 COS915 COS916 COS917"),
+        ("faculty:SP", "PED117 PSY109 EDU103 PED317 PED318"),
+        ("SPTOAN", "EDU126 ALG115 CAL111 ALG114 ALG116 CAL112 GEM111 PED338 CAL505 ALG512"),
+        ("SPTOAN", "PRS303 EDU512 EDU812 EDU945"),
+        ("SPAV", "EDU134 LAS113 LAS501 GSK106 GSK107 LAS115 GSK108 GSK311 PED583 LAS525"),
+        ("SPAV", "LAS533 EDU519 EDU819 EDU952"),
+        ("SPVL", "PHY115 MAT111 PHY116 PHY114 TEC111 PHY117 PED545 PHY309 PHY304 PHY509"),
+        ("SPVL", "PHY546 PHY514 EDU518 EDU813 EDU946"),
+    ];
+
+    private static readonly Dictionary<string, string> SeedCourseScopes = SeedCourseGroups
+        .SelectMany(group => group.Codes.Split(' ').Select(code => (Code: code, group.Scope)))
+        .ToDictionary(entry => entry.Code, entry => entry.Scope, StringComparer.OrdinalIgnoreCase);
+
     public KhungChuongTrinhController(ApplicationDbContext db, CourseCatalogCache catalog)
     {
         _db = db;
         _catalog = catalog;
     }
 
+    [HttpGet("{maNganh}/course-options")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetCourseOptions(string maNganh, CancellationToken cancellationToken)
+    {
+        var major = await _db.Nganhs.AsNoTracking().Where(n => n.MaNganh == maNganh)
+            .Select(n => new { n.MaNganh, n.MaKhoa }).SingleOrDefaultAsync(cancellationToken);
+        if (major == null) return NotFound(new { message = "Không tìm thấy ngành đào tạo." });
+
+        var assignments = await _db.KhungChuongTrinhs.AsNoTracking().Where(k => k.MaMon != null)
+            .GroupBy(k => k.MaMon!)
+            .Select(g => new { MaMon = g.Key, InMajor = g.Max(k => k.MaNganh == major.MaNganh ? 1 : 0) == 1 })
+            .ToDictionaryAsync(k => k.MaMon, k => k.InMajor, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var options = new List<object>();
+        foreach (var course in await _catalog.GetAsync())
+        {
+            var scope = ClassifyCourseOption(course, major.MaNganh, major.MaKhoa, assignments.GetValueOrDefault(course.MaMon));
+            if (scope == null) continue;
+            options.Add(new
+            {
+                course.MaMon, course.TenMon, course.SoTinChi, course.SoTietLyThuyet,
+                course.SoTietThucHanh, course.MaKhoa, course.Khoa,
+                PhamVi = scope
+            });
+        }
+        return Ok(new { data = options });
+    }
+
+    private static string? ClassifyCourseOption(MonHoc course, string maNganh, string? maKhoa,
+        bool inMajor)
+    {
+        var seedScope = SeedCourseScopes.GetValueOrDefault(course.MaMon);
+        if (seedScope == "ALL") return "general";
+        if (inMajor) return "major";
+        if (seedScope != null)
+            return seedScope == maNganh || seedScope == $"faculty:{maKhoa}" ? "major" : null;
+
+        // Mã môn bổ sung của seed giữ được ngành ngay cả khi đã gỡ khỏi khung.
+        var parts = course.MaMon.Split('_');
+        if (parts.Length == 3 && parts[0] == "BS" && int.TryParse(parts[2], out _))
+            return string.Equals(parts[1], maNganh, StringComparison.OrdinalIgnoreCase) ? "major" : null;
+
+        return "unclassified";
+    }
+
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [HttpGet("{maNganh}")]
     public async Task<IActionResult> GetByNganh(string maNganh, [FromQuery] string? sort = null)
     {
@@ -246,7 +315,7 @@ public class KhungChuongTrinhController : ControllerBase
         _db.KhungChuongTrinhs.Remove(existing);
         await _db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa môn khỏi Khung đào tạo", $"Đã xóa môn {existing.MaMon} khỏi ngành {existing.MaNganh}");
-        return Ok(new { status = "success", message = "Đã xóa môn khỏi khung chương trình" });
+        return Ok(new { status = "success", message = "Đã gỡ môn khỏi khung chương trình.", existing.MaMon, existing.MaNganh });
     }
 }
 

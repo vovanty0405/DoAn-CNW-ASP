@@ -5,6 +5,14 @@ namespace QL_DiemSV.Services;
 
 public static class GradeHelper
 {
+    public const string CourseworkAppealKey = "__approved_coursework_appeal";
+
+    public static bool CanEditGradebook(string? status) =>
+        status is null or "" or "Đang nhập" or "Chưa nhập" or "Vui lòng nhập điểm";
+
+    public static bool IsValidGrade(double? value) =>
+        value == null || (double.IsFinite(value.Value) && value.Value is >= 0 and <= 10);
+
     public static string QuyDoiDiemChu(double diemTK)
     {
         if (diemTK >= 9.0) return "A+";
@@ -38,14 +46,14 @@ public static class GradeHelper
     public static (double? diemTK, string? diemChu, string? ghiChu) TinhDiemTongKetCuoiCung(
         double? diemQT, double? diemThi1, double? diemThi2, double tyLeQT = 40, double tyLeThi = 60)
     {
-        if (diemQT == null)
+        if (tyLeQT > 0 && diemQT == null)
         {
             return (null, null, null);
         }
 
         double wQt = tyLeQT / 100.0;
         double wThi = tyLeThi / 100.0;
-        double qt = diemQT.Value;
+        double qt = diemQT ?? 0;
 
         // Trường hợp môn học 100% Quá trình - 0% Thi kết thúc (Đồ án, Thực hành...)
         if (tyLeThi <= 0)

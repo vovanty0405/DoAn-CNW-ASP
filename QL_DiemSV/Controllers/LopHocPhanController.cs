@@ -225,10 +225,8 @@ public class LopHocPhanController : ControllerBase
             .Select(d => d.MaMonTienQuyet!).Distinct().ToListAsync(ct);
         var query = _db.SinhViens.AsNoTracking().Where(s => s.TrangThai == "Đang học"
             && !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == lhp.MaMon && k.LopHocPhan.MaHK == lhp.MaHK));
-        // Giữ quy tắc lọc hiện có cho các môn tiên quyết chưa có điểm.
         foreach (var code in prerequisites)
-            query = query.Where(s => !s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code)
-                || s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code && (k.DiemTongKet == null || k.DiemTongKet >= 4.0)));
+            query = query.Where(s => s.KetQuaHocTaps.Any(k => k.LopHocPhan!.MaMon == code && k.DiemTongKet >= 4.0));
         return query;
     }
 
@@ -469,17 +467,19 @@ public class LopHocPhanController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var existing = await _db.LopHocPhans
             .Include(l => l.KetQuaHocTaps)
             .FirstOrDefaultAsync(l => l.MaLHP == id);
 
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
-        if (existing.KetQuaHocTaps.Any(k => k.DiemTongKet != null))
+        if (existing.KetQuaHocTaps.Any(ScheduleRules.HasGrades))
             return BadRequest(new { status = "error", message = "Không thể xóa Lớp học phần đã có điểm sinh viên!" });
 
         _db.LopHocPhans.Remove(existing);
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa Lớp học phần", $"Đã xóa lớp học phần {id}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa lớp học phần thành công" });
     }

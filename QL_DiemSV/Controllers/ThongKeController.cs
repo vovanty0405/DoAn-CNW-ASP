@@ -61,50 +61,40 @@ public class ThongKeController : ControllerBase
         if (!string.IsNullOrWhiteSpace(maLHP))
             lhpQuery = lhpQuery.Where(l => l.MaLHP == maLHP);
 
-        var grades = await (
+        var grades =
             from grade in _db.KetQuaHocTaps.AsNoTracking()
             join section in lhpQuery on grade.MaLHP equals section.MaLHP
             join student in svQuery on grade.MaSV equals student.MaSV
             where grade.DiemTongKet != null
             select new
             {
-                student.MaSV,
-                section.MaLHP,
-                DiemTongKet = grade.DiemTongKet!.Value,
-                LHP = new
-                {
-                    section.MaMon, section.MaHK,
-                    SoTinChi = section.MonHoc!.SoTinChi,
-                    TenHK = section.HocKy!.TenHK,
-                    section.HocKy.NamHocBatDau,
-                    section.HocKy.NamHocKetThuc
-                }
+                student.MaSV, section.MaHK, section.MaMon,
+                Score = grade.DiemTongKet!.Value, Credits = section.MonHoc!.SoTinChi,
+                section.HocKy!.TenHK, section.HocKy.NamHocBatDau, section.HocKy.NamHocKetThuc
+            };
+
+        var bestByCourse = grades.GroupBy(g => new { g.MaSV, g.MaMon, g.Credits })
+            .Select(g => new { g.Key.MaSV, g.Key.Credits, Score = g.Max(x => x.Score) });
+        var studentTotals = await bestByCourse.GroupBy(g => g.MaSV)
+            .Select(g => new
+            {
+                MaSV = g.Key, Credits = g.Sum(x => x.Credits),
+                PassedCredits = g.Sum(x => x.Score >= 4 ? x.Credits : 0),
+                Weighted10 = g.Sum(x => x.Score * x.Credits),
+                Weighted4 = g.Sum(x => (x.Score >= 8.5 ? 4.0 : x.Score >= 8.0 ? 3.5 : x.Score >= 7.0 ? 3.0
+                    : x.Score >= 6.5 ? 2.5 : x.Score >= 5.5 ? 2.0 : x.Score >= 5.0 ? 1.5 : x.Score >= 4.0 ? 1.0 : 0) * x.Credits)
             }).ToListAsync(cancellationToken);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var kqList = grades.Where(k => svDict.ContainsKey(k.MaSV))
-            .Select(k => new { k.MaSV, k.MaLHP, k.DiemTongKet, SV = svDict[k.MaSV], k.LHP })
-            .ToList();
+        var gradeFrequency = await grades.GroupBy(x => new { x.MaHK, x.TenHK, x.NamHocBatDau, x.NamHocKetThuc, x.Score })
+            .Select(g => new { g.Key.MaHK, g.Key.TenHK, g.Key.NamHocBatDau, g.Key.NamHocKetThuc, g.Key.Score, Count = g.Count() })
+            .ToListAsync(cancellationToken);
 
-        // Tính GPA cho từng sinh viên dựa trên tập kết quả đã lọc (khử trùng lặp môn học lại bằng cách lấy điểm cao nhất của mỗi môn)
-        var studentSummaries = kqList
-            .GroupBy(k => k.MaSV, StringComparer.OrdinalIgnoreCase)
-            .Select(g =>
+        var studentSummaries = studentTotals.Where(g => svDict.ContainsKey(g.MaSV)).Select(g =>
             {
-                var sv = g.First().SV;
-                var bestByCourse = g
-                    .GroupBy(x => x.LHP.MaMon ?? x.MaLHP, StringComparer.OrdinalIgnoreCase)
-                    .Select(cg => cg.OrderByDescending(x => x.DiemTongKet).First())
-                    .ToList();
-
-                int tinChiDat = bestByCourse.Where(x => x.DiemTongKet >= 4.0).Sum(x => x.LHP.SoTinChi);
-                int tongTinChi = bestByCourse.Sum(x => x.LHP.SoTinChi);
-                double gpa10 = tongTinChi > 0
-                    ? Math.Round(bestByCourse.Sum(x => x.DiemTongKet * x.LHP.SoTinChi) / tongTinChi, 2, MidpointRounding.AwayFromZero)
-                    : 0;
-                double gpa4 = tongTinChi > 0
-                    ? Math.Round(bestByCourse.Sum(x => GradeHelper.QuyDoiHe4(x.DiemTongKet) * x.LHP.SoTinChi) / tongTinChi, 2, MidpointRounding.AwayFromZero)
-                    : 0;
+                var sv = svDict[g.MaSV];
+                int tinChiDat = g.PassedCredits;
+                double gpa10 = g.Credits > 0 ? Math.Round(g.Weighted10 / g.Credits, 2, MidpointRounding.AwayFromZero) : 0;
+                double gpa4 = g.Credits > 0 ? Math.Round(g.Weighted4 / g.Credits, 2, MidpointRounding.AwayFromZero) : 0;
                 string xepLoai = gpa4 switch
                 {
                     >= 3.6 => "Xuất sắc",
@@ -135,8 +125,8 @@ public class ThongKeController : ControllerBase
             ? Math.Round(studentSummaries.Average(s => s.GPA_He4), 2)
             : 0;
 
-        int totalCourseGrades = kqList.Count;
-        int passedCourseGrades = kqList.Count(k => k.DiemTongKet >= 4.0);
+        int totalCourseGrades = gradeFrequency.Sum(k => k.Count);
+        int passedCourseGrades = gradeFrequency.Where(k => k.Score >= 4.0).Sum(k => k.Count);
         int failedCourseGrades = totalCourseGrades - passedCourseGrades;
         double tyLeQuaMon = totalCourseGrades > 0 ? Math.Round(passedCourseGrades * 100.0 / totalCourseGrades, 1) : 100;
         double tyLeRotMon = totalCourseGrades > 0 ? Math.Round(failedCourseGrades * 100.0 / totalCourseGrades, 1) : 0;
@@ -152,21 +142,22 @@ public class ThongKeController : ControllerBase
 
         var phoDiem = new[]
         {
-            new { range = "0 - 3.9 (F)", count = kqList.Count(k => k.DiemTongKet < 4.0) },
-            new { range = "4.0 - 5.4 (D/D+)", count = kqList.Count(k => k.DiemTongKet >= 4.0 && k.DiemTongKet < 5.5) },
-            new { range = "5.5 - 6.9 (C/C+)", count = kqList.Count(k => k.DiemTongKet >= 5.5 && k.DiemTongKet < 7.0) },
-            new { range = "7.0 - 8.4 (B/B+)", count = kqList.Count(k => k.DiemTongKet >= 7.0 && k.DiemTongKet < 8.5) },
-            new { range = "8.5 - 10 (A/A+)", count = kqList.Count(k => k.DiemTongKet >= 8.5) }
+            new { range = "0 - 3.9 (F)", count = gradeFrequency.Where(k => k.Score < 4.0).Sum(k => k.Count) },
+            new { range = "4.0 - 5.4 (D/D+)", count = gradeFrequency.Where(k => k.Score >= 4.0 && k.Score < 5.5).Sum(k => k.Count) },
+            new { range = "5.5 - 6.9 (C/C+)", count = gradeFrequency.Where(k => k.Score >= 5.5 && k.Score < 7.0).Sum(k => k.Count) },
+            new { range = "7.0 - 8.4 (B/B+)", count = gradeFrequency.Where(k => k.Score >= 7.0 && k.Score < 8.5).Sum(k => k.Count) },
+            new { range = "8.5 - 10 (A/A+)", count = gradeFrequency.Where(k => k.Score >= 8.5).Sum(k => k.Count) }
         };
 
-        var xuHuongGPA = kqList
-            .Where(k => !string.IsNullOrEmpty(k.LHP.MaHK))
-            .GroupBy(k => k.LHP.MaHK!)
+        var xuHuongGPA = gradeFrequency
+            .Where(k => !string.IsNullOrEmpty(k.MaHK))
+            .GroupBy(k => k.MaHK!)
             .Select(g =>
             {
-                var lhp = g.First().LHP;
-                double avg10 = Math.Round(g.Average(x => x.DiemTongKet), 2);
-                double avg4 = Math.Round(g.Average(x => GradeHelper.QuyDoiHe4(x.DiemTongKet)), 2);
+                var lhp = g.First();
+                int attempts = g.Sum(x => x.Count);
+                double avg10 = Math.Round(g.Sum(x => x.Score * x.Count) / attempts, 2);
+                double avg4 = Math.Round(g.Sum(x => GradeHelper.QuyDoiHe4(x.Score) * x.Count) / attempts, 2);
                 return new
                 {
                     MaHK = lhp.MaHK,

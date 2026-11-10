@@ -214,13 +214,14 @@ public class DiemController : ControllerBase
     [HttpPut("lophocphan/{maLHP}/ty-le")]
     public async Task<IActionResult> UpdateTyLeDiemHocPhan(string maLHP, [FromBody] TyLeDiemHocPhanDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans.FindAsync(maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
         if (!CanManageSection(lhp))
             return StatusCode(403, new { status = "error", message = "Bạn không có quyền thay đổi cấu hình tỷ lệ của lớp học phần này!" });
 
-        if (lhp.TrangThaiNhapDiem == "Đã khóa")
+        if (!GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem))
             return BadRequest(new { status = "error", message = "Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi cấu hình tỷ lệ điểm học phần!" });
 
         if (req.tyLeQuaTrinh < 0 || req.tyLeThiKetThuc < 0 || req.tyLeQuaTrinh + req.tyLeThiKetThuc != 100)
@@ -240,6 +241,7 @@ public class DiemController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cấu hình tỷ lệ học phần",
             $"Cập nhật tỷ lệ điểm học phần lớp {maLHP}: Quá trình {lhp.TyLeQuaTrinh}% - Thi kết thúc {lhp.TyLeThiKetThuc}%");
 
@@ -259,16 +261,20 @@ public class DiemController : ControllerBase
     [HttpPut("lophocphan/{maLHP}/cau-hinh")]
     public async Task<IActionResult> UpdateCauHinhDiem(string maLHP, [FromBody] CauHinhDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans.FindAsync(maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
         if (!CanManageSection(lhp))
             return StatusCode(403, new { status = "error", message = "Bạn không có quyền thay đổi cấu hình cột điểm của lớp học phần này!" });
 
-        if (lhp.TrangThaiNhapDiem == "Đã khóa")
+        if (!GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem))
             return BadRequest(new { status = "error", message = "Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi cấu hình cột điểm!" });
 
-        if (req.cauHinhDiem == null || !req.cauHinhDiem.Any())
+        if (req.cauHinhDiem == null || !req.cauHinhDiem.Any()
+            || req.cauHinhDiem.Any(c => c == null || string.IsNullOrWhiteSpace(c.id)
+                || c.id == GradeHelper.CourseworkAppealKey || !double.IsFinite(c.weight) || c.weight is < 0 or > 100)
+            || req.cauHinhDiem.Select(c => c.id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != req.cauHinhDiem.Count)
             return BadRequest(new { status = "error", message = "Cấu hình cột điểm không hợp lệ" });
 
         double totalWeight = req.cauHinhDiem.Sum(c => c.weight);
@@ -284,7 +290,7 @@ public class DiemController : ControllerBase
         {
             var chiTiet = ParseChiTietQT(kq.ChiTietDiemQT);
             bool hasAllCols = req.cauHinhDiem.All(c => chiTiet.ContainsKey(c.id) && chiTiet[c.id] != null);
-            if (hasAllCols)
+            if (hasAllCols && !chiTiet.ContainsKey(GradeHelper.CourseworkAppealKey))
             {
                 double qtSum = req.cauHinhDiem.Sum(c => (chiTiet[c.id] ?? 0) * (c.weight / 100.0));
                 kq.DiemCK = Math.Round(qtSum, 1, MidpointRounding.AwayFromZero);
@@ -296,6 +302,7 @@ public class DiemController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cấu hình cột điểm", $"Cập nhật cấu hình cột điểm quá trình cho lớp {maLHP}");
         return Ok(new { status = "success", message = "Đã lưu cấu hình cột điểm thành công", data = req.cauHinhDiem });
     }
@@ -322,6 +329,7 @@ public class DiemController : ControllerBase
     [HttpPut("lophocphan/{maLHP}/hang-loat")]
     public async Task<IActionResult> SaveBangDiemHangLoat(string maLHP, [FromBody] SaveBangDiemDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans.FindAsync(maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
@@ -336,35 +344,47 @@ public class DiemController : ControllerBase
             return BadRequest(new { status = "error", message = "Mật khẩu xác nhận không chính xác!" });
         }
 
-        if (lhp.TrangThaiNhapDiem == "Đã khóa")
+        if (!GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem))
         {
             return BadRequest(new { status = "error", message = "Bảng điểm của lớp này đã bị khóa! Vui lòng mở khóa sổ trước khi chỉnh sửa." });
         }
 
-        if (req.tyLeQuaTrinh != null && req.tyLeThiKetThuc != null &&
-            req.tyLeQuaTrinh >= 0 && req.tyLeThiKetThuc >= 0 &&
-            req.tyLeQuaTrinh.Value + req.tyLeThiKetThuc.Value == 100)
+        if (req.danhSachDiem is not { Count: > 0 } || req.danhSachDiem.Any(item => item == null
+            || string.IsNullOrWhiteSpace(item.MaSV) || !GradeHelper.IsValidGrade(item.DiemCC)
+            || !GradeHelper.IsValidGrade(item.DiemGK) || !GradeHelper.IsValidGrade(item.DiemCK)
+            || !GradeHelper.IsValidGrade(item.DiemThiLan1) || !GradeHelper.IsValidGrade(item.DiemThiLan2)
+            || (item.ChiTietDiemQT?.Any(kv => !GradeHelper.IsValidGrade(kv.Value)) ?? false)))
+            return BadRequest(new { message = "Danh sách hoặc điểm không hợp lệ. Điểm phải từ 0 đến 10." });
+
+        var kqRecords = await _db.KetQuaHocTaps.Where(k => k.MaLHP == maLHP).ToListAsync();
+        var recordsByStudent = kqRecords.Where(k => k.MaSV != null).ToLookup(k => k.MaSV!, StringComparer.OrdinalIgnoreCase);
+        var updatedIds = req.danhSachDiem.Select(item => item.MaSV!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (updatedIds.Count != req.danhSachDiem.Count || updatedIds.Any(id => recordsByStudent[id].Count() != 1))
+            return BadRequest(new { message = "Có mã sinh viên trùng, không thuộc lớp hoặc có kết quả học tập trùng." });
+
+        var previousRatios = GetValidTyLe(lhp);
+        if (req.tyLeQuaTrinh != null || req.tyLeThiKetThuc != null)
         {
+            if (req.tyLeQuaTrinh is not (>= 0 and <= 100) || req.tyLeThiKetThuc is not (>= 0 and <= 100)
+                || req.tyLeQuaTrinh + req.tyLeThiKetThuc != 100)
+                return BadRequest(new { message = "Tỷ lệ quá trình và thi phải hợp lệ và có tổng bằng 100%." });
             lhp.TyLeQuaTrinh = req.tyLeQuaTrinh.Value;
             lhp.TyLeThiKetThuc = req.tyLeThiKetThuc.Value;
         }
 
         var (tyLeQT, tyLeThi) = GetValidTyLe(lhp);
         var cauHinh = ParseCauHinhDiem(lhp.CauHinhDiem);
-        var kqRecords = await _db.KetQuaHocTaps.Where(k => k.MaLHP == maLHP).ToListAsync();
 
         foreach (var item in req.danhSachDiem)
         {
-            if (string.IsNullOrWhiteSpace(item.MaSV)) continue;
-            var kq = kqRecords.FirstOrDefault(k => k.MaSV == item.MaSV);
-            if (kq == null) continue;
+            var kq = recordsByStudent[item.MaSV!.Trim()].Single();
 
             var chiTiet = ParseChiTietQT(kq.ChiTietDiemQT);
             if (item.ChiTietDiemQT != null)
             {
                 foreach (var kv in item.ChiTietDiemQT)
                 {
-                    chiTiet[kv.Key] = kv.Value;
+                    if (kv.Key != GradeHelper.CourseworkAppealKey) chiTiet[kv.Key] = kv.Value;
                 }
             }
 
@@ -378,7 +398,11 @@ public class DiemController : ControllerBase
 
             // Tính điểm quá trình tổng (DiemCK) từ các cột động nếu có đủ hoặc từ DiemCK gửi lên
             bool hasAllCols = cauHinh.All(c => chiTiet.ContainsKey(c.id) && chiTiet[c.id] != null);
-            if (hasAllCols)
+            if (chiTiet.TryGetValue(GradeHelper.CourseworkAppealKey, out var approvedCoursework))
+            {
+                kq.DiemCK = approvedCoursework;
+            }
+            else if (hasAllCols)
             {
                 double qtSum = cauHinh.Sum(c => (chiTiet[c.id] ?? 0) * (c.weight / 100.0));
                 kq.DiemCK = Math.Round(qtSum, 1, MidpointRounding.AwayFromZero);
@@ -390,7 +414,12 @@ public class DiemController : ControllerBase
 
             kq.DiemThiLan1 = item.DiemThiLan1;
             kq.DiemThiLan2 = item.DiemThiLan2;
+        }
 
+        var recalculate = previousRatios != (tyLeQT, tyLeThi) ? kqRecords
+            : kqRecords.Where(k => k.MaSV != null && updatedIds.Contains(k.MaSV));
+        foreach (var kq in recalculate)
+        {
             var (tk, dc, gc) = GradeHelper.TinhDiemTongKetCuoiCung(kq.DiemCK, kq.DiemThiLan1, kq.DiemThiLan2, tyLeQT, tyLeThi);
             kq.DiemTongKet = tk;
             kq.DiemChu = dc;
@@ -433,6 +462,7 @@ public class DiemController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật bảng điểm", $"Đã lưu điểm cho {req.danhSachDiem.Count} sinh viên tại lớp {maLHP} (Tỷ lệ QT {tyLeQT}% - Thi {tyLeThi}%)");
         return Ok(new { status = "success", message = "Đã cập nhật bảng điểm thành công!" });
     }
@@ -446,6 +476,7 @@ public class DiemController : ControllerBase
     [HttpPut("lophocphan/{maLHP}/trang-thai")]
     public async Task<IActionResult> UpdateTrangThaiNhapDiem(string maLHP, [FromBody] TrangThaiDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans
             .Include(l => l.MonHoc)
             .FirstOrDefaultAsync(l => l.MaLHP == maLHP);
@@ -458,6 +489,15 @@ public class DiemController : ControllerBase
         {
             return StatusCode(403, new { status = "error", message = "Bạn không có quyền thay đổi trạng thái sổ điểm của lớp học phần này!" });
         }
+
+        if (newStatus is not ("Đã khóa" or "Chờ mở khóa" or "Đang nhập"))
+            return BadRequest(new { message = "Trạng thái sổ điểm không hợp lệ." });
+        if (newStatus == lhp.TrangThaiNhapDiem)
+            return Ok(new { status = "success", message = "Sổ điểm đã ở trạng thái này.", data = lhp });
+        if ((newStatus == "Chờ mở khóa" && lhp.TrangThaiNhapDiem != "Đã khóa")
+            || (newStatus == "Đang nhập" && GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem))
+            || (newStatus == "Đã khóa" && !GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem) && lhp.TrangThaiNhapDiem != "Chờ mở khóa"))
+            return BadRequest(new { message = "Không thể chuyển trạng thái sổ điểm theo yêu cầu." });
 
         if (newStatus == "Đang nhập" && CurrentRole != "Admin" && CurrentRole != "KhaoThi")
         {
@@ -489,7 +529,6 @@ public class DiemController : ControllerBase
                 NgayGui = DateTime.Now,
                 DaDoc = false
             });
-            GradeHelper.GhiNhatKy(_db, uname, "Xin mở khóa điểm", $"Yêu cầu mở khóa điểm lớp {maLHP}", "Cảnh báo");
         }
         else if (newStatus == "Đang nhập")
         {
@@ -507,7 +546,6 @@ public class DiemController : ControllerBase
                     DaDoc = false
                 });
             }
-            GradeHelper.GhiNhatKy(_db, uname, "Mở khóa điểm", $"Đã mở khóa bảng điểm lớp {maLHP}");
         }
         else if (newStatus == "Đã khóa")
         {
@@ -535,10 +573,11 @@ public class DiemController : ControllerBase
                 });
             }
 
-            GradeHelper.GhiNhatKy(_db, uname, "Chốt sổ điểm", $"Đã khóa bảng điểm lớp {maLHP}");
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        GradeHelper.GhiNhatKy(_db, uname, "Đổi trạng thái sổ điểm", $"Lớp {maLHP}: {newStatus}");
         return Ok(new { status = "success", message = $"Đã chuyển trạng thái bảng điểm sang: {newStatus}", data = lhp });
     }
 
@@ -551,18 +590,20 @@ public class DiemController : ControllerBase
     [HttpPost("lophocphan/{maLHP}/auto-seed")]
     public async Task<IActionResult> AutoSeedGradesForSection(string maLHP, [FromBody] AutoSeedGradesDto? req = null)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var lhp = await _db.LopHocPhans.FirstOrDefaultAsync(l => l.MaLHP == maLHP);
         if (lhp == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
         if (!CanManageSection(lhp))
             return StatusCode(403, new { status = "error", message = "Bạn không có quyền tạo điểm mẫu cho lớp học phần này!" });
 
-        if (lhp.TrangThaiNhapDiem == "Đã khóa")
+        if (!GradeHelper.CanEditGradebook(lhp.TrangThaiNhapDiem))
             return BadRequest(new { status = "error", message = "Bảng điểm của lớp này đang bị khóa! Vui lòng mở khóa sổ trước khi tạo điểm mẫu." });
 
         bool overwrite = req?.overwriteExisting ?? false;
         int updatedCount = await SeedGradesForSingleSectionAsync(lhp, overwrite);
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Tạo điểm mẫu tự động", $"Đã sinh điểm mẫu cho {updatedCount} sinh viên tại lớp {maLHP}");
         return Ok(new
@@ -577,6 +618,7 @@ public class DiemController : ControllerBase
     [Authorize(Roles = "Admin,KhaoThi")]
     public async Task<IActionResult> AutoSeedAllSections([FromBody] AutoSeedGradesDto? req = null)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         bool overwrite = req?.overwriteExisting ?? false;
         var query = _db.LopHocPhans.AsQueryable();
         if (!string.IsNullOrWhiteSpace(req?.maHK))
@@ -585,7 +627,8 @@ public class DiemController : ControllerBase
         }
 
         var openSections = await query
-            .Where(l => l.TrangThaiNhapDiem != "Đã khóa")
+            .Where(l => l.TrangThaiNhapDiem == null || l.TrangThaiNhapDiem == "" || l.TrangThaiNhapDiem == "Đang nhập"
+                || l.TrangThaiNhapDiem == "Chưa nhập" || l.TrangThaiNhapDiem == "Vui lòng nhập điểm")
             .ToListAsync();
 
         int sectionCount = 0;
@@ -602,6 +645,7 @@ public class DiemController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Tạo điểm mẫu hàng loạt", $"Đã sinh điểm mẫu cho {studentCount} lượt sinh viên trên {sectionCount} lớp học phần");
         return Ok(new
         {
@@ -625,7 +669,8 @@ public class DiemController : ControllerBase
         for (int idx = 0; idx < kqList.Count; idx++)
         {
             var kq = kqList[idx];
-            if (!overwriteExisting && kq.DiemTongKet != null)
+            if ((!overwriteExisting && ScheduleRules.HasGrades(kq))
+                || ParseChiTietQT(kq.ChiTietDiemQT).ContainsKey(GradeHelper.CourseworkAppealKey))
                 continue;
 
             // Tạo seed xác định nhưng phân phối chuẩn thực tế dựa trên mã SV + mã LHP

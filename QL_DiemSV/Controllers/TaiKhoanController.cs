@@ -155,12 +155,20 @@ public class TaiKhoanController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] TaiKhoanDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var ua = await _db.UserAccounts.FindAsync(id);
         if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
 
         var faculty = req.maKhoa == null ? ua.MaKhoa : (string.IsNullOrWhiteSpace(req.maKhoa) ? null : req.maKhoa.Trim());
         var error = await ValidateAssignment(req.roleId ?? ua.RoleID, faculty);
         if (error != null) return BadRequest(new { message = error });
+        var adminRole = await _db.Roles.AsNoTracking().Where(r => r.RoleName == "Admin")
+            .Select(r => (int?)r.RoleID).SingleOrDefaultAsync();
+        if (adminRole != null && ua.IsActive && ua.RoleID == adminRole
+            && (!req.isActive || (req.roleId.HasValue && req.roleId != adminRole))
+            && !await _db.UserAccounts.AnyAsync(u => u.UserID != id && u.RoleID == adminRole && u.IsActive))
+            return Conflict(new { message = "Phải giữ ít nhất một tài khoản quản trị đang hoạt động." });
+
         ua.MaKhoa = faculty;
         if (!string.IsNullOrWhiteSpace(req.username)) ua.Username = req.username.Trim();
         if (!string.IsNullOrWhiteSpace(req.password)) ua.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.password);
@@ -194,6 +202,7 @@ public class TaiKhoanController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật tài khoản", $"Đã cập nhật tài khoản #{id} ({ua.Username})");
         return Ok(new { status = "success", message = "Cập nhật tài khoản thành công!" });
     }
@@ -201,11 +210,18 @@ public class TaiKhoanController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var ua = await _db.UserAccounts.FindAsync(id);
         if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
 
         if (ua.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { status = "error", message = "Không thể xóa tài khoản Quản trị viên gốc!" });
+
+        var adminRole = await _db.Roles.AsNoTracking().Where(r => r.RoleName == "Admin")
+            .Select(r => (int?)r.RoleID).SingleOrDefaultAsync();
+        if (adminRole != null && ua.IsActive && ua.RoleID == adminRole
+            && !await _db.UserAccounts.AnyAsync(u => u.UserID != id && u.RoleID == adminRole && u.IsActive))
+            return Conflict(new { message = "Phải giữ ít nhất một tài khoản quản trị đang hoạt động." });
 
         var gv = await _db.GiangViens.FirstOrDefaultAsync(g => g.UserID == id);
         if (gv != null) gv.UserID = null;
@@ -215,6 +231,7 @@ public class TaiKhoanController : ControllerBase
 
         _db.UserAccounts.Remove(ua);
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa tài khoản", $"Đã xóa tài khoản {ua.Username}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa tài khoản thành công!" });
     }

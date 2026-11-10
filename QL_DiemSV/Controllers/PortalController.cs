@@ -451,15 +451,7 @@ public class PortalController(ApplicationDbContext db) : Controller
                 .ToListAsync()
             : new List<KhungChuongTrinh>();
 
-        int khungTCBatBuoc = khungCT.Where(k => k.LoaiMon != "Tự chọn" && k.MonHoc != null).Sum(k => k.MonHoc!.SoTinChi);
-        int khungTCTuChon = khungCT.Where(k => k.LoaiMon == "Tự chọn" && k.MonHoc != null).Sum(k => k.MonHoc!.SoTinChi);
-
-        int tongTTC = quyDinh != null && quyDinh.TongTTC > 0
-            ? quyDinh.TongTTC
-            : (khungTCBatBuoc + khungTCTuChon > 0 ? khungTCBatBuoc + khungTCTuChon : 120);
-        int tcBatBuoc = quyDinh != null ? quyDinh.TCBatBuoc : khungTCBatBuoc;
-        int tcTuChon = quyDinh != null ? quyDinh.TCTuChon : khungTCTuChon;
-        double minGPA = quyDinh != null && quyDinh.MinGPA > 0 ? Math.Round(quyDinh.MinGPA, 2) : 2.0;
+        var (tongTTC, tcBatBuoc, tcTuChon, minGPA) = GraduationRules.Requirements(khungCT, quyDinh);
 
         // Scalar projection to avoid selecting nvarchar(max) ChiTietDiemQT / CauHinhDiem
         var rawGrades = await db.KetQuaHocTaps.AsNoTracking()
@@ -553,65 +545,26 @@ public class PortalController(ApplicationDbContext db) : Controller
             .GroupBy(c => c.MaLHP)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var khungLookup = khungCT
-            .GroupBy(k => k.MaMon)
-            .ToDictionary(g => g.Key, g => g.First().LoaiMon != "Tự chọn");
+        foreach (var complaint in rawComplaints)
+        {
+            complaint.TrangThai = AppealRules.Status(complaint.TrangThai);
+            complaint.LoaiDiem = AppealRules.GradeType(complaint.LoaiDiem) ?? complaint.LoaiDiem;
+        }
 
+        var khungLookup = GraduationRules.CourseTypes(khungCT);
         var cumulativeStats = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
-
-        // Best attempt per course for credit accumulation & failed course checks
-        var bestByCourse = ketQuas
-            .GroupBy(k => k.LopHocPhan!.MaMon)
-            .Select(g => g.OrderByDescending(x => x.DiemTongKet.HasValue)
-                .ThenByDescending(x => x.DiemTongKet)
-                .ThenByDescending(x => x.MaKQ)
-                .First())
-            .ToList();
-
-        int tcBatBuocDat = 0;
-        int tcTuChonDat = 0;
-        int soMonNo = 0;
-        int soMonBatBuocNo = 0;
-
-        foreach (var c in bestByCourse)
-        {
-            string maMon = c.LopHocPhan!.MaMon;
-            int soTC = Math.Max(0, c.LopHocPhan.MonHoc!.SoTinChi);
-            bool isBatBuoc = !khungLookup.TryGetValue(maMon, out bool bb) || bb;
-
-            if (c.DiemTongKet.HasValue && c.DiemTongKet.Value >= 4.0)
-            {
-                if (isBatBuoc) tcBatBuocDat += soTC;
-                else tcTuChonDat += soTC;
-            }
-            else if (c.DiemTongKet.HasValue && c.DiemTongKet.Value < 4.0)
-            {
-                soMonNo++;
-                if (isBatBuoc) soMonBatBuocNo++;
-            }
-        }
-
-        foreach (var k in khungCT.Where(x => x.LoaiMon != "Tự chọn"))
-        {
-            bool passed = bestByCourse.Any(x => x.LopHocPhan!.MaMon == k.MaMon && x.DiemTongKet >= 4.0);
-            bool alreadyCountedFailed = bestByCourse.Any(x => x.LopHocPhan!.MaMon == k.MaMon && x.DiemTongKet.HasValue && x.DiemTongKet.Value < 4.0);
-            if (!passed && !alreadyCountedFailed)
-            {
-                // Course in curriculum not yet completed
-                soMonBatBuocNo++;
-            }
-        }
-
-        int tongTinChiTichLuy = cumulativeStats.TinChiDat;
+        var graduation = GraduationRules.Evaluate(ketQuas, khungLookup, cumulativeStats.GPAHe4,
+            tongTTC, tcBatBuoc, tcTuChon, minGPA);
+        int tcBatBuocDat = graduation.RequiredCredits, tcTuChonDat = graduation.ElectiveCredits;
+        int soMonNo = graduation.FailedCourses, soMonBatBuocNo = graduation.MissingRequiredCourses;
+        int tongTinChiTichLuy = graduation.PassedCredits;
         double gpaHe4 = cumulativeStats.GPAHe4 ?? 0;
-
         bool duTongTC = tongTinChiTichLuy >= tongTTC;
         bool duTCBB = tcBatBuocDat >= tcBatBuoc;
         bool duTCTC = tcTuChonDat >= tcTuChon;
         bool duGPA = gpaHe4 >= minGPA;
         bool khongNoMon = soMonNo == 0 && soMonBatBuocNo == 0;
-
-        bool duDieuKien = duTongTC && duTCBB && duTCTC && duGPA && khongNoMon;
+        bool duDieuKien = graduation.Eligible;
 
         int thieuTC = Math.Max(0, tongTTC - tongTinChiTichLuy);
         string trangThaiText;
@@ -693,8 +646,8 @@ public class PortalController(ApplicationDbContext db) : Controller
             int stt = 1;
             foreach (var item in termCourses)
             {
-                string maMon = item.LopHocPhan!.MaMon;
-                bool isBatBuoc = !khungLookup.TryGetValue(maMon, out bool bb) || bb;
+                string maMon = item.LopHocPhan!.MaMon ?? "";
+                bool isBatBuoc = khungLookup.GetValueOrDefault(maMon);
                 double? diemHe4 = item.DiemTongKet.HasValue ? GradeHelper.QuyDoiHe4(item.DiemTongKet.Value) : null;
                 string diemChu = !string.IsNullOrWhiteSpace(item.DiemChu)
                     ? item.DiemChu!

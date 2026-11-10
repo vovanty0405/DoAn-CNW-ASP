@@ -14,7 +14,7 @@
             <h3 class="font-bold text-sm text-text-primary flex items-center gap-2">
                 <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i> Danh Sách Đơn Phúc Khảo Từ Sinh Viên
             </h3>
-            <input id="kn-search" oninput="renderComplaints()" placeholder="Tìm Mã đơn, MSSV, Họ tên..."
+            <input id="kn-search" oninput="queueComplaintSearch()" placeholder="Tìm Mã đơn, MSSV, Họ tên..."
                    class="bg-canvas border border-surface-hover rounded-lg px-3 py-1.5 text-sm text-text-primary outline-none w-64" />
         </div>
         <div class="overflow-x-auto">
@@ -97,39 +97,45 @@
 @section Scripts {
     <script>
         let complaints = [], selectedKn = null;
-        let knCurrentPage = 1, knPageSize = 10;
+        let knCurrentPage = 1, knPageSize = 10, knTotal = 0, knTotalPages = 1;
+        let knRequest, knSearchTimer;
+        const complaintText = value => String(value ?? "").replace(/[&<>"']/g, ch =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 
         const gradeLabels = {
-            quatrinh: 'Điểm Quá Trình (40%)',
+            quatrinh: 'Điểm quá trình',
             cuoiky: 'Điểm Cuối Kỳ',
-            thiLan1: 'Điểm Thi Lần 1 (60%)',
+            thiLan1: 'Điểm thi lần 1',
             thiLan2: 'Điểm Thi Lần 2'
         };
 
-        async function loadComplaints() {
-            const res = await apiFetch('/api/khieunai');
-            complaints = res.data || [];
-            renderComplaints();
+        function queueComplaintSearch() {
+            clearTimeout(knSearchTimer);
+            knSearchTimer = setTimeout(() => loadComplaints(1), 250);
         }
 
-        function getFilteredComplaints() {
-            const q = document.getElementById('kn-search').value.toLowerCase().trim();
-            return complaints.filter(c => !q || String(c.id).includes(q) || (c.studentId || '').toLowerCase().includes(q) || (c.studentName || '').toLowerCase().includes(q));
+        async function loadComplaints(page = knCurrentPage) {
+            knRequest?.abort();
+            const request = new AbortController();
+            knRequest = request;
+            const params = new URLSearchParams({ page, pageSize: knPageSize, search: document.getElementById('kn-search').value });
+            try {
+                const res = await apiFetch(`/api/khieunai?${params}`, { signal: request.signal });
+                if (request.signal.aborted) return;
+                complaints = res.data || [];
+                knCurrentPage = res.page;
+                knTotal = res.total;
+                knTotalPages = res.totalPages;
+                renderComplaints();
+            } catch (err) {
+                if (!request.signal.aborted) showToast(err.message, 'error');
+            }
         }
 
-        function renderComplaints(resetPage = false) {
-            if (resetPage) knCurrentPage = 1;
-            const filtered = getFilteredComplaints();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / knPageSize));
-
-            if (knCurrentPage > totalPages) knCurrentPage = totalPages;
-            if (knCurrentPage < 1) knCurrentPage = 1;
-
+        function renderComplaints() {
             const startIndex = (knCurrentPage - 1) * knPageSize;
-            const endIndex = Math.min(startIndex + knPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
-
+            const endIndex = startIndex + complaints.length;
+            const paged = complaints;
             const tbody = document.getElementById('kn-tbody');
             if (paged.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-text-muted">Không có đơn khiếu nại nào</td></tr>`;
@@ -145,12 +151,12 @@
                         <tr class="hover:bg-surface-hover/40 cursor-pointer transition-colors" onclick="selectComplaint(${c.id})">
                             <td class="px-5 py-3.5 font-bold text-primary">KN-${c.id}</td>
                             <td class="px-5 py-3.5">
-                                <div class="font-semibold text-text-primary">${c.studentName}</div>
-                                <div class="text-xs text-text-muted">${c.studentId}</div>
+                                <div class="font-semibold text-text-primary">${complaintText(c.studentName)}</div>
+                                <div class="text-xs text-text-muted">${complaintText(c.studentId)}</div>
                             </td>
-                            <td class="px-5 py-3.5 font-medium text-text-primary">${c.courseName}</td>
-                            <td class="px-5 py-3.5 text-amber-400 font-semibold text-xs">${gradeLabels[c.appealedGrade] || c.appealedGrade}</td>
-                            <td class="px-5 py-3.5 text-xs text-text-muted max-w-xs truncate">${c.reason}</td>
+                            <td class="px-5 py-3.5 font-medium text-text-primary">${complaintText(c.courseName)}</td>
+                            <td class="px-5 py-3.5 text-amber-400 font-semibold text-xs">${complaintText(gradeLabels[c.appealedGrade] || c.appealedGrade)}</td>
+                            <td class="px-5 py-3.5 text-xs text-text-muted max-w-xs truncate">${complaintText(c.reason)}</td>
                             <td class="px-5 py-3.5 text-xs text-text-muted">${new Date(c.submitDate).toLocaleDateString('vi-VN')}</td>
                             <td class="px-5 py-3.5 text-center">${badge}</td>
                             <td class="px-5 py-3.5 text-right whitespace-nowrap">
@@ -161,7 +167,7 @@
                 }).join('');
             }
 
-            renderKnPagination(totalItems, totalPages, startIndex, endIndex);
+            renderKnPagination(knTotal, knTotalPages, startIndex, endIndex);
             lucide.createIcons();
         }
 
@@ -208,14 +214,12 @@
         }
 
         function changeKnPage(page) {
-            knCurrentPage = page;
-            renderComplaints();
+            loadComplaints(page);
         }
 
         function changeKnPageSize(size) {
             knPageSize = parseInt(size, 10);
-            knCurrentPage = 1;
-            renderComplaints();
+            loadComplaints(1);
         }
 
         function selectComplaint(id) {

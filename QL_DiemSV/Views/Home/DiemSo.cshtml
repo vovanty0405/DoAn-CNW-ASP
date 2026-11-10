@@ -1022,7 +1022,7 @@
         }
 
         let btns = '';
-        if (st !== 'Đã khóa') {
+        if (!['Đã khóa', 'Chờ mở khóa'].includes(st)) {
             btns += `<button type="button" onclick="updateTrangThai('Đã khóa')" class="btn bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                 <i data-lucide="lock" class="w-4 h-4"></i> <span>Khóa sổ điểm</span>
             </button>`;
@@ -1031,7 +1031,7 @@
                 btns += `<button type="button" onclick="updateTrangThai('Đang nhập')" class="btn bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                     <i data-lucide="unlock" class="w-4 h-4"></i> <span>Mở khóa sổ</span>
                 </button>`;
-            } else {
+            } else if (st === 'Đã khóa') {
                 btns += `<button type="button" onclick="updateTrangThai('Chờ mở khóa')" class="btn bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                     <i data-lucide="key" class="w-4 h-4"></i> <span>Xin mở khóa</span>
                 </button>`;
@@ -1043,7 +1043,7 @@
 
     function renderGradeTable() {
         const theadRow = document.getElementById('grade-thead-row');
-        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa';
+        const isLocked = ['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem);
         const isNoExam = currentTyLeThi === 0;
 
         const btnSave = document.getElementById('btn-save-grades');
@@ -1211,8 +1211,9 @@
         });
 
         const qtEl = document.getElementById(`qt-${idx}`);
-        if (hasAllQT && currentCauHinh.length > 0) {
-            row.diemCK = round1(qtSum);
+        const approvedCoursework = row.chiTietDiemQT.__approved_coursework_appeal;
+        if (approvedCoursework != null || (hasAllQT && currentCauHinh.length > 0)) {
+            row.diemCK = approvedCoursework ?? round1(qtSum);
             if (qtEl) qtEl.textContent = row.diemCK.toFixed(1);
         } else {
             row.diemCK = null;
@@ -1242,7 +1243,7 @@
 
         const wQt = currentTyLeQT / 100.0;
         const wThi = currentTyLeThi / 100.0;
-        const isLocked = currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa';
+        const isLocked = ['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem);
 
         // Trường hợp 1: Môn 100% Quá trình - 0% Thi kết thúc (Không thi cuối kỳ)
         if (currentTyLeThi === 0) {
@@ -1270,7 +1271,7 @@
         }
 
         // Trường hợp 2: Có thi kết thúc học phần (currentTyLeThi > 0)
-        if (row.diemCK !== null && t1 !== null) {
+        if ((currentTyLeQT === 0 || row.diemCK !== null) && t1 !== null) {
             const tk1 = round1((row.diemCK * wQt) + (t1 * wThi));
             let finalTK = tk1;
             let gc = tk1 >= 4.0 ? 'Đạt' : 'Học lại';
@@ -1324,7 +1325,7 @@
             showToast('Vui lòng chọn Lớp học phần trước', 'info');
             return;
         }
-        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+        if (['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem)) {
             showToast('Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi tỷ lệ điểm học phần!', 'error');
             return;
         }
@@ -1474,7 +1475,7 @@
     function handleSaveClick() {
         if (!currentMaLHP) return;
         const st = currentLHPInfo?.trangThaiNhapDiem;
-        if (st === 'Đã khóa') {
+        if (['Đã khóa', 'Chờ mở khóa'].includes(st)) {
             showToast('Bảng điểm đã khóa! Vui lòng mở khóa sổ trước khi chỉnh sửa.', 'error');
             return;
         }
@@ -1576,7 +1577,7 @@
             showToast('Vui lòng chọn Lớp học phần trước', 'info');
             return;
         }
-        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+        if (['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem)) {
             showToast('Bảng điểm đã khóa, vui lòng mở khóa sổ trước khi thay đổi cấu hình cột điểm!', 'error');
             return;
         }
@@ -1692,7 +1693,7 @@
 
     async function autoSeedCurrentSection() {
         if (!currentMaLHP) return;
-        if (currentLHPInfo?.trangThaiNhapDiem === 'Đã khóa') {
+        if (['Đã khóa', 'Chờ mở khóa'].includes(currentLHPInfo?.trangThaiNhapDiem)) {
             showToast('Bảng điểm đang bị khóa, vui lòng mở khóa sổ trước khi tạo điểm mẫu!', 'error');
             return;
         }
