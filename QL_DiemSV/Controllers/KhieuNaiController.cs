@@ -16,9 +16,12 @@ public class KhieuNaiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
 
-    public KhieuNaiController(ApplicationDbContext db)
+    private readonly AcademicEmailNotifications? _email;
+
+    public KhieuNaiController(ApplicationDbContext db, AcademicEmailNotifications? email = null)
     {
         _db = db;
+        _email = email;
     }
 
     [Authorize(Roles = "Admin,GiangVien,KhaoThi,SinhVien"), HttpGet]
@@ -139,6 +142,7 @@ public class KhieuNaiController : ControllerBase
         await _db.SaveChangesAsync();
 
         await transaction.CommitAsync();
+        _email?.Enqueue("Academic Ledger – Có đơn phúc khảo mới");
         GradeHelper.GhiNhatKy(_db, maSV, "Gửi đơn khiếu nại", $"Sinh viên {maSV} gửi đơn phúc khảo lớp {req.MaLHP}");
         return Ok(new { status = "success", message = "Đã gửi đơn khiếu nại thành công!", data = don });
     }
@@ -238,6 +242,7 @@ public class KhieuNaiController : ControllerBase
 
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
+        _email?.Enqueue("Academic Ledger – Đã xử lý đơn phúc khảo");
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xử lý khiếu nại", $"Đã xử lý đơn khiếu nại #{id} ({req.status}) cho SV {don.MaSV}");
         return Ok(new { status = "success", message = "Đã xử lý đơn khiếu nại thành công!", data = don });
     }

@@ -25,6 +25,7 @@ public class SinhVienController : ControllerBase
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = await StudentLookupScope.StudentsAsync(_db, User);
+        var canViewIdentity = User.IsInRole("Admin");
         if (!string.IsNullOrWhiteSpace(maLop)) query = query.Where(s => s.MaLop == maLop);
         if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(s => s.LopHanhChinh!.MaNganh == maNganh);
         if (!string.IsNullOrWhiteSpace(maKhoa)) query = query.Where(s => s.LopHanhChinh!.Nganh!.MaKhoa == maKhoa);
@@ -33,7 +34,8 @@ public class SinhVienController : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             search = search.Trim();
-            query = query.Where(s => s.MaSV.Contains(search) || s.HoTen.Contains(search) || (s.Email != null && s.Email.Contains(search)));
+            query = query.Where(s => s.MaSV.Contains(search) || s.HoTen.Contains(search)
+                || (canViewIdentity && s.Email != null && s.Email.Contains(search)));
         }
 
         query = (sort?.Trim().ToLowerInvariant()) switch
@@ -62,13 +64,15 @@ public class SinhVienController : ControllerBase
         var data = await query.Skip((page - 1) * pageSize).Take(pageSize)
             .Select(s => new
             {
-                s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.Email, s.SDT, s.CCCD, s.DiaChi, s.TrangThai,
+                s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.TrangThai,
+                Email = canViewIdentity ? s.Email : null, SDT = canViewIdentity ? s.SDT : null,
+                CCCD = canViewIdentity ? s.CCCD : null, DiaChi = canViewIdentity ? s.DiaChi : null,
                 LopHanhChinh = s.LopHanhChinh == null ? null : new { s.LopHanhChinh.MaLop, s.LopHanhChinh.TenLop, s.LopHanhChinh.MaNganh, s.LopHanhChinh.NienKhoa }
             }).ToListAsync();
         return Ok(new { status = "success", data, total, page, pageSize, totalPages });
     }
 
-    [HttpGet("{id}")]
+    [Authorize(Roles = "Admin"), HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
         var students = await StudentLookupScope.StudentsAsync(_db, User);

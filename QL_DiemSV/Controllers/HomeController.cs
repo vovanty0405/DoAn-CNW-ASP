@@ -24,7 +24,7 @@ public class HomeController : Controller
         return View("Login");
     }
 
-    [HttpGet("/thong-ke")]
+    [Authorize(Roles = "Admin,GiangVien,KhaoThi"), HttpGet("/thong-ke")]
     public IActionResult ThongKe()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -32,7 +32,7 @@ public class HomeController : Controller
         return View("ThongKe");
     }
 
-    [HttpGet("/sinh-vien")]
+    [Authorize(Roles = "Admin"), HttpGet("/sinh-vien")]
     public IActionResult SinhVien()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -40,7 +40,7 @@ public class HomeController : Controller
         return View("SinhVien");
     }
 
-    [HttpGet("/giang-vien")]
+    [Authorize(Roles = "Admin"), HttpGet("/giang-vien")]
     public IActionResult GiangVien()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -48,7 +48,7 @@ public class HomeController : Controller
         return View("GiangVien");
     }
 
-    [HttpGet("/mon-hoc")]
+    [Authorize(Roles = "Admin"), HttpGet("/mon-hoc")]
     public IActionResult MonHoc()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -56,7 +56,7 @@ public class HomeController : Controller
         return View("MonHoc");
     }
 
-    [HttpGet("/khung-dao-tao")]
+    [Authorize(Roles = "Admin"), HttpGet("/khung-dao-tao")]
     public IActionResult KhungDaoTao()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -64,7 +64,7 @@ public class HomeController : Controller
         return View("KhungDaoTao");
     }
 
-    [HttpGet("/lop-hoc-phan")]
+    [Authorize(Roles = "Admin"), HttpGet("/lop-hoc-phan")]
     public IActionResult LopHocPhan()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -72,7 +72,7 @@ public class HomeController : Controller
         return View("LopHocPhan");
     }
 
-    [HttpGet("/lop-hanh-chinh")]
+    [Authorize(Roles = "Admin"), HttpGet("/lop-hanh-chinh")]
     public IActionResult LopHanhChinh()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -80,7 +80,7 @@ public class HomeController : Controller
         return View("LopHanhChinh");
     }
 
-    [HttpGet("/diem-so")]
+    [Authorize(Roles = "Admin,GiangVien,KhaoThi"), HttpGet("/diem-so")]
     public IActionResult DiemSo()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -88,7 +88,7 @@ public class HomeController : Controller
         return View("DiemSo");
     }
 
-    [Authorize(Roles = StudentLookupScope.Roles), HttpGet("/tra-cuu-diem")]
+    [Authorize(Roles = "Admin,KhaoThi"), HttpGet("/tra-cuu-diem")]
     public IActionResult TraCuuDiem()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -96,7 +96,7 @@ public class HomeController : Controller
         return View("TraCuuDiem");
     }
 
-    [HttpGet("/khieu-nai")]
+    [Authorize(Roles = "Admin,GiangVien,KhaoThi"), HttpGet("/khieu-nai")]
     public IActionResult KhieuNai()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");
@@ -121,7 +121,7 @@ public class HomeController : Controller
         return View("PhanQuyenChiTiet");
     }
 
-    [HttpGet("/nhat-ky-he-thong")]
+    [Authorize(Roles = "Admin"), HttpGet("/nhat-ky-he-thong")]
     public IActionResult NhatKyHeThong()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");

@@ -23,6 +23,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LogoutPath = "/api/auth/logout";
         options.AccessDeniedPath = "/";
         options.Cookie.Name = "QLDiemSV.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.Events.OnRedirectToLogin = context =>
         {
@@ -54,6 +58,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("SignIn", http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     options.AddPolicy("TranscriptVerification", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
@@ -77,6 +84,8 @@ builder.Services.AddControllersWithViews()
     });
 
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<AcademicEmailNotifications>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<AcademicEmailNotifications>());
 builder.Services.AddScoped<QL_DiemSV.Services.CourseCatalogCache>();
 
 var app = builder.Build();

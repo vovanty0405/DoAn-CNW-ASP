@@ -421,6 +421,12 @@
             return u.username;
         }
 
+        function notificationText(value) {
+            const text = document.createElement('span');
+            text.textContent = value ?? '';
+            return text.innerHTML;
+        }
+
         async function loadNotifications() {
             const code = getRecipientCode();
             if (!code) return;
@@ -444,15 +450,21 @@
                         container.innerHTML = `<div class="p-6 text-center text-xs text-text-muted">Chưa có thông báo nào</div>`;
                     } else {
                         container.innerHTML = list.map(n => `
-                            <div onclick="handleNotificationClick(${n.MaThongBao}, '${n.LoaiThongBao || ''}', '${n.ThamChieuID || ''}')"
+                            <div data-notification-id="${Number(n.MaThongBao)}"
                                  class="p-3.5 hover:bg-surface-hover/50 cursor-pointer transition-colors ${!n.DaDoc ? 'bg-primary/5 border-l-2 border-l-primary' : ''}">
                                 <div class="flex justify-between items-start gap-2">
-                                    <div class="text-xs font-bold text-text-primary">${n.TieuDe || 'Thông báo'}</div>
+                                    <div class="text-xs font-bold text-text-primary">${notificationText(n.TieuDe || 'Thông báo')}</div>
                                     <span class="text-[10px] text-text-muted whitespace-nowrap">${new Date(n.NgayGui).toLocaleDateString('vi-VN')}</span>
                                 </div>
-                                <p class="text-xs text-text-muted mt-1 leading-relaxed">${n.NoiDung || ''}</p>
+                                <p class="text-xs text-text-muted mt-1 leading-relaxed">${notificationText(n.NoiDung)}</p>
                             </div>
                         `).join('');
+                        const byId = new Map(list.map(n => [String(n.MaThongBao), n]));
+                        container.querySelectorAll('[data-notification-id]').forEach(element => {
+                            const item = byId.get(element.dataset.notificationId);
+                            if (item) element.addEventListener('click', () =>
+                                handleNotificationClick(item.MaThongBao, item.LoaiThongBao, item.ThamChieuID));
+                        });
                     }
                 }
             } catch (err) { }

@@ -1,0 +1,58 @@
+Academic Ledger — Email thông báo và sao lưu SQL Server
+
+EMAIL THỬ NGHIỆM
+
+1. Nếu dùng Gmail, bật xác minh hai bước rồi tạo App Password.
+   https://support.google.com/accounts/answer/185833
+2. Trong Visual Studio, nhấp chuột phải dự án QL_DiemSV, chọn Manage User Secrets.
+   Thêm các khóa dưới đây vào JSON hiện có và thay các giá trị mẫu.
+
+   {
+     "AcademicEmail": {
+       "Enabled": true,
+       "Username": "EMAIL_GMAIL_GUI",
+       "AppPassword": "DAN_APP_PASSWORD_VAO_DAY",
+       "Recipient": "EMAIL_CUA_BAN"
+     }
+   }
+
+   Username là địa chỉ Gmail tạo App Password. Recipient là hộp thư duy nhất nhận email.
+   Nếu muốn gửi về chính hộp thư đó, nhập cùng địa chỉ ở cả hai trường.
+   Khi dán App Password của Gmail, bỏ các dấu cách phân nhóm ký tự nếu có.
+   Mặc định SMTP dùng smtp.gmail.com, cổng 587, STARTTLS.
+3. Chạy lại ứng dụng bằng launch profile Development để nạp User Secrets.
+   User Secrets nằm trong hồ sơ Windows và lưu giá trị dưới dạng văn bản.
+   Trên máy chủ, dùng kho bí mật hoặc cấu hình môi trường AcademicEmail__Enabled,
+   AcademicEmail__Username, AcademicEmail__AppPassword và AcademicEmail__Recipient.
+4. Lưu bảng điểm thử, đổi trạng thái sổ hoặc gửi/xử lý một đơn phúc khảo thử.
+   Mỗi thao tác thành công xếp một email về địa chỉ cấu hình.
+   Email chỉ nêu loại sự kiện, còn chi tiết xem sau khi đăng nhập.
+   Xem log ứng dụng nếu SMTP gặp lỗi. Hàng đợi trong bộ nhớ có thể mất thư khi ứng dụng dừng.
+
+SAO LƯU
+
+Từ thư mục gốc, chạy PowerShell bằng tài khoản Windows có quyền sao lưu
+và chạy RESTORE VERIFYONLY trên SQL Server. Ví dụ cho cơ sở dữ liệu Demo:
+
+  .\scripts\Backup-AcademicLedger.ps1 -Server '.\SQLEXPRESS01' -Database 'QuanLyDiemSV_Demo'
+
+Nếu SQL Server thử nghiệm cục bộ dùng chứng chỉ tự ký và sqlcmd từ chối kết nối,
+thêm -TrustServerCertificate cho lượt thử cục bộ. Môi trường thật dùng chứng chỉ tin cậy.
+
+Script tạo bản sao toàn bộ cơ sở dữ liệu vào thư mục backup mặc định của instance,
+bao gồm sinh viên, bảng điểm, phúc khảo và các bảng liên quan. Kết quả in đường dẫn
+sau khi RESTORE VERIFYONLY với CHECKSUM thành công. Tài khoản dịch vụ SQL cần quyền
+ghi vào thư mục backup. Thư mục đó nằm trên máy chạy SQL Server.
+
+Để lập lịch với SQL Server Express, tạo tác vụ chạy hằng đêm trong Windows Task Scheduler.
+Chọn powershell.exe và đặt toàn bộ tham số sau trên một dòng:
+
+  -NoProfile -File "ĐƯỜNG_DẪN_ĐẦY_ĐỦ_ĐẾN_SCRIPT" -Server ".\SQLEXPRESS01" -Database "QuanLyDiemSV_Demo"
+
+Chạy thử tác vụ, kiểm tra mã thoát và đường dẫn bản sao. Điều chỉnh tên cơ sở dữ liệu
+đúng với môi trường thực tế.
+
+Giới hạn quyền đọc thư mục backup và lưu bản sao thứ hai ở nơi có mã hóa, ngoài máy SQL.
+Định kỳ phục hồi sang một cơ sở dữ liệu thử riêng với tên và đường dẫn tệp dữ liệu riêng,
+rồi kiểm tra số hồ sơ, số kết quả và mở một bảng điểm mẫu. VERIFYONLY kiểm tra bản sao
+có thể đọc được và checksum, còn diễn tập khôi phục xác nhận ứng dụng sử dụng được dữ liệu.

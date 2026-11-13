@@ -16,9 +16,12 @@ public class DiemController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
 
-    public DiemController(ApplicationDbContext db)
+    private readonly AcademicEmailNotifications? _email;
+
+    public DiemController(ApplicationDbContext db, AcademicEmailNotifications? email = null)
     {
         _db = db;
+        _email = email;
     }
 
     private string CurrentRole => User.FindFirstValue(ClaimTypes.Role) ?? "";
@@ -463,6 +466,7 @@ public class DiemController : ControllerBase
 
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
+        _email?.Enqueue("Academic Ledger – Cập nhật bảng điểm");
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật bảng điểm", $"Đã lưu điểm cho {req.danhSachDiem.Count} sinh viên tại lớp {maLHP} (Tỷ lệ QT {tyLeQT}% - Thi {tyLeThi}%)");
         return Ok(new { status = "success", message = "Đã cập nhật bảng điểm thành công!" });
     }
@@ -577,6 +581,7 @@ public class DiemController : ControllerBase
 
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
+        _email?.Enqueue("Academic Ledger – Thay đổi trạng thái sổ điểm");
         GradeHelper.GhiNhatKy(_db, uname, "Đổi trạng thái sổ điểm", $"Lớp {maLHP}: {newStatus}");
         return Ok(new { status = "success", message = $"Đã chuyển trạng thái bảng điểm sang: {newStatus}", data = lhp });
     }

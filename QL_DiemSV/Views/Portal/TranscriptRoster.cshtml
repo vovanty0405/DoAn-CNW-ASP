@@ -1,0 +1,78 @@
+@model QL_DiemSV.ViewModels.TranscriptRosterViewModel
+@{
+    Layout = "_PortalLayout";
+    ViewData["Title"] = "Tra cứu kết quả học tập và tốt nghiệp";
+}
+
+<section class="transcript-roster">
+    <h1>Tra cứu kết quả học tập và tốt nghiệp</h1>
+    <p>@(User.IsInRole("GiangVien") ? "Sinh viên thuộc lớp bạn chủ nhiệm." : "Sinh viên thuộc khoa bạn phụ trách.")</p>
+    @if (TempData["TranscriptError"] is string error)
+    {
+        <p role="alert">@error</p>
+    }
+    @if (Model.Rows.Count == 0)
+    {
+        <p>Không có sinh viên trong phạm vi tra cứu của bạn.</p>
+    }
+    else
+    {
+        <table>
+            <thead><tr><th>Mã sinh viên</th><th>Họ tên</th><th>Lớp</th><th>Bảng điểm</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td>@row.MaSV</td><td>@row.HoTen</td><td>@row.MaLop</td>
+                    <td><button type="button" class="portal-button" data-student="@row.MaSV">Xem điểm</button></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        @if (Model.LastPage > 1)
+        {
+            <nav aria-label="Phân trang danh sách sinh viên">
+                @if (Model.Page > 1) { <a asp-action="TranscriptRoster" asp-route-page="@(Model.Page - 1)">← Trang trước</a> }
+                <span>Trang @Model.Page / @Model.LastPage</span>
+                @if (Model.Page < Model.LastPage) { <a asp-action="TranscriptRoster" asp-route-page="@(Model.Page + 1)">Trang sau →</a> }
+            </nav>
+        }
+    }
+</section>
+
+<dialog id="roster-verification" aria-labelledby="roster-verification-title">
+    <form asp-action="VerifyScopedTranscript" method="post">
+        <h2 id="roster-verification-title">Xác nhận xem điểm</h2>
+        <p>Mã sinh viên <strong id="roster-selected-code"></strong></p>
+        <input name="maSV" type="hidden" />
+        <label for="roster-password">Mật khẩu tài khoản đang đăng nhập</label>
+        <input id="roster-password" name="password" type="password" autocomplete="current-password" maxlength="256" required />
+        <div>
+            <button type="submit" class="portal-button">Xem điểm</button>
+            <button type="button" id="roster-cancel">Hủy</button>
+        </div>
+    </form>
+</dialog>
+
+<style>
+    .transcript-roster { max-width: 1050px; margin: 2rem auto; padding: 0 1rem; overflow-x: auto; }
+    .transcript-roster table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    .transcript-roster th, .transcript-roster td { text-align: left; padding: .65rem; border-bottom: 1px solid #94a3b8; }
+    .transcript-roster nav { display: flex; align-items: center; gap: 1rem; }
+    #roster-verification { width: min(420px, 92vw); border: 1px solid #94a3b8; border-radius: .6rem; padding: 1rem; }
+    #roster-verification::backdrop { background: rgb(15 23 42 / .55); }
+    #roster-verification form { display: grid; gap: .65rem; }
+    #roster-verification input[type=password] { padding: .45rem; border: 1px solid #94a3b8; border-radius: .3rem; }
+</style>
+<script>
+    const rosterDialog = document.getElementById('roster-verification');
+    document.querySelectorAll('.transcript-roster [data-student]').forEach(button => {
+        button.addEventListener('click', () => {
+            rosterDialog.querySelector('form').reset();
+            rosterDialog.querySelector('[name="maSV"]').value = button.dataset.student;
+            document.getElementById('roster-selected-code').textContent = button.dataset.student;
+            rosterDialog.showModal();
+        });
+    });
+    document.getElementById('roster-cancel').addEventListener('click', () => rosterDialog.close());
+</script>

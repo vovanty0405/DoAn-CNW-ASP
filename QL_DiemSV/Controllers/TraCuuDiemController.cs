@@ -9,7 +9,7 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = StudentLookupScope.Roles)]
+[Authorize(Roles = "Admin,KhaoThi")]
 public class TraCuuDiemController : ControllerBase
 {
     private readonly ApplicationDbContext _db;

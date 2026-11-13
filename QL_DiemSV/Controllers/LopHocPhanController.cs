@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,16 @@ public class LopHocPhanController : ControllerBase
         _db = db;
     }
 
+    private IQueryable<LopHocPhan> VisibleSections()
+    {
+        var sections = _db.LopHocPhans.AsNoTracking();
+        if (ControllerContext.HttpContext?.User.IsInRole("GiangVien") != true)
+            return sections;
+
+        var teacher = User.FindFirstValue("MaGV");
+        return sections.Where(l => !string.IsNullOrEmpty(teacher) && l.MaGV == teacher);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? maHK, [FromQuery] string? maGV,
         [FromQuery] string? maMon, int page = 1, int pageSize = 20, string? search = null,
@@ -26,7 +37,7 @@ public class LopHocPhanController : ControllerBase
     {
         maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var query = _db.LopHocPhans.AsNoTracking().Where(l => maHK != null && l.MaHK == maHK);
+        var query = VisibleSections().Where(l => maHK != null && l.MaHK == maHK);
         if (!string.IsNullOrWhiteSpace(maGV)) query = query.Where(l => l.MaGV == maGV);
         if (!string.IsNullOrWhiteSpace(maMon)) query = query.Where(l => l.MaMon == maMon);
         if (!string.IsNullOrWhiteSpace(maKhoa)) query = query.Where(l => l.MonHoc!.MaKhoa == maKhoa);
@@ -100,19 +111,19 @@ public class LopHocPhanController : ControllerBase
     public async Task<IActionResult> Options(string? maHK = null)
     {
         maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
-        var data = await _db.LopHocPhans.AsNoTracking().Where(l => maHK != null && l.MaHK == maHK)
+        var data = await VisibleSections().Where(l => maHK != null && l.MaHK == maHK)
             .OrderBy(l => l.MaLHP).Select(l => new { l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK }).ToListAsync();
         return Ok(new { status = "success", data, maHK });
     }
 
     [HttpGet("count")]
     public async Task<IActionResult> Count()
-        => Ok(new { status = "success", total = await _db.LopHocPhans.AsNoTracking().CountAsync() });
+        => Ok(new { status = "success", total = await VisibleSections().CountAsync() });
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
-        var l = await _db.LopHocPhans.AsNoTracking().AsSplitQuery()
+        var l = await VisibleSections().AsSplitQuery()
             .Include(x => x.MonHoc)
                 .ThenInclude(m => m!.Khoa)
             .Include(x => x.HocKy)

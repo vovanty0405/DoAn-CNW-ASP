@@ -12,7 +12,7 @@ using QL_DiemSV.ViewModels;
 
 namespace QL_DiemSV.Controllers;
 
-[AllowAnonymous, Route("Portal")]
+[Route("Portal")]
 public class PortalController(ApplicationDbContext db) : Controller
 {
     [HttpGet("Curriculums")]
@@ -251,9 +251,17 @@ public class PortalController(ApplicationDbContext db) : Controller
             return View(vm);
         }
 
+        Response.Headers.CacheControl = "no-store";
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            vm.Error = "Vui lòng đăng nhập để xem thời khóa biểu cá nhân.";
+            return View(vm);
+        }
+
         if (vm.Kind == "student")
         {
-            var person = await db.SinhViens.AsNoTracking()
+            var visibleStudents = await StudentLookupScope.StudentsAsync(db, User);
+            var person = await visibleStudents
                 .Include(x => x.LopHanhChinh)
                 .ThenInclude(x => x!.Nganh)
                 .ThenInclude(x => x!.Khoa)
@@ -272,6 +280,14 @@ public class PortalController(ApplicationDbContext db) : Controller
         }
         else
         {
+            var lecturerCode = User.FindFirstValue("MaGV");
+            if (!User.IsInRole("Admin") && !User.IsInRole("KhaoThi")
+                && (!User.IsInRole("GiangVien") || string.IsNullOrWhiteSpace(lecturerCode)
+                    || !string.Equals(vm.Code, lecturerCode, StringComparison.OrdinalIgnoreCase)))
+            {
+                vm.Error = "Bạn không có quyền xem thời khóa biểu của giảng viên này.";
+                return View(vm);
+            }
             var person = await db.GiangViens.AsNoTracking()
                 .Include(x => x.Khoa)
                 .FirstOrDefaultAsync(x => x.MaGV == vm.Code);
@@ -316,6 +332,7 @@ public class PortalController(ApplicationDbContext db) : Controller
 
     private const string TranscriptCookie = "QLDiemSV.TranscriptAccess";
     private const string TranscriptPath = "/Portal/KetQuaHocTap";
+    private const string TranscriptRosterPath = TranscriptPath + "/danh-sach";
 
     private ITimeLimitedDataProtector TranscriptProtector()
     {
@@ -333,28 +350,79 @@ public class PortalController(ApplicationDbContext db) : Controller
         IsEssential = true
     };
 
+    private bool HasScopedTranscriptAccess => User.IsInRole("GiangVien") || User.IsInRole("GiaoVuKhoa");
+
+    [HttpGet("KetQuaHocTap/danh-sach"), Authorize(Roles = "GiangVien,GiaoVuKhoa")]
+    public async Task<IActionResult> TranscriptRoster(int page = 1)
+    {
+        Response.Headers.CacheControl = "no-store";
+        var ct = HttpContext.RequestAborted;
+        var students = await StudentLookupScope.StudentsAsync(db, User);
+        const int pageSize = 30;
+        int total = await students.CountAsync(ct);
+        int lastPage = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, lastPage);
+        var rows = await students.OrderBy(s => s.MaLop).ThenBy(s => s.MaSV)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(s => new TranscriptRosterRow(s.MaSV, s.HoTen, s.MaLop)).ToListAsync(ct);
+        return View("TranscriptRoster", new TranscriptRosterViewModel(rows, page, lastPage));
+    }
+
+    [HttpPost("KetQuaHocTap/xem-diem"), Authorize(Roles = "GiangVien,GiaoVuKhoa"),
+        ValidateAntiForgeryToken, EnableRateLimiting("TranscriptVerification")]
+    public async Task<IActionResult> VerifyScopedTranscript(string? maSV, string? password)
+    {
+        Response.Headers.CacheControl = "no-store";
+        var ct = HttpContext.RequestAborted;
+        var students = await StudentLookupScope.StudentsAsync(db, User);
+        var student = await students.Where(s => s.MaSV == maSV).Select(s => s.MaSV).FirstOrDefaultAsync(ct);
+        if (student == null) return NotFound();
+
+        if (!string.IsNullOrEmpty(password) && password.Length <= 256
+            && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
+        {
+            var hash = await db.UserAccounts.AsNoTracking().Where(a => a.UserID == id && a.IsActive)
+                .Select(a => a.PasswordHash).FirstOrDefaultAsync(ct);
+            if (hash != null && StudentPasswordMatches(password, hash))
+            {
+                IssueTranscriptTicket(student);
+                return Redirect(TranscriptPath);
+            }
+        }
+
+        if (Request.Cookies.ContainsKey(TranscriptCookie))
+            Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions());
+        TempData["TranscriptError"] = "Mật khẩu tài khoản đang đăng nhập không chính xác.";
+        return Redirect(TranscriptRosterPath);
+    }
+
+    private void IssueTranscriptTicket(string code)
+    {
+        var duration = TimeSpan.FromMinutes(15);
+        var cookie = TranscriptCookieOptions();
+        cookie.MaxAge = duration;
+        Response.Cookies.Append(TranscriptCookie, TranscriptProtector().Protect(code, duration), cookie);
+    }
+
     [HttpPost("KetQuaHocTap/xac-thuc"), ValidateAntiForgeryToken, EnableRateLimiting("TranscriptVerification")]
     public async Task<IActionResult> VerifyTranscript(string? account, string? password)
     {
         if (User.IsInRole("SinhVien")) return Redirect(TranscriptPath);
+        if (HasScopedTranscriptAccess) return Redirect(TranscriptRosterPath);
+        if (User.IsInRole("KhaoThi")) return Redirect("/tra-cuu-diem");
         Response.Headers.CacheControl = "no-store";
         Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions());
         var code = account?.Trim();
         if (!string.IsNullOrWhiteSpace(code) && code.Length <= 255 && !string.IsNullOrEmpty(password) && password.Length <= 256)
         {
-            var students = User.Identity?.IsAuthenticated == true
-                ? await StudentLookupScope.StudentsAsync(db, User)
-                : db.SinhViens.AsNoTracking();
+            var students = db.SinhViens.AsNoTracking();
             var candidates = await students
                 .Where(s => s.UserAccount != null && s.UserAccount.IsActive && s.UserAccount.Role!.RoleName == "SinhVien"
                     && (s.MaSV == code || s.Email == code || s.UserAccount.Username == code))
                 .Select(s => new { s.MaSV, s.UserAccount!.PasswordHash }).Take(2).ToListAsync(HttpContext.RequestAborted);
             if (candidates.Count == 1 && StudentPasswordMatches(password, candidates[0].PasswordHash))
             {
-                var duration = TimeSpan.FromMinutes(15);
-                var cookie = TranscriptCookieOptions();
-                cookie.MaxAge = duration;
-                Response.Cookies.Append(TranscriptCookie, TranscriptProtector().Protect(candidates[0].MaSV, duration), cookie);
+                IssueTranscriptTicket(candidates[0].MaSV);
                 return Redirect(TranscriptPath);
             }
         }
@@ -386,8 +454,9 @@ public class PortalController(ApplicationDbContext db) : Controller
     public async Task<IActionResult> KetQuaHocTap(string? hocKy = null, string? tab = null)
     {
         Response.Headers.CacheControl = "no-store";
+        if (User.IsInRole("KhaoThi")) return Redirect("/tra-cuu-diem");
         bool ownRecord = User.IsInRole("SinhVien");
-        var students = User.Identity?.IsAuthenticated == true
+        var students = ownRecord || HasScopedTranscriptAccess
             ? await StudentLookupScope.StudentsAsync(db, User)
             : db.SinhViens.AsNoTracking();
 
@@ -400,9 +469,12 @@ public class PortalController(ApplicationDbContext db) : Controller
                 catch (CryptographicException) { Response.Cookies.Delete(TranscriptCookie, TranscriptCookieOptions()); }
             }
             if (string.IsNullOrWhiteSpace(verifiedCode))
-                return View(new PortalKetQuaHocTapViewModel { RequiresVerification = true });
-            students = students.Where(s => s.MaSV == verifiedCode && s.UserAccount != null && s.UserAccount.IsActive
-                && s.UserAccount.Role!.RoleName == "SinhVien");
+                return HasScopedTranscriptAccess ? Redirect(TranscriptRosterPath)
+                    : View(new PortalKetQuaHocTapViewModel { RequiresVerification = true });
+            students = students.Where(s => s.MaSV == verifiedCode);
+            if (!HasScopedTranscriptAccess)
+                students = students.Where(s => s.UserAccount != null && s.UserAccount.IsActive
+                    && s.UserAccount.Role!.RoleName == "SinhVien");
         }
 
         string normalizedTab = (ownRecord ? (tab ?? "").Trim().ToLowerInvariant() : "") switch
@@ -431,6 +503,7 @@ public class PortalController(ApplicationDbContext db) : Controller
 
         if (sv == null)
         {
+            if (HasScopedTranscriptAccess) return Redirect(TranscriptRosterPath);
             vm.RequiresVerification = !ownRecord;
             vm.ErrorMessage = "Không tìm thấy hồ sơ sinh viên trong phạm vi tra cứu.";
             return View(vm);

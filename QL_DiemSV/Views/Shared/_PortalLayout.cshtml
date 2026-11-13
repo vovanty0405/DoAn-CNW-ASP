@@ -50,7 +50,7 @@
             <a href="/portal#documents">Văn bản - Hướng dẫn</a>
             <a href="/Portal/LichPhongHoc">Lịch phòng học</a>
             <a href="/portal/tra-cuu-tkb">Tra cứu TKB</a>
-            <a href="/Portal/KetQuaHocTap">Kết quả học tập</a>
+            <a href="@(User.IsInRole("GiangVien") || User.IsInRole("GiaoVuKhoa") ? "/Portal/KetQuaHocTap/danh-sach" : "/Portal/KetQuaHocTap")">Kết quả học tập</a>
         </nav>
         <div class="portal-account">
             <button type="button" class="theme-toggle" id="portal-theme" aria-label="Chuyển giao diện Sáng/Tối">◐</button>
@@ -88,8 +88,19 @@
                         }
                         @if (User.IsInRole("Admin") || User.IsInRole("GiangVien") || User.IsInRole("KhaoThi") || User.IsInRole("GiaoVuKhoa"))
                         {
-                            <a href="/Portal/KetQuaHocTap">📊 Tra cứu KQHT &amp; Tốt nghiệp</a>
-                            <a href="/tra-cuu-diem">🔎 Danh sách tra cứu điểm</a>
+                            @if (User.IsInRole("GiangVien") || User.IsInRole("GiaoVuKhoa"))
+                            {
+                                <a href="/Portal/KetQuaHocTap/danh-sach">📊 Tra cứu KQHT &amp; Tốt nghiệp</a>
+                            }
+                            @if (User.IsInRole("GiangVien") || User.IsInRole("KhaoThi"))
+                            {
+                                <a href="/diem-so">📋 Quản lý điểm số</a>
+                                <a href="/khieu-nai">📝 Khiếu nại &amp; Phúc khảo</a>
+                            }
+                            @if (User.IsInRole("Admin") || User.IsInRole("KhaoThi"))
+                            {
+                                <a href="/tra-cuu-diem">🔎 Danh sách tra cứu điểm</a>
+                            }
                             @if (User.IsInRole("Admin") || User.IsInRole("KhaoThi")) { <a href="/">⚙️ Khu vực quản trị</a> }
                         }
                     </div>
@@ -136,13 +147,14 @@
     </footer>
     <div class="university-copyright">© @QL_DiemSV.Services.RoomMatrixRules.Today.Year. Trường Đại học An Giang. All Rights Reserved.</div>
     <script>
-        window.PORTAL_USER = {
-            isAuthenticated: @(logged ? "true" : "false"),
-            username: '@Html.Raw(User.Identity?.Name ?? "")',
-            role: '@Html.Raw(User.FindFirst(ClaimTypes.Role)?.Value ?? "")',
-            maSV: '@Html.Raw(User.FindFirst("MaSV")?.Value ?? "")',
-            maGV: '@Html.Raw(User.FindFirst("MaGV")?.Value ?? "")'
-        };
+        window.PORTAL_USER = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            isAuthenticated = logged,
+            username = User.Identity?.Name ?? "",
+            role = User.FindFirst(ClaimTypes.Role)?.Value ?? "",
+            maSV = User.FindFirst("MaSV")?.Value ?? "",
+            maGV = User.FindFirst("MaGV")?.Value ?? ""
+        }));
     </script>
     <script src="~/js/portal.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

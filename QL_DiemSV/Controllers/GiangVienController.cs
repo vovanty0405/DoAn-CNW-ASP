@@ -31,6 +31,7 @@ public class GiangVienController : ControllerBase
             query = query.Where(g => g.MaKhoa == maKhoa);
         }
 
+        var canViewProfile = User.IsInRole("Admin");
         query = (sort?.Trim().ToLowerInvariant()) switch
         {
             "newest" => query.OrderByDescending(g => g.UserID).ThenByDescending(g => g.MaGV),
@@ -42,16 +43,22 @@ public class GiangVienController : ControllerBase
             "hocvi_desc" => query.OrderByDescending(g => g.HocVi).ThenByDescending(g => g.MaGV),
             "khoa_asc" => query.OrderBy(g => g.Khoa!.TenKhoa).ThenBy(g => g.MaGV),
             "khoa_desc" => query.OrderByDescending(g => g.Khoa!.TenKhoa).ThenByDescending(g => g.MaGV),
-            "email_asc" => query.OrderBy(g => g.Email).ThenBy(g => g.MaGV),
-            "email_desc" => query.OrderByDescending(g => g.Email).ThenByDescending(g => g.MaGV),
+            "email_asc" when canViewProfile => query.OrderBy(g => g.Email).ThenBy(g => g.MaGV),
+            "email_desc" when canViewProfile => query.OrderByDescending(g => g.Email).ThenByDescending(g => g.MaGV),
             _ => query.OrderBy(g => g.MaGV)
         };
+
+        if (!canViewProfile)
+        {
+            var directory = await query.Select(g => new { g.MaGV, g.HoTen, g.HocVi, g.MaKhoa }).ToListAsync();
+            return Ok(new { status = "success", data = directory });
+        }
 
         var data = await query.ToListAsync();
         return Ok(new { status = "success", data });
     }
 
-    [HttpGet("{id}")]
+    [Authorize(Roles = "Admin"), HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
         var item = await _db.GiangViens

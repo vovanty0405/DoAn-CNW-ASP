@@ -13,7 +13,8 @@
  if(admin)training.Add(("/quan-ly-lich-hoc","Điều phối lịch & Phòng học","school"));
  if(training.Count>0)groups.Add(("training","QUẢN LÝ ĐÀO TẠO",training));
  var grades=new List<(string,string,string)>();if(admin||gv||User.IsInRole("KhaoThi"))grades.Add(("/diem-so","Quản lý Điểm số","file-spreadsheet"));
- if(admin||gv||sv||User.IsInRole("GiaoVuKhoa")||User.IsInRole("KhaoThi")) grades.Add(("/tra-cuu-diem","Tra cứu điểm & Tốt nghiệp","award"));if(admin||gv)grades.Add(("/khieu-nai","Khiếu nại & Phúc khảo","message-square-warning"));groups.Add(("grades","ĐIỂM SỐ & PHÚC KHẢO",grades));
+ if(admin||User.IsInRole("KhaoThi")) grades.Add(("/tra-cuu-diem","Danh sách tra cứu điểm","award"));
+ if(gv||User.IsInRole("GiaoVuKhoa")) grades.Add(("/Portal/KetQuaHocTap/danh-sach","Tra cứu điểm & Tốt nghiệp","award"));if(admin||gv||User.IsInRole("KhaoThi"))grades.Add(("/khieu-nai","Khiếu nại & Phúc khảo","message-square-warning"));groups.Add(("grades","ĐIỂM SỐ & PHÚC KHẢO",grades));
  if(admin)groups.Add(("system","QUẢN TRỊ HỆ THỐNG",new(){("/tai-khoan","Tài khoản & Phân quyền","shield-check"),("/nhat-ky-he-thong","Nhật ký hệ thống","history")}));
  bool Active(string url)=>url=="/"?path=="/":path==url||path.StartsWith(url+"/")||(url=="/tai-khoan"&&path.StartsWith("/phan-quyen"));
 }

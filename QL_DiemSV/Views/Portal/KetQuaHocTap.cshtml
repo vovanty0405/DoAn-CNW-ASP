@@ -859,7 +859,11 @@
         @if (!Model.RequiresVerification && !string.IsNullOrEmpty(Model.MaSV))
         {
         <div class="kqht-header-actions">
-            @if (!Model.IsOwnRecord)
+            @if (User.IsInRole("GiangVien") || User.IsInRole("GiaoVuKhoa"))
+            {
+                <a href="/Portal/KetQuaHocTap/danh-sach" class="kqht-btn-outline">← Về danh sách sinh viên</a>
+            }
+            else if (!Model.IsOwnRecord)
             {
                 <form method="post" action="/Portal/KetQuaHocTap/doi-sinh-vien">
                     @Html.AntiForgeryToken()

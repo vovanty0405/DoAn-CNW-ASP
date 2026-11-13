@@ -248,3 +248,6 @@ public class PortalComplaintItemViewModel
         _ => string.IsNullOrWhiteSpace(LoaiDiem) ? "Điểm tổng kết" : LoaiDiem
     };
 }
+
+public sealed record TranscriptRosterRow(string MaSV, string HoTen, string? MaLop);
+public sealed record TranscriptRosterViewModel(IReadOnlyList<TranscriptRosterRow> Rows, int Page, int LastPage);

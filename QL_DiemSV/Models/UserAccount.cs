@@ -17,6 +17,7 @@ public class UserAccount
 
     [Required]
     [MaxLength(255)]
+    [JsonIgnore]
     public string PasswordHash { get; set; } = string.Empty;
 
     public int? RoleID { get; set; }

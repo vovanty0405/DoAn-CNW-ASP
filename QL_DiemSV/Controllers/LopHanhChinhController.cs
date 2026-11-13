@@ -53,7 +53,7 @@ public class LopHanhChinhController : ControllerBase
         return Ok(new { status = "success", data });
     }
 
-    [HttpGet("{id}")]
+    [Authorize(Roles = "Admin"), HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
     {
         var classes = await StudentLookupScope.ClassesAsync(_db, User);

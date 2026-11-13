@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -26,7 +27,7 @@ public class AuthController : ControllerBase
         public string? Password { get; set; }
     }
 
-    [HttpPost("login")]
+    [HttpPost("login"), EnableRateLimiting("SignIn")]
     public async Task<IActionResult> Login([FromBody] LoginDto req)
     {
         var uname = (req.Username ?? "").Trim();
@@ -220,7 +221,7 @@ public class AuthController : ControllerBase
         public string? Password { get; set; }
     }
 
-    [HttpPost("verify-password")]
+    [HttpPost("verify-password"), EnableRateLimiting("TranscriptVerification")]
     public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordDto req)
     {
         if (User.Identity?.IsAuthenticated != true)
