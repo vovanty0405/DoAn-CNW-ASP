@@ -26,6 +26,11 @@ yarn-error.log*
 # Isolated build output
 .verification/
 
+# Database backup artifacts
+*.bak
+*.bak.cms
+*.bak.cms.partial
+
 QL_DiemSV/App_Data/PortalFiles/
 
 ## Thư mục không push lên GitHub

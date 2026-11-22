@@ -18,12 +18,47 @@ public class NhatKyHoatDongController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? account = null,
+        [FromQuery] string? actionName = null,
+        [FromQuery] string? type = null,
+        [FromQuery] string? desc = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 15)
     {
-        var list = await _db.NhatKyHoatDongs.AsNoTracking()
+        var query = _db.NhatKyHoatDongs.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(account))
+        {
+            var acc = account.Trim();
+            query = query.Where(l => l.NguoiDung != null && l.NguoiDung.Contains(acc));
+        }
+        if (!string.IsNullOrWhiteSpace(actionName))
+        {
+            var act = actionName.Trim();
+            query = query.Where(l => l.HanhDong != null && l.HanhDong.Contains(act));
+        }
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var t = type.Trim();
+            query = query.Where(l => l.Loai == t);
+        }
+        if (!string.IsNullOrWhiteSpace(desc))
+        {
+            var d = desc.Trim();
+            query = query.Where(l => l.ChiTiet != null && l.ChiTiet.Contains(d));
+        }
+
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        int total = await query.CountAsync();
+        int totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+
+        var list = await query
             .OrderByDescending(l => l.ThoiGian)
             .ThenByDescending(l => l.MaLog)
-            .Take(200)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var data = list.Select(l => new
@@ -42,6 +77,6 @@ public class NhatKyHoatDongController : ControllerBase
             ChiTiet = l.ChiTiet ?? ""
         });
 
-        return Ok(new { status = "success", data });
+        return Ok(new { status = "success", data, total, page, pageSize, totalPages });
     }
 }

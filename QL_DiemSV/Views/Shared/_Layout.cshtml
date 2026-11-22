@@ -218,7 +218,12 @@
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || json.status === 'error') {
-                throw new Error(json.message || `Lỗi HTTP ${res.status}`);
+                const errors = Object.values(json.errors || {}).flat();
+                const bindingField = Object.keys(json.errors || {}).find(key => key.startsWith('$.'));
+                const validationMessage = bindingField
+                    ? 'Giá trị ở trường ' + bindingField.slice(2) + ' sai kiểu dữ liệu.'
+                    : errors[0];
+                throw new Error(json.message || validationMessage || 'Lỗi HTTP ' + res.status);
             }
             return json;
         };

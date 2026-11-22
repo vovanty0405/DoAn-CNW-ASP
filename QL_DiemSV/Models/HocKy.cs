@@ -15,8 +15,10 @@ public class HocKy
     [MaxLength(50)]
     public string TenHK { get; set; } = string.Empty;
 
+    [Range(1900, 2200)]
     public int NamHocBatDau { get; set; }
 
+    [Range(1900, 2200)]
     public int NamHocKetThuc { get; set; }
 
     public DateTime? NgayBatDauTuan1 { get; set; }

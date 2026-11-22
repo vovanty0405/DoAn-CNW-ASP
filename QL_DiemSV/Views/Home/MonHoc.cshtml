@@ -27,7 +27,7 @@
     <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="mh-search" oninput="renderMhTable(true)" type="text" placeholder="Tìm Mã môn, Tên môn học..."
+            <input id="mh-search" oninput="queueMhSearch()" type="text" placeholder="Tìm Mã môn, Tên môn học..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
         </div>
         <select id="mh-khoa" onchange="renderMhTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
@@ -255,20 +255,22 @@
             return academicExcel.bulk(input, "Xem trước môn học", "/api/monhoc/bulk", ["MaMon", "TenMon", "MaKhoa", "SoTinChi", "SoTietLyThuyet", "SoTietThucHanh"], ["MaMon", "TenMon"], ["SoTinChi", "SoTietLyThuyet", "SoTietThucHanh"], loadData);
         }
 
-        let mhList = [], khoas = [], editingMaMon = null;
+        let mhList = [], allMhCatalog = [], khoas = [], editingMaMon = null;
         let mhCurrentPage = 1, mhPageSize = 10;
-        let mhSortCol = 'mamon', mhSortDir = 'asc';
+        let mhSortCol = 'mamon', mhSortDir = 'asc', mhSortParam = 'mamon_asc';
+        let mhRequest = 0, mhSearchTimer;
         let selectedPrereqSet = new Set();
+
+        function queueMhSearch() {
+            clearTimeout(mhSearchTimer);
+            mhSearchTimer = setTimeout(() => renderMhTable(true), 250);
+        }
 
         async function loadData() {
             try {
-                const sortVal = document.getElementById('mh-sort')?.value || 'mamon_asc';
-                const [resMh, resKhoa] = await Promise.all([
-                    apiFetch(`/api/monhoc?sort=${encodeURIComponent(sortVal)}`),
-                    apiFetch('/api/khoa')
-                ]);
-                mhList = resMh.data || [];
+                const resKhoa = await apiFetch('/api/khoa');
                 khoas = resKhoa.data || [];
+                allMhCatalog = [];
 
                 const prevMhKhoa = document.getElementById('mh-khoa').value;
                 document.getElementById('mh-khoa').innerHTML = '<option value="">Tất cả Khoa phụ trách</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
@@ -280,20 +282,26 @@
                     prereqFilter.innerHTML = '<option value="">Tất cả các Khoa</option>' + khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
                 }
 
-                renderMhTable();
+                await renderMhTable();
             } catch (err) {
                 showToast('Lỗi khi tải dữ liệu: ' + err.message, 'error');
             }
         }
 
+        async function ensureAllMhCatalogLoaded() {
+            if (allMhCatalog.length > 0) return allMhCatalog;
+            const res = await apiFetch('/api/monhoc?sort=mamon_asc');
+            allMhCatalog = res.data || [];
+            return allMhCatalog;
+        }
+
         async function onMhSortDropdownChange(val) {
+            mhSortParam = val;
             const parts = val.split('_');
             mhSortCol = parts[0] || 'mamon';
             mhSortDir = parts[1] || 'asc';
             updateMhSortIcons();
-            const resMh = await apiFetch(`/api/monhoc?sort=${encodeURIComponent(val)}`);
-            mhList = resMh.data || [];
-            renderMhTable(true);
+            await renderMhTable(true);
         }
 
         async function sortMhByColumn(col) {
@@ -304,14 +312,13 @@
                 mhSortDir = 'asc';
             }
             const sortKey = `${mhSortCol}_${mhSortDir}`;
+            mhSortParam = sortKey;
             const selectEl = document.getElementById('mh-sort');
             if (selectEl && [...selectEl.options].some(o => o.value === sortKey)) {
                 selectEl.value = sortKey;
             }
             updateMhSortIcons();
-            const resMh = await apiFetch(`/api/monhoc?sort=${encodeURIComponent(sortKey)}`);
-            mhList = resMh.data || [];
-            renderMhTable(true);
+            await renderMhTable(true);
         }
 
         function updateMhSortIcons() {
@@ -328,31 +335,35 @@
             });
         }
 
-        function getFilteredMh() {
-            const q = document.getElementById('mh-search').value.toLowerCase().trim();
-            const maKhoa = document.getElementById('mh-khoa').value;
-            const tc = document.getElementById('mh-tc').value;
-
-            return mhList.filter(m => {
-                const mQ = !q || m.MaMon.toLowerCase().includes(q) || m.TenMon.toLowerCase().includes(q);
-                const mK = !maKhoa || m.MaKhoa === maKhoa;
-                const mTC = !tc || String(m.SoTinChi) === tc;
-                return mQ && mK && mTC;
-            });
-        }
-
-        function renderMhTable(resetPage = false) {
+        async function renderMhTable(resetPage = false) {
             if (resetPage) mhCurrentPage = 1;
-            const filtered = getFilteredMh();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / mhPageSize));
+            const request = ++mhRequest;
+            const params = new URLSearchParams({
+                page: mhCurrentPage,
+                pageSize: mhPageSize,
+                search: document.getElementById('mh-search').value.trim(),
+                maKhoa: document.getElementById('mh-khoa').value,
+                sort: mhSortParam
+            });
+            const tcVal = document.getElementById('mh-tc').value;
+            if (tcVal) params.set('soTC', tcVal);
 
-            if (mhCurrentPage > totalPages) mhCurrentPage = totalPages;
-            if (mhCurrentPage < 1) mhCurrentPage = 1;
+            let response;
+            try {
+                response = await apiFetch('/api/monhoc?' + params.toString());
+            } catch (err) {
+                if (request === mhRequest) showToast(err.message, 'error');
+                return;
+            }
+            if (request !== mhRequest) return;
 
+            mhList = response.data || [];
+            mhCurrentPage = response.page || 1;
+            const totalItems = response.total ?? mhList.length;
+            const totalPages = response.totalPages || 1;
             const startIndex = (mhCurrentPage - 1) * mhPageSize;
-            const endIndex = Math.min(startIndex + mhPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + mhList.length, totalItems);
+            const paged = mhList;
 
             const tbody = document.getElementById('mh-tbody');
             if (paged.length === 0) {
@@ -447,11 +458,16 @@
             renderAvailablePrereqs();
         }
 
+        function getCatalogForPrereq() {
+            return allMhCatalog.length > 0 ? allMhCatalog : mhList;
+        }
+
         function isCircularDependency(candMaMon) {
             const currentCode = (editingMaMon || document.getElementById('mh-mamon').value.trim()).toUpperCase();
             if (!currentCode) return false;
             if (candMaMon.toUpperCase() === currentCode) return true;
 
+            const catalog = getCatalogForPrereq();
             // Kiểm tra xem candidate môn này có phụ thuộc vào currentCode qua chuỗi tiên quyết hay không (BFS)
             const queue = [candMaMon];
             const visited = new Set();
@@ -462,7 +478,7 @@
 
                 if (!visited.has(curr)) {
                     visited.add(curr);
-                    const subj = mhList.find(x => x.MaMon.toUpperCase() === curr);
+                    const subj = catalog.find(x => x.MaMon.toUpperCase() === curr);
                     if (subj && subj.DieuKienTienQuyets) {
                         for (const d of subj.DieuKienTienQuyets) {
                             if (d.MaMonTienQuyet) {
@@ -479,6 +495,7 @@
             const container = document.getElementById('mh-selected-tags');
             const badge = document.getElementById('prereq-count-badge');
             const clearBtn = document.getElementById('btn-clear-prereqs');
+            const catalog = getCatalogForPrereq();
 
             if (badge) badge.textContent = `Đã chọn: ${selectedPrereqSet.size}`;
             if (clearBtn) {
@@ -493,7 +510,7 @@
 
             let html = '';
             selectedPrereqSet.forEach(code => {
-                const subj = mhList.find(x => x.MaMon.toUpperCase() === code.toUpperCase());
+                const subj = catalog.find(x => x.MaMon.toUpperCase() === code.toUpperCase());
                 const name = subj ? subj.TenMon : code;
                 html += `
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold group animate-fadeIn">
@@ -536,9 +553,10 @@
             const filterKhoa = document.getElementById('prereq-khoa-filter')?.value || '';
             const q = document.getElementById('prereq-search')?.value.toLowerCase().trim() || '';
             const currentCode = (editingMaMon || document.getElementById('mh-mamon')?.value.trim() || '').toUpperCase();
+            const catalog = getCatalogForPrereq();
 
             // Lọc danh sách ứng viên
-            const filtered = mhList.filter(m => {
+            const filtered = catalog.filter(m => {
                 const matchesQ = !q || m.MaMon.toLowerCase().includes(q) || m.TenMon.toLowerCase().includes(q);
                 const matchesKhoa = !filterKhoa || m.MaKhoa === filterKhoa;
                 return matchesQ && matchesKhoa;
@@ -613,7 +631,8 @@
             lucide.createIcons();
         }
 
-        function openMhModal(mh = null) {
+        async function openMhModal(mh = null) {
+            await ensureAllMhCatalogLoaded();
             editingMaMon = mh ? mh.MaMon : null;
             document.getElementById('mh-modal-title').textContent = mh ? 'Cập Nhật Môn Học' : 'Thêm Môn Học Mới';
             const maMonInput = document.getElementById('mh-mamon');

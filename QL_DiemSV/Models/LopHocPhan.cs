@@ -26,6 +26,7 @@ public class LopHocPhan
     [MaxLength(50)]
     public string? PhongHoc { get; set; }
 
+    [Required, Range(1, 10000)]
     public int? SiSoToiDa { get; set; } = 40;
 
     [MaxLength(10)] public string NMH { get; set; } = "01";

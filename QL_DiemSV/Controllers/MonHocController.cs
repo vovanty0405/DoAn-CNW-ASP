@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,21 +24,49 @@ public class MonHocController : ControllerBase
 
     public class MonHocDto
     {
+        [Required, MaxLength(20)]
         public string MaMon { get; set; } = string.Empty;
+        [Required, MaxLength(255)]
         public string TenMon { get; set; } = string.Empty;
+        [Range(0, 30)]
         public int SoTinChi { get; set; }
+        [Range(0, int.MaxValue)]
         public int? SoTietLyThuyet { get; set; }
+        [Range(0, int.MaxValue)]
         public int? SoTietThucHanh { get; set; }
         public string? MaKhoa { get; set; }
         public List<string>? MonTienQuyet { get; set; }
     }
 
+    [HttpGet("count")]
+    public async Task<IActionResult> Count()
+        => Ok(new { status = "success", total = (await _catalog.GetAsync()).Count });
+
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maKhoa, [FromQuery] string? sort = null)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? maKhoa,
+        [FromQuery] int? soTC = null,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int pageSize = 10)
     {
         var subjects = await _catalog.GetAsync();
         var query = subjects.Where(m => string.IsNullOrWhiteSpace(maKhoa) || m.MaKhoa == maKhoa);
-        var data = (sort?.Trim().ToLowerInvariant()) switch
+
+        if (soTC.HasValue)
+        {
+            query = query.Where(m => m.SoTinChi == soTC.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var kw = search.Trim();
+            query = query.Where(m => m.MaMon.Contains(kw, StringComparison.OrdinalIgnoreCase)
+                || m.TenMon.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var ordered = (sort?.Trim().ToLowerInvariant()) switch
         {
             "mamon_desc" or "newest" => query.OrderByDescending(m => m.MaMon),
             "oldest" => query.OrderBy(m => m.MaMon),
@@ -51,7 +80,19 @@ public class MonHocController : ControllerBase
             "khoa_desc" => query.OrderByDescending(m => m.Khoa?.TenKhoa ?? m.MaKhoa).ThenByDescending(m => m.MaMon),
             _ => query.OrderBy(m => m.MaMon)
         };
-        return Ok(new { status = "success", data });
+
+        if (page.HasValue)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            var list = ordered.ToList();
+            int total = list.Count;
+            int totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+            int currentPage = Math.Clamp(page.Value, 1, totalPages);
+            var paged = list.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+            return Ok(new { status = "success", data = paged, total, page = currentPage, pageSize, totalPages });
+        }
+
+        return Ok(new { status = "success", data = ordered });
     }
 
     [HttpGet("{id}")]
@@ -67,7 +108,7 @@ public class MonHocController : ControllerBase
         var allPrereqs = await _db.DieuKienMonHocs.ToListAsync();
         foreach (var prereq in newPrerequisites)
         {
-            if (prereq == currentMaMon) return true;
+            if (string.Equals(prereq, currentMaMon, StringComparison.OrdinalIgnoreCase)) return true;
 
             var visited = new HashSet<string>();
             var queue = new Queue<string>();
@@ -76,11 +117,11 @@ public class MonHocController : ControllerBase
             while (queue.Count > 0)
             {
                 var node = queue.Dequeue();
-                if (node == currentMaMon) return true;
+                if (string.Equals(node, currentMaMon, StringComparison.OrdinalIgnoreCase)) return true;
                 if (!visited.Add(node)) continue;
 
                 var nextNodes = allPrereqs
-                    .Where(d => d.MaMon == node && !string.IsNullOrEmpty(d.MaMonTienQuyet))
+                    .Where(d => string.Equals(d.MaMon, node, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(d.MaMonTienQuyet))
                     .Select(d => d.MaMonTienQuyet!);
 
                 foreach (var next in nextNodes)
@@ -99,6 +140,10 @@ public class MonHocController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.MaMon) || string.IsNullOrWhiteSpace(req.TenMon))
             return BadRequest(new { status = "error", message = "Mã môn và Tên môn không được để trống" });
 
+        req.MaMon = req.MaMon.Trim();
+        if (!ProfileValidation.Code().IsMatch(req.MaMon))
+            return BadRequest(new { message = "Mã môn học không hợp lệ." });
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         if (await _db.MonHocs.AnyAsync(m => m.MaMon == req.MaMon))
             return BadRequest(new { status = "error", message = $"Mã môn {req.MaMon} đã tồn tại!" });
 
@@ -109,28 +154,31 @@ public class MonHocController : ControllerBase
             SoTinChi = req.SoTinChi,
             SoTietLyThuyet = req.SoTietLyThuyet ?? 30,
             SoTietThucHanh = req.SoTietThucHanh ?? 15,
-            MaKhoa = string.IsNullOrWhiteSpace(req.MaKhoa) ? null : req.MaKhoa
+            MaKhoa = ProfileValidation.Optional(req.MaKhoa)
         };
 
+        if (mh.MaKhoa != null && !await _db.Khoas.AnyAsync(x => x.MaKhoa == mh.MaKhoa))
+            return BadRequest(new { message = "Khoa phụ trách không tồn tại." });
         _db.MonHocs.Add(mh);
-        await _db.SaveChangesAsync();
-        _catalog.Invalidate();
 
         if (req.MonTienQuyet != null && req.MonTienQuyet.Any())
         {
-            var distinctPrereqs = req.MonTienQuyet.Where(p => !string.IsNullOrWhiteSpace(p) && p != mh.MaMon).Distinct().ToList();
+            var distinctPrereqs = req.MonTienQuyet.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (await HasCircularDependencyAsync(mh.MaMon, distinctPrereqs))
             {
                 return BadRequest(new { status = "error", message = "Phát hiện vòng lặp môn tiên quyết (Circular Dependency)! Không thể thêm môn học." });
             }
+            if (await _db.MonHocs.CountAsync(m => distinctPrereqs.Contains(m.MaMon)) != distinctPrereqs.Count)
+                return BadRequest(new { message = "Có môn tiên quyết không tồn tại." });
             foreach (var p in distinctPrereqs)
             {
                 _db.DieuKienMonHocs.Add(new DieuKienMonHoc { MaMon = mh.MaMon, MaMonTienQuyet = p });
             }
-            await _db.SaveChangesAsync();
-        _catalog.Invalidate();
         }
 
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        _catalog.Invalidate();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Môn học", $"Đã thêm môn học {mh.MaMon} - {mh.TenMon}");
         return Ok(new { status = "success", message = "Thêm môn học thành công", data = mh });
     }
@@ -145,24 +193,31 @@ public class MonHocController : ControllerBase
         var existingCodes = (await _db.MonHocs.AsNoTracking().Select(m => m.MaMon).ToListAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var facultyCodes = (await _db.Khoas.Select(k => k.MaKhoa).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         int count = 0;
+        int row = 1;
         foreach (var req in list)
         {
-            if (string.IsNullOrWhiteSpace(req.MaMon))
-                continue;
+            row++;
+            if (req == null || !ProfileValidation.Code().IsMatch(req.MaMon.Trim()))
+                return BadRequest(new { message = $"Dòng {row}: Mã môn học không hợp lệ." });
             var code = req.MaMon.Trim();
             if (existingCodes.Contains(code))
                 continue;
+
+            var faculty = ProfileValidation.Optional(req.MaKhoa);
+            if (faculty != null && !facultyCodes.Contains(faculty))
+                return BadRequest(new { message = $"Dòng {row}: Khoa phụ trách không tồn tại." });
 
             existingCodes.Add(code);
             _db.MonHocs.Add(new MonHoc
             {
                 MaMon = code,
-                TenMon = req.TenMon?.Trim() ?? code,
-                SoTinChi = req.SoTinChi > 0 ? req.SoTinChi : 3,
+                TenMon = req.TenMon.Trim(),
+                SoTinChi = req.SoTinChi,
                 SoTietLyThuyet = req.SoTietLyThuyet ?? 30,
                 SoTietThucHanh = req.SoTietThucHanh ?? 15,
-                MaKhoa = string.IsNullOrWhiteSpace(req.MaKhoa) ? null : req.MaKhoa
+                MaKhoa = ProfileValidation.Optional(req.MaKhoa)
             });
             count++;
         }
@@ -179,6 +234,11 @@ public class MonHocController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] MonHocDto req)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        req.MaKhoa = ProfileValidation.Optional(req.MaKhoa);
+        if (req.MaKhoa != null && !await _db.Khoas.AnyAsync(x => x.MaKhoa == req.MaKhoa))
+            return BadRequest(new { message = "Khoa phụ trách không tồn tại." });
+
         var existing = await _db.MonHocs
             .Include(m => m.DieuKienTienQuyets)
             .FirstOrDefaultAsync(m => m.MaMon == id);
@@ -187,13 +247,15 @@ public class MonHocController : ControllerBase
 
         if (req.MonTienQuyet != null)
         {
-            var distinctPrereqs = req.MonTienQuyet.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct().ToList();
+            var distinctPrereqs = req.MonTienQuyet.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (await HasCircularDependencyAsync(id, distinctPrereqs))
             {
                 return BadRequest(new { status = "error", message = "Phát hiện vòng lặp môn tiên quyết (Circular Dependency)! Không thể cập nhật." });
             }
 
             _db.DieuKienMonHocs.RemoveRange(existing.DieuKienTienQuyets);
+            if (await _db.MonHocs.CountAsync(m => distinctPrereqs.Contains(m.MaMon)) != distinctPrereqs.Count)
+                return BadRequest(new { message = "Có môn tiên quyết không tồn tại." });
             foreach (var p in distinctPrereqs)
             {
                 _db.DieuKienMonHocs.Add(new DieuKienMonHoc { MaMon = id, MaMonTienQuyet = p });
@@ -204,9 +266,10 @@ public class MonHocController : ControllerBase
         existing.SoTinChi = req.SoTinChi;
         existing.SoTietLyThuyet = req.SoTietLyThuyet;
         existing.SoTietThucHanh = req.SoTietThucHanh;
-        existing.MaKhoa = string.IsNullOrWhiteSpace(req.MaKhoa) ? null : req.MaKhoa;
+        existing.MaKhoa = ProfileValidation.Optional(req.MaKhoa);
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         _catalog.Invalidate();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật Môn học", $"Đã cập nhật môn học {id}");
         return Ok(new { status = "success", message = "Cập nhật môn học thành công", data = existing });
@@ -221,6 +284,9 @@ public class MonHocController : ControllerBase
 
         if (await _db.LopHocPhans.AnyAsync(l => l.MaMon == id))
             return BadRequest(new { status = "error", message = "Không thể xóa Môn học đã mở Lớp học phần!" });
+
+        if (await _db.KhungChuongTrinhs.AnyAsync(k => k.MaMon == id))
+            return BadRequest(new { message = "Không thể xóa môn đang nằm trong khung đào tạo." });
 
         var asPrereq = await _db.DieuKienMonHocs.Where(d => d.MaMon == id || d.MaMonTienQuyet == id).ToListAsync();
         _db.DieuKienMonHocs.RemoveRange(asPrereq);

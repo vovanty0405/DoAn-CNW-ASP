@@ -71,9 +71,18 @@ public class NganhController : ControllerBase
         if (string.IsNullOrWhiteSpace(model.MaNganh) || string.IsNullOrWhiteSpace(model.TenNganh))
             return BadRequest(new { status = "error", message = "Mã ngành và Tên ngành không được để trống" });
 
+        model.MaNganh = model.MaNganh.Trim();
+        if (!ProfileValidation.Code().IsMatch(model.MaNganh)) return BadRequest(new { message = "Mã ngành không hợp lệ." });
+        model.MaKhoa = ProfileValidation.Optional(model.MaKhoa);
+        if (model.MaKhoa != null && !await _db.Khoas.AnyAsync(x => x.MaKhoa == model.MaKhoa))
+            return BadRequest(new { message = "Khoa không tồn tại." });
         if (await _db.Nganhs.AnyAsync(n => n.MaNganh == model.MaNganh))
             return BadRequest(new { status = "error", message = $"Mã ngành {model.MaNganh} đã tồn tại!" });
 
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        model.TenNganh = model.TenNganh.Trim();
+        model.Khoa = null;
+        model.QuyDinhTotNghiep = null;
         _db.Nganhs.Add(model);
         await _db.SaveChangesAsync();
 
@@ -90,6 +99,7 @@ public class NganhController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Ngành", $"Đã thêm ngành {model.MaNganh} - {model.TenNganh}");
         return Ok(new { status = "success", message = "Thêm ngành thành công", data = model });
     }
@@ -101,7 +111,11 @@ public class NganhController : ControllerBase
         var existing = await _db.Nganhs.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Ngành" });
 
-        existing.TenNganh = model.TenNganh;
+        model.MaKhoa = ProfileValidation.Optional(model.MaKhoa);
+        if (model.MaKhoa != null && !await _db.Khoas.AnyAsync(x => x.MaKhoa == model.MaKhoa))
+            return BadRequest(new { message = "Khoa không tồn tại." });
+
+        existing.TenNganh = model.TenNganh.Trim();
         existing.MaKhoa = model.MaKhoa;
 
         await _db.SaveChangesAsync();
@@ -120,6 +134,10 @@ public class NganhController : ControllerBase
         {
             return BadRequest(new { status = "error", message = "Không thể xóa Ngành đang có Lớp hành chính trực thuộc!" });
         }
+
+        if (await _db.KhungChuongTrinhs.AnyAsync(k => k.MaNganh == id)
+            || await _db.Curriculums.AnyAsync(c => c.NganhHocId == id))
+            return BadRequest(new { message = "Không thể xóa ngành đang có khung đào tạo hoặc chương trình đào tạo." });
 
         _db.Nganhs.Remove(existing);
         await _db.SaveChangesAsync();

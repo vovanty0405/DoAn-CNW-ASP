@@ -104,6 +104,21 @@ public static class AcademicSchemaUpgrade
             });
         }
 
+        try
+        {
+            db.Database.ExecuteSqlRaw("""
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_KetQuaHocTap_MaSV_MaLHP' AND object_id = OBJECT_ID('KetQuaHocTap'))
+                    CREATE INDEX IX_KetQuaHocTap_MaSV_MaLHP ON KetQuaHocTap(MaSV, MaLHP) INCLUDE (DiemCC, DiemGK, DiemCK, DiemThiLan1, DiemThiLan2, DiemTongKet, DiemChu, GhiChu);
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_LopHocPhan_MaHK_MaMon' AND object_id = OBJECT_ID('LopHocPhan'))
+                    CREATE INDEX IX_LopHocPhan_MaHK_MaMon ON LopHocPhan(MaHK, MaMon);
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_KhungChuongTrinh_MaNganh' AND object_id = OBJECT_ID('KhungChuongTrinh'))
+                    CREATE INDEX IX_KhungChuongTrinh_MaNganh ON KhungChuongTrinh(MaNganh) INCLUDE (MaMon, LoaiMon, HocKyDuKien);
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SinhVien_MaLop' AND object_id = OBJECT_ID('SinhVien'))
+                    CREATE INDEX IX_SinhVien_MaLop ON SinhVien(MaLop);
+                """);
+        }
+        catch { }
+
         SeedDefaultArticlesIfEmpty(db);
         SeedMissingStudentGradesIfAny(db);
     }

@@ -24,9 +24,9 @@
     <div id="tab-acc" class="space-y-4">
         <div class="bg-surface border border-surface-hover rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-3">
-                <input id="acc-search" oninput="renderAccounts()" placeholder="Tìm tên đăng nhập..."
+                <input id="acc-search" oninput="queueAccSearch()" placeholder="Tìm tên đăng nhập, Mã SV/GV..."
                        class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none w-64" />
-                <select id="acc-role" onchange="loadAccounts()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
+                <select id="acc-role" onchange="loadAccounts(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
                     <option value="">Tất cả Nhóm quyền</option>
                 </select>
             </div>
@@ -269,31 +269,37 @@
             document.getElementById('tab-btn-role').className = !isAcc ? 'pb-3 text-sm font-bold text-primary border-b-2 border-primary' : 'pb-3 text-sm font-bold text-text-muted';
         }
 
-        async function loadAccounts() {
-            const role = document.getElementById('acc-role').value;
-            const res = await apiFetch(`/api/taikhoan?role=${role}`);
-            accounts = res.data || [];
-            accCurrentPage = 1;
-            renderAccounts();
+        let accRequest = 0, accSearchTimer;
+        function queueAccSearch() {
+            clearTimeout(accSearchTimer);
+            accSearchTimer = setTimeout(() => loadAccounts(true), 250);
         }
 
-        function getFilteredAccounts() {
-            const q = document.getElementById('acc-search').value.toLowerCase().trim();
-            return accounts.filter(a => !q || a.username.toLowerCase().includes(q) || (a.refId || '').toLowerCase().includes(q));
-        }
-
-        function renderAccounts(resetPage = false) {
+        async function loadAccounts(resetPage = false) {
             if (resetPage) accCurrentPage = 1;
-            const filtered = getFilteredAccounts();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / accPageSize));
+            const request = ++accRequest;
+            const params = new URLSearchParams({
+                page: accCurrentPage,
+                pageSize: accPageSize,
+                role: document.getElementById('acc-role').value,
+                search: document.getElementById('acc-search').value.trim()
+            });
+            let res;
+            try {
+                res = await apiFetch(`/api/taikhoan?${params.toString()}`);
+            } catch (err) {
+                if (request === accRequest) showToast(err.message, 'error');
+                return;
+            }
+            if (request !== accRequest) return;
 
-            if (accCurrentPage > totalPages) accCurrentPage = totalPages;
-            if (accCurrentPage < 1) accCurrentPage = 1;
-
+            accounts = res.data || [];
+            accCurrentPage = res.page || 1;
+            const totalItems = res.total ?? accounts.length;
+            const totalPages = res.totalPages || 1;
             const startIndex = (accCurrentPage - 1) * accPageSize;
-            const endIndex = Math.min(startIndex + accPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + accounts.length, totalItems);
+            const paged = accounts;
 
             const tbody = document.getElementById('acc-tbody');
             if (paged.length === 0) {
@@ -320,6 +326,17 @@
 
             renderAccPagination(totalItems, totalPages, startIndex, endIndex);
             lucide.createIcons();
+        }
+
+        function changeAccPage(page) {
+            accCurrentPage = page;
+            loadAccounts();
+        }
+
+        function changeAccPageSize(size) {
+            accPageSize = parseInt(size, 10);
+            accCurrentPage = 1;
+            loadAccounts();
         }
 
         function renderAccPagination(totalItems, totalPages, startIndex, endIndex) {
@@ -364,16 +381,7 @@
             controlsEl.innerHTML = html;
         }
 
-        function changeAccPage(page) {
-            accCurrentPage = page;
-            renderAccounts();
-        }
-
-        function changeAccPageSize(size) {
-            accPageSize = parseInt(size, 10);
-            accCurrentPage = 1;
-            renderAccounts();
-        }
+        function noopAccPagerPlaceholder() {}
 
         function renderRoles() {
             document.getElementById('role-tbody').innerHTML = roles.map(r => `

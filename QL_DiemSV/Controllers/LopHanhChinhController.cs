@@ -20,10 +20,22 @@ public class LopHanhChinhController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maNganh, [FromQuery] string? sort = null)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? maNganh,
+        [FromQuery] string? maGVCN = null,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int pageSize = 10)
     {
         var query = await StudentLookupScope.ClassesAsync(_db, User);
         if (!string.IsNullOrWhiteSpace(maNganh)) query = query.Where(l => l.MaNganh == maNganh);
+        if (!string.IsNullOrWhiteSpace(maGVCN)) query = query.Where(l => l.MaGVCN == maGVCN);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var kw = search.Trim();
+            query = query.Where(l => l.MaLop.Contains(kw) || l.TenLop.Contains(kw));
+        }
 
         query = (sort?.Trim().ToLowerInvariant()) switch
         {
@@ -40,6 +52,26 @@ public class LopHanhChinhController : ControllerBase
             "siso_asc" => query.OrderBy(l => l.SinhViens.Count()).ThenBy(l => l.MaLop),
             _ => query.OrderBy(l => l.MaLop)
         };
+
+        if (page.HasValue)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            int total = await query.CountAsync();
+            int totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+            int currentPage = Math.Clamp(page.Value, 1, totalPages);
+
+            var pagedData = await query.Skip((currentPage - 1) * pageSize).Take(pageSize)
+                .Select(l => new
+                {
+                    l.MaLop, l.TenLop, l.NienKhoa, l.MaNganh, l.MaGVCN,
+                    Nganh = l.Nganh == null ? null : new { l.Nganh.MaNganh, l.Nganh.TenNganh, l.Nganh.MaKhoa,
+                        Khoa = l.Nganh.Khoa == null ? null : new { l.Nganh.Khoa.MaKhoa, l.Nganh.Khoa.TenKhoa } },
+                    GiangVien = l.GiangVien == null ? null : new { l.GiangVien.MaGV, l.GiangVien.HoTen },
+                    SiSo = l.SinhViens.Count()
+                }).ToListAsync();
+
+            return Ok(new { status = "success", data = pagedData, total, page = currentPage, pageSize, totalPages });
+        }
 
         var data = await query.Select(l => new
         {
@@ -92,6 +124,11 @@ public class LopHanhChinhController : ControllerBase
             return BadRequest(new { status = "error", message = "Mã lớp và Tên lớp không được để trống" });
 
         model.MaLop = model.MaLop.Trim();
+        if (!ProfileValidation.Code().IsMatch(model.MaLop)) return BadRequest(new { message = "Mã lớp không hợp lệ." });
+        var error = await ValidateReferencesAsync(model);
+        if (error != null) return BadRequest(new { message = error });
+        model.Nganh = null;
+        model.GiangVien = null;
         if (await _db.LopHanhChinhs.AnyAsync(l => l.MaLop == model.MaLop))
             return BadRequest(new { status = "error", message = $"Mã lớp {model.MaLop} đã tồn tại!" });
 
@@ -114,18 +151,26 @@ public class LopHanhChinhController : ControllerBase
         var existingCodes = (await _db.LopHanhChinhs.AsNoTracking().Select(l => l.MaLop).ToListAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var majors = (await _db.Nganhs.Select(x => x.MaNganh).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var lecturers = (await _db.GiangViens.Select(x => x.MaGV).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         int count = 0;
+        int row = 1;
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaLop))
-                continue;
+            row++;
+            if (item == null || !ProfileValidation.Code().IsMatch(item.MaLop.Trim()))
+                return BadRequest(new { message = $"Dòng {row}: Mã lớp không hợp lệ." });
             item.MaLop = item.MaLop.Trim();
             if (existingCodes.Contains(item.MaLop))
                 continue;
 
             existingCodes.Add(item.MaLop);
-            if (string.IsNullOrWhiteSpace(item.MaNganh)) item.MaNganh = null;
-            if (string.IsNullOrWhiteSpace(item.MaGVCN)) item.MaGVCN = null;
+            NormalizeClass(item);
+            if ((item.MaNganh != null && !majors.Contains(item.MaNganh))
+                || (item.MaGVCN != null && !lecturers.Contains(item.MaGVCN)))
+                return BadRequest(new { message = $"Dòng {row}: Ngành hoặc giảng viên chủ nhiệm không tồn tại." });
+            item.Nganh = null;
+            item.GiangVien = null;
             _db.LopHanhChinhs.Add(item);
             count++;
         }
@@ -144,6 +189,9 @@ public class LopHanhChinhController : ControllerBase
     {
         var existing = await _db.LopHanhChinhs.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp hành chính" });
+
+        var error = await ValidateReferencesAsync(model);
+        if (error != null) return BadRequest(new { message = error });
 
         existing.TenLop = model.TenLop;
         existing.NienKhoa = model.NienKhoa;
@@ -165,9 +213,30 @@ public class LopHanhChinhController : ControllerBase
         if (await _db.SinhViens.AnyAsync(s => s.MaLop == id))
             return BadRequest(new { status = "error", message = "Không thể xóa Lớp hành chính đang có Sinh viên theo học!" });
 
+        if (await _db.LopHocPhans.AnyAsync(l => l.MaLop == id))
+            return BadRequest(new { message = "Không thể xóa lớp hành chính đang được dùng trong lớp học phần." });
+
         _db.LopHanhChinhs.Remove(existing);
         await _db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa Lớp hành chính", $"Đã xóa lớp hành chính {id}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa lớp hành chính thành công" });
+    }
+
+    private static void NormalizeClass(LopHanhChinh model)
+    {
+        model.TenLop = model.TenLop.Trim();
+        model.NienKhoa = ProfileValidation.Optional(model.NienKhoa);
+        model.MaNganh = ProfileValidation.Optional(model.MaNganh);
+        model.MaGVCN = ProfileValidation.Optional(model.MaGVCN);
+    }
+
+    private async Task<string?> ValidateReferencesAsync(LopHanhChinh model)
+    {
+        NormalizeClass(model);
+        if (model.MaNganh != null && !await _db.Nganhs.AnyAsync(x => x.MaNganh == model.MaNganh))
+            return "Ngành không tồn tại.";
+        if (model.MaGVCN != null && !await _db.GiangViens.AnyAsync(x => x.MaGV == model.MaGVCN))
+            return "Giảng viên chủ nhiệm không tồn tại.";
+        return null;
     }
 }

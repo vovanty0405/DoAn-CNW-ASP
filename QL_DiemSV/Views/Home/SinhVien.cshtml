@@ -123,7 +123,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Mã Sinh Viên *</label>
-                    <input id="m-masv" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                    <input id="m-masv" required maxlength="20" pattern="[A-Za-z0-9_\-]{1,20}" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Họ và Tên *</label>
@@ -159,11 +159,11 @@
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Số điện thoại</label>
-                    <input id="m-sdt" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                    <input id="m-sdt" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{10,11}" title="Nhập 10 hoặc 11 chữ số" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Số CCCD</label>
-                    <input id="m-cccd" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
+                    <input id="m-cccd" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" title="Nhập đúng 12 chữ số" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Địa chỉ</label>
@@ -581,8 +581,9 @@
                     const HoTen = String(row.HoTen || row['Họ Tên'] || '').trim();
                     const MaLop = String(row.MaLop || row['Mã Lớp'] || '').trim();
                     if (!MaSV || !HoTen || !MaLop) throw new Error('Cần mã sinh viên, họ tên và mã lớp.');
-                    return { MaSV, HoTen, MaLop, GioiTinh: row.GioiTinh || row['Giới tính'] || 'Nam',
-                        Email: String(row.Email || ''), SDT: String(row.SDT || ''), TrangThai: row.TrangThai || 'Đang học' };
+                    return academicExcel.validateProfileContacts({ MaSV, HoTen, MaLop, GioiTinh: row.GioiTinh || row['Giới tính'] || 'Nam',
+                        Email: String(row.Email || ''), SDT: String(row.SDT ?? row['Số điện thoại'] ?? '').trim(),
+                        CCCD: String(row.CCCD ?? row['Số CCCD'] ?? '').trim(), TrangThai: row.TrangThai || 'Đang học' });
                 },
                 save: rows => apiFetch('/api/sinhvien/bulk', { method: 'POST', body: JSON.stringify(rows) }),
                 refresh: loadData

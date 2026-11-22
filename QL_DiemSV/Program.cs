@@ -5,6 +5,7 @@ using QL_DiemSV.Services;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using QL_DiemSV.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,13 +44,30 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnValidatePrincipal = async context =>
         {
             var principal = context.Principal;
-            var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-            if (int.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
-                && int.TryParse(principal.FindFirstValue("RoleID"), out var roleId)
-                && await db.UserAccounts.AnyAsync(u => u.UserID == id && u.IsActive
-                    && (u.RoleID ?? 0) == roleId
-                    && (u.Role == null ? "SinhVien" : u.Role.RoleName) == principal.FindFirstValue(ClaimTypes.Role)))
+            if (!int.TryParse(principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
+                || !int.TryParse(principal.FindFirstValue("RoleID"), out var roleId))
+            {
+                context.RejectPrincipal();
+                await Microsoft.AspNetCore.Authentication.AuthenticationHttpContextExtensions.SignOutAsync(
+                    context.HttpContext, CookieAuthenticationDefaults.AuthenticationScheme);
                 return;
+            }
+
+            var roleClaim = principal.FindFirstValue(ClaimTypes.Role) ?? "SinhVien";
+            var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+            var cacheKey = $"AUTH_VALID:{id}:{roleId}:{roleClaim}";
+
+            if (!cache.TryGetValue(cacheKey, out bool isValid))
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                isValid = await db.UserAccounts.AsNoTracking().AnyAsync(u => u.UserID == id && u.IsActive
+                    && (u.RoleID ?? 0) == roleId
+                    && (u.Role == null ? "SinhVien" : u.Role.RoleName) == roleClaim);
+                cache.Set(cacheKey, isValid, TimeSpan.FromSeconds(45));
+            }
+
+            if (isValid) return;
+
             context.RejectPrincipal();
             await Microsoft.AspNetCore.Authentication.AuthenticationHttpContextExtensions.SignOutAsync(
                 context.HttpContext, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -87,6 +105,10 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<AcademicEmailNotifications>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<AcademicEmailNotifications>());
 builder.Services.AddScoped<QL_DiemSV.Services.CourseCatalogCache>();
+builder.Services.Configure<QL_DiemSV.ViewModels.TranscriptPdfOptions>(
+    builder.Configuration.GetSection(QL_DiemSV.ViewModels.TranscriptPdfOptions.SectionName));
+builder.Services.AddScoped<QL_DiemSV.Services.TranscriptQueryService>();
+builder.Services.AddSingleton<QL_DiemSV.Services.TranscriptPdfService>();
 
 var app = builder.Build();
 
@@ -99,6 +121,9 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<ApplicationDbContext>();
         DbInitializer.Initialize(context);
         RoleSetup.Initialize(context);
+        // Pre-warm QuestPDF native engine in background so first PDF request is instant
+        var pdfWarmup = services.GetRequiredService<QL_DiemSV.Services.TranscriptPdfService>();
+        _ = Task.Run(() => pdfWarmup.WarmUp());
     }
     catch (Exception ex)
     {

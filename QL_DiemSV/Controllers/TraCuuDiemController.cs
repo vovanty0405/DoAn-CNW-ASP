@@ -9,183 +9,274 @@ namespace QL_DiemSV.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin,KhaoThi")]
+[Authorize(Roles = StudentLookupScope.Roles)]
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
 public class TraCuuDiemController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly TranscriptQueryService _queryService;
+    private readonly TranscriptPdfService _pdfService;
 
-    public TraCuuDiemController(ApplicationDbContext db)
+    public TraCuuDiemController(
+        ApplicationDbContext db,
+        TranscriptQueryService queryService,
+        TranscriptPdfService pdfService)
     {
         _db = db;
+        _queryService = queryService;
+        _pdfService = pdfService;
     }
 
-    [HttpGet("{maSV}")]
-    public async Task<IActionResult> TraCuuTheoMaSV(string maSV)
+    public sealed class BatchPdfRequestDto
     {
-        var role = User.FindFirstValue(ClaimTypes.Role) ?? "";
-        if (role == "SinhVien")
+        public List<string>? StudentIds { get; set; }
+    }
+
+    /// <summary>
+    /// Tra cứu dữ liệu JSON bảng điểm & xét tốt nghiệp của 1 sinh viên (hiển thị tại màn hình Details).
+    /// </summary>
+    [HttpGet("{maSV}")]
+    public async Task<IActionResult> TraCuuTheoMaSV(string maSV, CancellationToken cancellationToken = default)
+    {
+        var result = await _queryService.GetSingleAsync(maSV, User, cancellationToken);
+        if (!result.Success || result.Documents.Count == 0)
         {
-            var myMaSV = User.FindFirstValue("MaSV") ?? User.Identity?.Name ?? "";
-            if (!string.Equals(myMaSV, maSV, StringComparison.OrdinalIgnoreCase))
+            return StatusCode(result.StatusCode, new
             {
-                return StatusCode(403, new { status = "error", message = "Sinh viên chỉ được phép tra cứu bảng điểm của chính mình!" });
-            }
+                status = "error",
+                message = result.ErrorMessage ?? "Không thể tải bảng điểm sinh viên!"
+            });
         }
 
-        var students = await StudentLookupScope.StudentsAsync(_db, User);
-        var sv = await students
-            .Include(s => s.LopHanhChinh)
-                .ThenInclude(l => l!.Nganh)
-                    .ThenInclude(n => n!.Khoa)
-            .Include(s => s.LopHanhChinh)
-                .ThenInclude(l => l!.Nganh)
-                    .ThenInclude(n => n!.QuyDinhTotNghiep)
-            .FirstOrDefaultAsync(s => s.MaSV == maSV);
-
-        if (sv == null)
-        {
-            return NotFound(new { status = "error", message = $"Không tìm thấy sinh viên có mã {maSV}!" });
-        }
-
-        var maNganh = sv.LopHanhChinh?.MaNganh;
-        var khungRows = await _db.KhungChuongTrinhs.AsNoTracking()
-            .Include(k => k.MonHoc)
-            .Where(k => k.MaNganh == maNganh)
-            .ToListAsync();
-
-        var khungCT = GraduationRules.CourseTypes(khungRows);
-        var quyDinh = sv.LopHanhChinh?.Nganh?.QuyDinhTotNghiep
-            ?? await _db.QuyDinhTotNghieps.AsNoTracking().FirstOrDefaultAsync(q => q.MaNganh == maNganh);
-        var (reqTongTC, reqTCBatBuoc, reqTCTuChon, reqMinGPA) = GraduationRules.Requirements(khungRows, quyDinh);
-
-        var ketQuas = await _db.KetQuaHocTaps.AsNoTracking()
-            .Include(k => k.LopHocPhan)
-                .ThenInclude(l => l!.MonHoc)
-            .Include(k => k.LopHocPhan)
-                .ThenInclude(l => l!.HocKy)
-            .Where(k => k.MaSV == maSV && k.LopHocPhan != null && k.LopHocPhan.HocKy != null && k.LopHocPhan.MonHoc != null)
-            .ToListAsync();
-
-        var completedSoFar = new List<QL_DiemSV.Models.KetQuaHocTap>();
-        var groupedByHK = ketQuas
-            .GroupBy(k => k.LopHocPhan!.MaHK!)
-            .OrderBy(g => g.First().LopHocPhan!.HocKy!.NamHocBatDau)
-            .ThenBy(g => TranscriptStatistics.TermOrder(g.First().LopHocPhan!.HocKy!))
-            .ThenBy(g => g.First().LopHocPhan!.HocKy!.NgayBatDauTuan1)
-            .ThenBy(g => g.Key)
-            .Select(g =>
-            {
-                var hk = g.First().LopHocPhan!.HocKy!;
-                var danhSachMon = g.Select(k =>
-                {
-                    var mh = k.LopHocPhan!.MonHoc!;
-                    string loaiMon = khungCT.GetValueOrDefault(mh.MaMon) ? "Bắt buộc" : "Tự chọn";
-                    double? diemHe4 = k.DiemTongKet != null ? GradeHelper.QuyDoiHe4(k.DiemTongKet.Value) : null;
-                    bool quaMon = k.DiemTongKet != null && k.DiemTongKet.Value >= 4.0;
-
-                    return new
-                    {
-                        k.MaKQ,
-                        k.MaLHP,
-                        TenLopHP = k.LopHocPhan!.TenLopHP,
-                        mh.MaMon,
-                        mh.TenMon,
-                        mh.SoTinChi,
-                        LoaiMon = loaiMon,
-                        DiemQT = k.DiemCK,
-                        k.DiemCC,
-                        k.DiemGK,
-                        k.DiemCK,
-                        k.DiemThiLan1,
-                        k.DiemThiLan2,
-                        k.DiemTongKet,
-                        DiemHe4 = diemHe4,
-                        k.DiemChu,
-                        k.GhiChu,
-                        QuaMon = quaMon
-                    };
-                }).ToList();
-
-                var semesterTotals = TranscriptStatistics.Calculate(g);
-                completedSoFar.AddRange(g);
-                var accumulatedTotals = TranscriptStatistics.Calculate(completedSoFar, cumulative: true);
-
-                return new
-                {
-                    hk.MaHK,
-                    hk.TenHK,
-                    NamHoc = $"{hk.NamHocBatDau} - {hk.NamHocKetThuc}",
-                    hk.NamHocBatDau,
-                    TongTinChiHK = semesterTotals.TinChiDat,
-                    GPA_HK_He10 = semesterTotals.GPAHe10,
-                    GPA_HK_He4 = semesterTotals.GPAHe4,
-                    ThongKeHocKy = semesterTotals,
-                    TichLuyDenHocKy = accumulatedTotals,
-                    DanhSachMon = danhSachMon
-                };
-            })
-            .ToList();
-
-        var overallTotals = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
-        var graduation = GraduationRules.Evaluate(ketQuas, khungCT, overallTotals.GPAHe4,
-            reqTongTC, reqTCBatBuoc, reqTCTuChon, reqMinGPA);
-        int tcTichLuy = graduation.PassedCredits, tcBatBuocDat = graduation.RequiredCredits;
-        int tcTuChonDat = graduation.ElectiveCredits, soMonNo = graduation.FailedCourses, tcNo = graduation.FailedCredits;
-        var xepLoai = overallTotals.XepLoai;
-        var lyDoKhongDat = new List<string>();
-        if (tcTichLuy < reqTongTC) lyDoKhongDat.Add($"Thiếu {reqTongTC - tcTichLuy} tín chỉ tích lũy ({tcTichLuy}/{reqTongTC} TC)");
-        if (tcBatBuocDat < reqTCBatBuoc) lyDoKhongDat.Add($"Thiếu {reqTCBatBuoc - tcBatBuocDat} tín chỉ bắt buộc ({tcBatBuocDat}/{reqTCBatBuoc} TC)");
-        if (tcTuChonDat < reqTCTuChon) lyDoKhongDat.Add($"Thiếu {reqTCTuChon - tcTuChonDat} tín chỉ tự chọn ({tcTuChonDat}/{reqTCTuChon} TC)");
-        if ((overallTotals.GPAHe4 ?? 0) < reqMinGPA) lyDoKhongDat.Add($"GPA tích lũy hệ 4 ({overallTotals.GPAHe4:0.00}) thấp hơn mức tối thiểu ({reqMinGPA:0.00})");
-        if (soMonNo > 0) lyDoKhongDat.Add($"Còn nợ {soMonNo} môn học ({tcNo} tín chỉ)");
-        if (graduation.MissingRequiredCourses > 0) lyDoKhongDat.Add($"Còn {graduation.MissingRequiredCourses} môn bắt buộc chưa đạt");
-
+        var doc = result.Documents[0];
         return Ok(new
         {
             status = "success",
             data = new
             {
-                thongTinSinhVien = new
-                {
-                    sv.MaSV,
-                    sv.HoTen,
-                    sv.NgaySinh,
-                    sv.GioiTinh,
-                    sv.TrangThai,
-                    sv.Email,
-                    sv.SDT,
-                    MaLop = sv.MaLop,
-                    TenLop = sv.LopHanhChinh?.TenLop,
-                    NienKhoa = sv.LopHanhChinh?.NienKhoa,
-                    TenNganh = sv.LopHanhChinh?.Nganh?.TenNganh,
-                    TenKhoa = sv.LopHanhChinh?.Nganh?.Khoa?.TenKhoa
-                },
-                tongKetToanKhoa = new
-                {
-                    TongTinChiTichLuy = tcTichLuy,
-                    TCBatBuocDat = tcBatBuocDat,
-                    TCTuChonDat = tcTuChonDat,
-                    GPA_He10 = overallTotals.GPAHe10,
-                    GPA_He4 = overallTotals.GPAHe4,
-                    ThongKe = overallTotals,
-                    XepLoai = xepLoai,
-                    SoMonNo = soMonNo,
-                    SoTinChiNo = tcNo,
-                    XetTotNghiep = new
-                    {
-                        DuDieuKien = graduation.Eligible,
-                        LyDo = lyDoKhongDat,
-                        QuyDinh = new
-                        {
-                            TongTTC = reqTongTC,
-                            TCBatBuoc = reqTCBatBuoc,
-                            TCTuChon = reqTCTuChon,
-                            MinGPA = reqMinGPA
-                        }
-                    }
-                },
-                ketQuaTheoHocKy = groupedByHK
+                thongTinSinhVien = doc.ThongTinSinhVien,
+                tongKetToanKhoa = doc.TongKetToanKhoa,
+                ketQuaTheoHocKy = doc.KetQuaTheoHocKy
             }
+        });
+    }
+
+    /// <summary>
+    /// Xuất PDF bảng điểm cá nhân của 1 sinh viên.
+    /// Mặc định trả về Content-Disposition: inline để mở trên tab mới, hoặc attachment khi download=true.
+    /// </summary>
+    [HttpGet("{maSV}/pdf")]
+    public async Task<IActionResult> ExportSingleTranscriptPdf(
+        string maSV,
+        [FromQuery] bool download = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _queryService.GetSingleAsync(maSV, User, cancellationToken);
+        if (!result.Success || result.Documents.Count == 0)
+        {
+            return StatusCode(result.StatusCode, new
+            {
+                status = "error",
+                message = result.ErrorMessage ?? "Không thể xuất PDF bảng điểm sinh viên!"
+            });
+        }
+
+        var doc = result.Documents[0];
+        var pdfBytes = _pdfService.GenerateSinglePdf(doc);
+        var safeCode = string.Concat(doc.ThongTinSinhVien.MaSV.Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-'));
+        var fileName = $"BangDiem_{safeCode}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+        Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        Response.Headers["Pragma"] = "no-cache";
+
+        if (download)
+        {
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}\"";
+        return File(pdfBytes, "application/pdf");
+    }
+
+    /// <summary>
+    /// Xuất hàng loạt nhiều bảng điểm sinh viên thành MỘT file PDF duy nhất.
+    /// Mỗi sinh viên bắt đầu trên một trang A4 mới độc lập.
+    /// </summary>
+    [Authorize(Roles = "Admin,KhaoThi,GiangVien,GiaoVuKhoa")]
+    [HttpPost("pdf/batch")]
+    public async Task<IActionResult> ExportBatchTranscriptPdf(
+        [FromBody] BatchPdfRequestDto? req,
+        CancellationToken cancellationToken = default)
+    {
+        if (req?.StudentIds == null || req.StudentIds.Count == 0)
+        {
+            return BadRequest(new
+            {
+                status = "error",
+                message = "Vui lòng chọn ít nhất một sinh viên để xuất bảng điểm."
+            });
+        }
+
+        // Khử trùng lặp theo đúng thứ tự người dùng chọn
+        var distinctOrderedIds = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in req.StudentIds)
+        {
+            var code = (raw ?? "").Trim();
+            if (code.Length > 0 && seen.Add(code))
+            {
+                distinctOrderedIds.Add(code);
+            }
+        }
+
+        if (distinctOrderedIds.Count == 0)
+        {
+            return BadRequest(new
+            {
+                status = "error",
+                message = "Vui lòng chọn ít nhất một sinh viên để xuất bảng điểm."
+            });
+        }
+
+        int maxBatch = _pdfService.MaxStudentsPerBatch;
+        if (distinctOrderedIds.Count > maxBatch)
+        {
+            return BadRequest(new
+            {
+                status = "error",
+                maxAllowed = maxBatch,
+                selectedCount = distinctOrderedIds.Count,
+                message = $"Số lượng sinh viên chọn xuất hàng loạt ({distinctOrderedIds.Count} SV) vượt quá giới hạn tối đa cho phép là {maxBatch} sinh viên mỗi lần xuất. Vui lòng bỏ bớt lựa chọn!"
+            });
+        }
+
+        var result = await _queryService.GetBatchAsync(distinctOrderedIds, User, cancellationToken);
+        if (!result.Success || result.Documents.Count == 0)
+        {
+            return StatusCode(result.StatusCode, new
+            {
+                status = "error",
+                message = result.ErrorMessage ?? "Không thể xuất PDF bảng điểm hàng loạt!"
+            });
+        }
+
+        var pdfBytes = _pdfService.GenerateBatchPdf(result.Documents);
+        var fileName = $"BangDiem_DanhSach_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+        GradeHelper.GhiNhatKy(
+            _db,
+            User.Identity?.Name,
+            "Xuất PDF Bảng điểm hàng loạt",
+            $"Đã xuất 1 file PDF gộp bảng điểm của {result.Documents.Count} sinh viên.");
+
+        Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        Response.Headers["Pragma"] = "no-cache";
+        Response.Headers["X-Transcript-Count"] = result.Documents.Count.ToString();
+        Response.Headers["X-Transcript-FileName"] = fileName;
+
+        return File(pdfBytes, "application/pdf", fileName);
+    }
+
+    /// <summary>
+    /// Tìm kiếm danh sách sinh viên trong Modal "CHỌN SINH VIÊN ĐỂ IN BẢNG ĐIỂM"
+    /// với 5 bộ lọc riêng biệt: Khóa học, Khoa, Lớp hành chính, Tìm theo Mã SV, Tìm theo Họ tên.
+    /// Hỗ trợ includeAllFilteredIds=true khi người dùng nhấn "Chọn tất cả trong kết quả lọc".
+    /// </summary>
+    [Authorize(Roles = "Admin,KhaoThi,GiangVien,GiaoVuKhoa")]
+    [HttpGet("batch-candidates")]
+    public async Task<IActionResult> GetBatchCandidates(
+        [FromQuery] string? cohort = null,
+        [FromQuery] string? maKhoa = null,
+        [FromQuery] string? maLop = null,
+        [FromQuery] string? searchMaSV = null,
+        [FromQuery] string? searchHoTen = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] bool includeAllFilteredIds = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = await StudentLookupScope.StudentsAsync(_db, User);
+
+        if (!string.IsNullOrWhiteSpace(maLop))
+            query = query.Where(s => s.MaLop == maLop);
+        if (!string.IsNullOrWhiteSpace(maKhoa))
+            query = query.Where(s => s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null && s.LopHanhChinh.Nganh.MaKhoa == maKhoa);
+        if (!string.IsNullOrWhiteSpace(cohort))
+            query = query.Where(s => s.LopHanhChinh != null && s.LopHanhChinh.NienKhoa == cohort);
+
+        if (!string.IsNullOrWhiteSpace(searchMaSV))
+        {
+            var codeKw = searchMaSV.Trim();
+            query = query.Where(s => s.MaSV.Contains(codeKw));
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchHoTen))
+        {
+            var nameKw = searchHoTen.Trim();
+            query = query.Where(s => s.HoTen.Contains(nameKw));
+        }
+
+        var ordered = query.OrderBy(s => s.MaSV);
+
+        pageSize = Math.Clamp(pageSize, 5, 100);
+        int total = await ordered.CountAsync(cancellationToken);
+        int totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+        page = Math.Clamp(page, 1, totalPages);
+
+        var data = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(s => new
+            {
+                s.MaSV,
+                s.HoTen,
+                s.GioiTinh,
+                s.NgaySinh,
+                MaLop = s.MaLop ?? "—",
+                NienKhoa = s.LopHanhChinh != null ? s.LopHanhChinh.NienKhoa : null,
+                TenNganh = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null ? s.LopHanhChinh.Nganh.TenNganh : "—",
+                TenKhoa = s.LopHanhChinh != null && s.LopHanhChinh.Nganh != null && s.LopHanhChinh.Nganh.Khoa != null ? s.LopHanhChinh.Nganh.Khoa.TenKhoa : "—",
+                TrangThai = s.TrangThai ?? "Đang học"
+            })
+            .ToListAsync(cancellationToken);
+
+        int maxBatch = _pdfService.MaxStudentsPerBatch;
+
+        if (includeAllFilteredIds)
+        {
+            var allMatching = await ordered
+                .Take(maxBatch + 1)
+                .Select(s => new
+                {
+                    s.MaSV,
+                    s.HoTen,
+                    MaLop = s.MaLop ?? "—"
+                })
+                .ToListAsync(cancellationToken);
+
+            return Ok(new
+            {
+                status = "success",
+                data,
+                total,
+                page,
+                pageSize,
+                totalPages,
+                maxBatchSize = maxBatch,
+                allFilteredStudents = allMatching.Take(maxBatch),
+                exceededMaxBatch = allMatching.Count > maxBatch
+            });
+        }
+
+        return Ok(new
+        {
+            status = "success",
+            data,
+            total,
+            page,
+            pageSize,
+            totalPages,
+            maxBatchSize = maxBatch
         });
     }
 }

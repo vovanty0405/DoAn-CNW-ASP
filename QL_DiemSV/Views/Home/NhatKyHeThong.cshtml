@@ -17,15 +17,15 @@
 
     <!-- Filter Bar -->
     <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <input id="log-account" oninput="renderLogs()" placeholder="Tìm theo Tài khoản..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
-        <input id="log-action" oninput="renderLogs()" placeholder="Tìm theo Hành động..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
-        <select id="log-type" onchange="renderLogs()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
+        <input id="log-account" oninput="queueLogSearch()" placeholder="Tìm theo Tài khoản..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+        <input id="log-action" oninput="queueLogSearch()" placeholder="Tìm theo Hành động..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+        <select id="log-type" onchange="loadLogs(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none">
             <option value="">Tất cả Phân loại</option>
             <option value="Thông tin">Thông tin</option>
             <option value="Cảnh báo">Cảnh báo</option>
             <option value="Lỗi">Lỗi</option>
         </select>
-        <input id="log-desc" oninput="renderLogs()" placeholder="Tìm trong chi tiết..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
+        <input id="log-desc" oninput="queueLogSearch()" placeholder="Tìm trong chi tiết..." class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none" />
     </div>
 
     <!-- Table -->
@@ -70,40 +70,41 @@
     <script>
         let logs = [];
         let logCurrentPage = 1, logPageSize = 15;
+        let logRequest = 0, logSearchTimer;
 
-        async function loadLogs() {
-            const res = await apiFetch('/api/nhatkyhoatdong');
-            logs = res.data || [];
-            renderLogs();
+        function queueLogSearch() {
+            clearTimeout(logSearchTimer);
+            logSearchTimer = setTimeout(() => loadLogs(true), 250);
         }
 
-        function getFilteredLogs() {
-            const acc = document.getElementById('log-account').value.toLowerCase().trim();
-            const act = document.getElementById('log-action').value.toLowerCase().trim();
-            const type = document.getElementById('log-type').value;
-            const desc = document.getElementById('log-desc').value.toLowerCase().trim();
-
-            return logs.filter(l => {
-                const mAcc = !acc || (l.account || '').toLowerCase().includes(acc);
-                const mAct = !act || (l.action || '').toLowerCase().includes(act);
-                const mType = !type || l.type === type;
-                const mDesc = !desc || (l.description || '').toLowerCase().includes(desc);
-                return mAcc && mAct && mType && mDesc;
-            });
-        }
-
-        function renderLogs(resetPage = false) {
+        async function loadLogs(resetPage = false) {
             if (resetPage) logCurrentPage = 1;
-            const filtered = getFilteredLogs();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / logPageSize));
+            const request = ++logRequest;
+            const params = new URLSearchParams({
+                page: logCurrentPage,
+                pageSize: logPageSize,
+                account: document.getElementById('log-account').value.trim(),
+                actionName: document.getElementById('log-action').value.trim(),
+                type: document.getElementById('log-type').value,
+                desc: document.getElementById('log-desc').value.trim()
+            });
 
-            if (logCurrentPage > totalPages) logCurrentPage = totalPages;
-            if (logCurrentPage < 1) logCurrentPage = 1;
+            let res;
+            try {
+                res = await apiFetch('/api/nhatkyhoatdong?' + params.toString());
+            } catch (err) {
+                if (request === logRequest) showToast(err.message, 'error');
+                return;
+            }
+            if (request !== logRequest) return;
 
+            logs = res.data || [];
+            logCurrentPage = res.page || 1;
+            const totalItems = res.total ?? logs.length;
+            const totalPages = res.totalPages || 1;
             const startIndex = (logCurrentPage - 1) * logPageSize;
-            const endIndex = Math.min(startIndex + logPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + logs.length, totalItems);
+            const paged = logs;
 
             const tbody = document.getElementById('log-tbody');
             if (paged.length === 0) {
@@ -176,13 +177,13 @@
 
         function changeLogPage(page) {
             logCurrentPage = page;
-            renderLogs();
+            loadLogs();
         }
 
         function changeLogPageSize(size) {
             logPageSize = parseInt(size, 10);
             logCurrentPage = 1;
-            renderLogs();
+            loadLogs();
         }
 
         function exportLogsExcel() {

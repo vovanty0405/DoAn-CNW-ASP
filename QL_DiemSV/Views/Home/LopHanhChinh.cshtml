@@ -33,7 +33,7 @@
     <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="lhc-search" oninput="renderLhcTable(true)" type="text" placeholder="Tìm Mã lớp, Tên lớp..."
+            <input id="lhc-search" oninput="queueLhcSearch()" type="text" placeholder="Tìm Mã lớp, Tên lớp..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
         </div>
         <select id="lhc-nganh" onchange="renderLhcTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary">
@@ -289,19 +289,22 @@
 
         let lhcList = [], nganhs = [], gvs = [], khoas = [], editingMaLop = null, editingMaNganh = null;
         let lhcCurrentPage = 1, lhcPageSize = 10;
-        let lhcSortCol = 'malop', lhcSortDir = 'asc';
+        let lhcSortCol = 'malop', lhcSortDir = 'asc', lhcSortParam = 'malop_asc';
+        let lhcRequest = 0, lhcSearchTimer;
         let nganhSortCol = 'manganh', nganhSortDir = 'asc';
         let pendingDeleteAction = null;
 
+        function queueLhcSearch() {
+            clearTimeout(lhcSearchTimer);
+            lhcSearchTimer = setTimeout(() => renderLhcTable(true), 250);
+        }
+
         async function loadData() {
-            const sortParam = document.getElementById('lhc-sort')?.value || `${lhcSortCol}_${lhcSortDir}`;
-            const [resLhc, resNganh, resGv, resKhoa] = await Promise.all([
-                apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(sortParam)}`),
+            const [resNganh, resGv, resKhoa] = await Promise.all([
                 apiFetch('/api/nganh'),
                 apiFetch('/api/giangvien'),
                 apiFetch('/api/khoa')
             ]);
-            lhcList = resLhc.data || [];
             nganhs = resNganh.data || [];
             gvs = resGv.data || [];
             khoas = resKhoa.data || [];
@@ -325,11 +328,12 @@
                 nganhFilterKhoaEl.value = prevNganhFilterKhoa;
             }
 
-            renderLhcTable();
+            await renderLhcTable();
             renderNganhTable();
         }
 
         async function onLhcSortDropdownChange(val) {
+            lhcSortParam = val;
             if (val === 'newest') { lhcSortCol = 'nienkhoa'; lhcSortDir = 'desc'; }
             else if (val === 'oldest') { lhcSortCol = 'nienkhoa'; lhcSortDir = 'asc'; }
             else {
@@ -338,9 +342,7 @@
                 lhcSortDir = parts[1] || 'asc';
             }
             updateLhcSortIcons();
-            const resLhc = await apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(val)}`);
-            lhcList = resLhc.data || [];
-            renderLhcTable(true);
+            await renderLhcTable(true);
         }
 
         async function sortLhcByColumn(col) {
@@ -351,6 +353,7 @@
                 lhcSortDir = 'asc';
             }
             const sortKey = `${lhcSortCol}_${lhcSortDir}`;
+            lhcSortParam = sortKey;
             const selectEl = document.getElementById('lhc-sort');
             if (selectEl) {
                 if (sortKey === 'nienkhoa_desc') selectEl.value = 'newest';
@@ -358,9 +361,7 @@
                 else if ([...selectEl.options].some(o => o.value === sortKey)) selectEl.value = sortKey;
             }
             updateLhcSortIcons();
-            const resLhc = await apiFetch(`/api/lophanhchinh?sort=${encodeURIComponent(sortKey)}`);
-            lhcList = resLhc.data || [];
-            renderLhcTable(true);
+            await renderLhcTable(true);
         }
 
         function updateLhcSortIcons() {
@@ -377,31 +378,34 @@
             });
         }
 
-        function getFilteredLhc() {
-            const q = document.getElementById('lhc-search').value.toLowerCase().trim();
-            const maNganh = document.getElementById('lhc-nganh').value;
-            const maGV = document.getElementById('lhc-gv').value;
-
-            return lhcList.filter(l => {
-                const mQ = !q || l.MaLop.toLowerCase().includes(q) || l.TenLop.toLowerCase().includes(q);
-                const mN = !maNganh || l.MaNganh === maNganh;
-                const mG = !maGV || l.MaGVCN === maGV;
-                return mQ && mN && mG;
-            });
-        }
-
-        function renderLhcTable(resetPage = false) {
+        async function renderLhcTable(resetPage = false) {
             if (resetPage) lhcCurrentPage = 1;
-            const filtered = getFilteredLhc();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / lhcPageSize));
+            const request = ++lhcRequest;
+            const params = new URLSearchParams({
+                page: lhcCurrentPage,
+                pageSize: lhcPageSize,
+                search: document.getElementById('lhc-search').value.trim(),
+                maNganh: document.getElementById('lhc-nganh').value,
+                maGVCN: document.getElementById('lhc-gv').value,
+                sort: lhcSortParam
+            });
 
-            if (lhcCurrentPage > totalPages) lhcCurrentPage = totalPages;
-            if (lhcCurrentPage < 1) lhcCurrentPage = 1;
+            let response;
+            try {
+                response = await apiFetch('/api/lophanhchinh?' + params.toString());
+            } catch (err) {
+                if (request === lhcRequest) showToast(err.message, 'error');
+                return;
+            }
+            if (request !== lhcRequest) return;
 
+            lhcList = response.data || [];
+            lhcCurrentPage = response.page || 1;
+            const totalItems = response.total ?? lhcList.length;
+            const totalPages = response.totalPages || 1;
             const startIndex = (lhcCurrentPage - 1) * lhcPageSize;
-            const endIndex = Math.min(startIndex + lhcPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + lhcList.length, totalItems);
+            const paged = lhcList;
 
             const tbody = document.getElementById('lhc-tbody');
             if (paged.length === 0) {

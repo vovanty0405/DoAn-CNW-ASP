@@ -10,40 +10,72 @@
     <!-- Top Header -->
     <div class="bg-surface border border-surface-hover rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <div class="text-xs text-text-muted font-medium mb-1">Điểm số & Phúc khảo &gt; Kết quả học tập & Tốt nghiệp</div>
-            <h1 class="text-2xl font-bold text-text-primary">Tra Cứu Điểm & Xét Điều Kiện Tốt Nghiệp</h1>
+            <div class="text-xs text-text-muted font-medium mb-1">Điểm số &amp; Phúc khảo &gt; Kết quả học tập &amp; Tốt nghiệp</div>
+            <h1 class="text-2xl font-bold text-text-primary">Tra Cứu Điểm &amp; Xét Điều Kiện Tốt Nghiệp</h1>
             <p class="text-xs text-text-muted mt-1">
                 @if (isStudent)
                 {
-                    <span>Theo dõi bảng điểm chi tiết, tiến độ tích lũy tín chỉ và gửi phúc khảo trực tuyến.</span>
+                    <span>Theo dõi bảng điểm chi tiết, tiến độ tích lũy tín chỉ, xuất PDF bảng điểm hành chính và gửi phúc khảo trực tuyến.</span>
                 }
                 else
                 {
-                    <span>Tra cứu kết quả học tập của sinh viên theo Khóa học, Khoa, Lớp hành chính hoặc tìm kiếm nhanh.</span>
+                    <span>Mô hình Master–Details: Tra cứu sinh viên, xuất bảng điểm PDF cá nhân từng dòng hoặc chọn nhiều sinh viên để xuất gộp 1 file PDF hàng loạt.</span>
                 }
             </p>
         </div>
 
-        <div class="flex items-center gap-3">
-            <button id="btn-back-to-list" onclick="backToList()" class="hidden px-4 py-2.5 rounded-xl bg-surface border border-surface-hover hover:border-primary text-text-primary text-sm font-semibold flex items-center gap-2 transition-all">
-                <i data-lucide="arrow-left" class="w-4 h-4 text-primary"></i> Quay lại danh sách SV
+        <div class="flex flex-wrap items-center gap-2.5">
+            @if (!isStudent)
+            {
+                <!-- Nút CHỨC NĂNG A: chỉ hiển thị ở màn hình Master -->
+                <button id="btn-open-batch-pdf-modal"
+                        type="button"
+                        onclick="openBatchPdfModal()"
+                        class="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all cursor-pointer">
+                    <i data-lucide="files" class="w-4 h-4"></i>
+                    <span>In Bảng Điểm Hàng Loạt</span>
+                </button>
+            }
+
+            <!-- Cụm nút DETAILS: Chỉ hiển thị khi người dùng đang xem chi tiết 1 sinh viên cụ thể -->
+            <button id="btn-back-to-list"
+                    type="button"
+                    onclick="backToList()"
+                    class="hidden px-4 py-2.5 rounded-xl bg-surface border border-surface-hover hover:border-primary text-text-primary text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="arrow-left" class="w-4 h-4 text-primary"></i>
+                <span>Quay lại danh sách SV</span>
             </button>
-            <button type="button" onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-text-primary text-sm font-semibold flex items-center gap-2 transition-all">
-                <i data-lucide="printer" class="w-4 h-4 text-primary"></i> In Bảng Điểm
+
+            <button id="btn-detail-print-pdf"
+                    type="button"
+                    onclick="printActiveDetailStudentPdf(false)"
+                    class="@(isStudent ? "" : "hidden") px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>In Bảng Điểm (PDF)</span>
+            </button>
+
+            <button id="btn-detail-download-pdf"
+                    type="button"
+                    onclick="printActiveDetailStudentPdf(true)"
+                    class="@(isStudent ? "" : "hidden") px-4 py-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-[#10B981] text-text-primary text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="download" class="w-4 h-4 text-[#10B981]"></i>
+                <span>Tải PDF</span>
             </button>
         </div>
     </div>
 
     @if (!isStudent)
     {
-        <!-- SECTION 1: FILTER BAR & DANH SÁCH SINH VIÊN (Dành cho Admin, Giảng viên, Khảo thí) -->
+        <!-- ========================================================================= -->
+        <!-- SECTION 1 (MASTER): FILTER BAR & DANH SÁCH SINH VIÊN                      -->
+        <!-- ========================================================================= -->
         <div id="section-search-students" class="space-y-6">
             <!-- Filter Bar Component -->
             <div class="bg-surface border border-surface-hover rounded-2xl p-5 space-y-4">
                 <div class="text-xs font-bold uppercase tracking-wider text-text-primary flex items-center gap-2">
                     <i data-lucide="filter" class="w-4 h-4 text-primary"></i> Bộ Lọc Tìm Kiếm Sinh Viên
                 </div>
-                
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Dropdown Khóa học (Niên khóa) -->
                     <div>
@@ -91,14 +123,23 @@
                 </div>
             </div>
 
-            <!-- Bảng danh sách sinh viên kết quả -->
+            <!-- Bảng danh sách sinh viên kết quả (MASTER TABLE) -->
             <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
                 <div class="p-4 border-b border-surface-hover bg-surface-header flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <i data-lucide="users" class="w-4 h-4 text-primary"></i>
                         <span class="text-sm font-bold text-text-primary">Kết Quả Danh Sách Sinh Viên</span>
+                        <span id="sv-results-count" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/15 text-primary">Đang tải...</span>
                     </div>
-                    <span id="sv-results-count" class="text-xs text-text-muted font-medium">Đang tải...</span>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button"
+                                onclick="openBatchPdfModal()"
+                                class="px-3.5 py-1.5 rounded-xl bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981] hover:bg-[#10B981] hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span>In Bảng Điểm Hàng Loạt</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -144,20 +185,31 @@
         </div>
     }
 
-    <!-- SECTION 2: CHI TIẾT BẢNG ĐIỂM & TIẾN ĐỘ TỐT NGHIỆP CỦA SINH VIÊN -->
+    <!-- ========================================================================= -->
+    <!-- SECTION 2 (DETAILS): CHI TIẾT BẢNG ĐIỂM & TIẾN ĐỘ TỐT NGHIỆP SINH VIÊN   -->
+    <!-- ========================================================================= -->
     <div id="section-student-detail" class="@(!isStudent ? "hidden" : "") space-y-6">
         <!-- Student Profile + Graduation Eligibility -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <!-- Student Info Card -->
             <div class="lg:col-span-5 bg-surface border border-surface-hover rounded-2xl p-6 space-y-4">
-                <div class="flex items-center gap-4 border-b border-surface-hover pb-4">
-                    <div class="w-14 h-14 rounded-2xl bg-primary/15 text-primary font-extrabold text-xl flex items-center justify-center">
-                        <i data-lucide="user-check" class="w-7 h-7"></i>
+                <div class="flex items-center justify-between gap-4 border-b border-surface-hover pb-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-primary/15 text-primary font-extrabold text-xl flex items-center justify-center">
+                            <i data-lucide="user-check" class="w-7 h-7"></i>
+                        </div>
+                        <div>
+                            <h2 id="info-hoten" class="text-xl font-extrabold text-text-primary">--</h2>
+                            <div class="text-xs font-bold text-primary mt-0.5">MSSV: <span id="info-masv">--</span> • Lớp: <span id="info-lop">--</span></div>
+                        </div>
                     </div>
-                    <div>
-                        <h2 id="info-hoten" class="text-xl font-extrabold text-text-primary">--</h2>
-                        <div class="text-xs font-bold text-primary mt-0.5">MSSV: <span id="info-masv">--</span> • Lớp: <span id="info-lop">--</span></div>
-                    </div>
+                    <button type="button"
+                            onclick="printActiveDetailStudentPdf(false)"
+                            title="Mở bản PDF hành chính của sinh viên này trên tab mới"
+                            class="px-3 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                        <span>Xuất PDF</span>
+                    </button>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-xs">
                     <div class="p-3 rounded-xl bg-canvas border border-surface-hover">
@@ -213,6 +265,210 @@
     </div>
 </div>
 
+<!-- ========================================================================= -->
+<!-- MODAL CHỨC NĂNG A: CHỌN SINH VIÊN ĐỂ IN BẢNG ĐIỂM HÀNG LOẠT (1 FILE PDF)  -->
+<!-- ========================================================================= -->
+@if (!isStudent)
+{
+    <div id="batch-pdf-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] my-auto">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-surface-hover bg-surface-header flex items-center justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+                        <i data-lucide="printer" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-extrabold text-text-primary tracking-wide uppercase">
+                            CHỌN SINH VIÊN ĐỂ IN BẢNG ĐIỂM
+                        </h3>
+                        <p class="text-xs text-text-muted">
+                            Hệ thống sẽ xuất <strong class="text-text-primary">một file PDF duy nhất</strong>, mỗi sinh viên được trình bày thành một bảng điểm hành chính độc lập bắt đầu trên trang A4 mới.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeBatchPdfModal()" class="p-2 rounded-xl text-text-muted hover:text-[#ef4444] hover:bg-surface-hover transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+                <!-- 1. Bộ lọc tìm kiếm 5 tiêu chí trong Modal -->
+                <div class="bg-canvas/70 border border-surface-hover rounded-xl p-4 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-text-muted mb-1">Khóa học / Niên khóa</label>
+                            <select id="bm-filter-nienkhoa" onchange="onBatchModalKhoaOrCohortChange()" class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-xs text-text-primary focus:border-primary outline-none">
+                                <option value="">Tất cả Khóa học</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-text-muted mb-1">Khoa</label>
+                            <select id="bm-filter-khoa" onchange="onBatchModalKhoaOrCohortChange()" class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-xs text-text-primary focus:border-primary outline-none">
+                                <option value="">Tất cả Khoa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-text-muted mb-1">Lớp hành chính</label>
+                            <select id="bm-filter-lop" onchange="loadBatchModalCandidates(1)" class="w-full bg-surface border border-surface-hover rounded-lg px-3 py-2 text-xs text-text-primary focus:border-primary outline-none">
+                                <option value="">Tất cả Lớp</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-text-muted mb-1">Tìm theo Mã sinh viên</label>
+                            <div class="relative">
+                                <i data-lucide="hash" class="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                                <input id="bm-filter-masv" oninput="queueBatchModalSearch()" type="text" placeholder="VD: DKH225801..."
+                                       class="w-full bg-surface border border-surface-hover rounded-lg pl-8 pr-2.5 py-2 text-xs text-text-primary focus:border-primary outline-none font-mono" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-text-muted mb-1">Tìm theo Họ và tên</label>
+                            <div class="relative">
+                                <i data-lucide="user-search" class="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                                <input id="bm-filter-hoten" oninput="queueBatchModalSearch()" type="text" placeholder="VD: Nguyễn Hoàng An..."
+                                       class="w-full bg-surface border border-surface-hover rounded-lg pl-8 pr-2.5 py-2 text-xs text-text-primary focus:border-primary outline-none" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Thanh công cụ chọn nhanh & Phân biệt rõ "Trang hiện tại" vs "Kết quả lọc" -->
+                    <div class="pt-2.5 border-t border-surface-hover flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button"
+                                    onclick="selectAllOnCurrentBatchPage()"
+                                    class="px-3 py-1.5 rounded-lg bg-surface border border-surface-hover hover:border-primary text-text-primary font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="check-square" class="w-3.5 h-3.5 text-primary"></i>
+                                <span>Chọn tất cả trên trang hiện tại</span>
+                            </button>
+
+                            <button type="button"
+                                    id="btn-select-all-filtered"
+                                    onclick="selectAllInFilteredBatchResult()"
+                                    class="px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/30 hover:bg-primary/25 text-primary font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+                                <span id="btn-select-all-filtered-text">Chọn tất cả trong kết quả lọc</span>
+                            </button>
+
+                            <button type="button"
+                                    onclick="deselectAllOnCurrentBatchPage()"
+                                    class="px-3 py-1.5 rounded-lg bg-surface border border-surface-hover hover:border-amber-400 text-text-muted hover:text-amber-400 font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="minus-square" class="w-3.5 h-3.5"></i>
+                                <span>Bỏ chọn trang hiện tại</span>
+                            </button>
+
+                            <button type="button"
+                                    onclick="clearAllBatchSelections()"
+                                    class="px-3 py-1.5 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 hover:bg-[#ef4444]/20 text-[#ef4444] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                <span>Xóa toàn bộ lựa chọn</span>
+                            </button>
+                        </div>
+
+                        <button type="button"
+                                onclick="resetBatchModalFilters()"
+                                class="px-3 py-1.5 rounded-lg bg-surface border border-surface-hover hover:border-primary text-text-muted hover:text-text-primary font-semibold inline-flex items-center gap-1.5 transition-colors">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            <span>Đặt lại bộ lọc</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Khu vực hiển thị danh sách sinh viên ĐÃ ĐƯỢC CHỌN (Giữ nguyên qua các trang & bộ lọc) -->
+                <div class="bg-canvas/50 border border-surface-hover rounded-xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-text-primary flex items-center gap-1.5">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-[#10B981]"></i>
+                                Danh sách sinh viên đã chọn xuất PDF (Theo thứ tự trang in):
+                            </span>
+                            <span id="bm-selected-badge" class="px-2.5 py-0.5 rounded-full font-extrabold bg-primary/15 text-primary border border-primary/30">
+                                Bạn đã chọn 0 sinh viên
+                            </span>
+                        </div>
+                        <span id="bm-max-limit-hint" class="text-[11px] text-text-muted">
+                            Giới hạn tối đa: <strong id="bm-max-limit-num">50</strong> sinh viên / lần xuất
+                        </span>
+                    </div>
+
+                    <div id="bm-selected-chips" class="min-h-[38px] max-h-28 overflow-y-auto flex flex-wrap items-center gap-1.5 p-2 rounded-lg bg-surface border border-surface-hover custom-scrollbar">
+                        <span class="text-xs text-text-muted italic">Chưa có sinh viên nào được chọn. Hãy tích chọn ở bảng bên dưới.</span>
+                    </div>
+                </div>
+
+                <!-- Cảnh báo / Thông báo lỗi trong Modal -->
+                <div id="bm-alert-box" class="hidden p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2"></div>
+
+                <!-- 3. Bảng dữ liệu sinh viên trong Modal -->
+                <div class="border border-surface-hover rounded-xl overflow-hidden bg-surface">
+                    <div class="overflow-x-auto max-h-80 custom-scrollbar">
+                        <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                            <thead class="sticky top-0 z-10 bg-surface-header border-b border-surface-hover text-xs text-text-muted uppercase">
+                                <tr>
+                                    <th class="px-4 py-3 text-center w-12">
+                                        <input id="bm-check-page-all"
+                                               type="checkbox"
+                                               onchange="toggleBatchPageHeaderCheckbox(this.checked)"
+                                               title="Chọn / Bỏ chọn các sinh viên đang hiển thị trên trang hiện tại"
+                                               class="w-4 h-4 rounded accent-primary cursor-pointer" />
+                                    </th>
+                                    <th class="px-3 py-3 text-center w-14">STT</th>
+                                    <th class="px-4 py-3">Mã SV</th>
+                                    <th class="px-4 py-3">Họ và tên</th>
+                                    <th class="px-4 py-3">Lớp</th>
+                                    <th class="px-4 py-3">Ngành / Khoa</th>
+                                    <th class="px-4 py-3 text-center">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bm-candidates-tbody" class="divide-y divide-surface-hover">
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-text-muted">Đang tải danh sách sinh viên...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination của Modal -->
+                    <div class="px-4 py-3 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-text-muted">
+                        <div class="flex items-center gap-2">
+                            <span id="bm-pagination-info">0 sinh viên</span>
+                            <select id="bm-page-size" onchange="changeBatchModalPageSize(this.value)" class="bg-canvas border border-surface-hover rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-primary">
+                                <option value="10">10 / trang</option>
+                                <option value="20">20 / trang</option>
+                                <option value="50">50 / trang</option>
+                            </select>
+                        </div>
+                        <div id="bm-pagination-controls" class="flex items-center gap-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-surface-hover bg-surface-header flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div id="bm-footer-summary" class="text-xs font-semibold text-text-muted">
+                    Chưa chọn sinh viên nào.
+                </div>
+
+                <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                    <button type="button"
+                            onclick="closeBatchPdfModal()"
+                            class="px-4 py-2.5 rounded-xl border border-surface-hover hover:bg-surface-hover text-xs font-bold text-text-muted hover:text-text-primary transition-colors">
+                        Hủy
+                    </button>
+                    <button type="button"
+                            id="btn-submit-batch-pdf"
+                            onclick="submitBatchTranscriptPdf()"
+                            class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-bold shadow-lg shadow-primary/25 flex items-center gap-2 transition-all cursor-pointer">
+                        <i data-lucide="file-down" class="w-4 h-4"></i>
+                        <span id="btn-submit-batch-pdf-text">Xuất PDF (0 sinh viên)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- Modal Gửi Đơn Phúc Khảo / Khiếu Nại Điểm -->
 <div id="appeal-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-surface border border-surface-hover rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -254,18 +510,40 @@
     <script>
         const IS_STUDENT = @(isStudent ? "true" : "false");
         const CURRENT_STUDENT_ID = "@currentMaSV";
-        
-        let allStudents = [];
+
+        // =========================================================================
+        // QUẢN LÝ TRẠNG THÁI TÁCH BIỆT RÕ RÀNG:
+        // 1. activeDetailStudentMaSV: Mã SV đang được người dùng mở ở màn hình DETAILS
+        // 2. batchSelectedStudentsMap: Map<MaSV, { maSV, hoTen, maLop }> phục vụ IN HÀNG LOẠT
+        // Tuyệt đối không mặc định chọn phần tử đầu tiên trong mảng hay DOM!
+        // =========================================================================
+        let activeDetailStudentMaSV = null;
         let allKhoas = [];
         let allLops = [];
-        let activeStudentMaSV = null;
         let currentFilteredSv = [];
         let svCurrentPage = 1, svPageSize = 10;
 
+        // State dành riêng cho Modal In Bảng Điểm Hàng Loạt
+        const batchSelectedStudentsMap = new Map();
+        let bmCurrentPage = 1;
+        let bmPageSize = 10;
+        let bmTotalItems = 0;
+        let bmTotalPages = 1;
+        let bmCurrentPageRows = [];
+        let bmMaxBatchSize = 50;
+        let bmSearchTimer = null;
+        let bmRequestCounter = 0;
+        let bmExportInProgress = false;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+        }
+
         async function initPage() {
             if (IS_STUDENT) {
-                // Nếu là sinh viên, load thẳng bảng điểm của chính mình
                 if (CURRENT_STUDENT_ID) {
+                    activeDetailStudentMaSV = CURRENT_STUDENT_ID;
                     await loadTranscript(CURRENT_STUDENT_ID);
                 } else {
                     document.getElementById('tc-semesters').innerHTML = '<div class="p-8 text-center text-text-muted">Không xác định được mã sinh viên của tài khoản.</div>';
@@ -273,27 +551,24 @@
                 return;
             }
 
-            // Với Admin / Giảng viên / Khảo thí: tải danh mục để phục vụ bộ lọc
             try {
                 const [resKhoa, resLop] = await Promise.all([
                     apiFetch('/api/khoa'),
                     apiFetch('/api/lophanhchinh')
                 ]);
 
-                allStudents = [];
                 allKhoas = resKhoa.data || [];
                 allLops = resLop.data || [];
-                currentFilteredSv = allStudents;
 
                 populateFilterOptions();
+                populateBatchModalFilterOptions();
                 await renderStudentResultsTable();
 
                 const urlMaSV = new URLSearchParams(window.location.search).get('maSV');
-                if (urlMaSV) {
+                if (urlMaSV && urlMaSV.trim().length > 0) {
                     await viewStudentDetail(urlMaSV.trim());
                 }
 
-                // Cho phép nhấn Enter trên ô tìm kiếm
                 document.getElementById('tc-filter-keyword').addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
@@ -305,24 +580,22 @@
             }
         }
 
-        // Đổ dữ liệu vào các dropdown lọc
+        // =========================================================================
+        // PHẦN 1: MASTER VIEW - BỘ LỌC & BẢNG DANH SÁCH SINH VIÊN
+        // =========================================================================
         function populateFilterOptions() {
-            // 1. Niên khóa (Lấy distinct từ danh sách lớp)
             const nienKhoas = [...new Set(allLops.map(l => l.NienKhoa).filter(Boolean))].sort();
             const selNienKhoa = document.getElementById('tc-filter-nienkhoa');
             selNienKhoa.innerHTML = '<option value="">Tất cả Khóa học</option>' +
-                nienKhoas.map(nk => `<option value="${nk}">${nk}</option>`).join('');
+                nienKhoas.map(nk => `<option value="${escapeHtml(nk)}">${escapeHtml(nk)}</option>`).join('');
 
-            // 2. Khoa
             const selKhoa = document.getElementById('tc-filter-khoa');
             selKhoa.innerHTML = '<option value="">Tất cả Khoa</option>' +
-                allKhoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
+                allKhoas.map(k => `<option value="${escapeHtml(k.MaKhoa)}">${escapeHtml(k.TenKhoa)}</option>`).join('');
 
-            // 3. Lớp hành chính ban đầu
             updateLopDropdown();
         }
 
-        // Cập nhật động danh sách lớp theo Khoa & Niên khóa đã chọn
         function onNienKhoaOrKhoaChange() {
             updateLopDropdown();
         }
@@ -339,46 +612,56 @@
 
             const selLop = document.getElementById('tc-filter-lop');
             selLop.innerHTML = '<option value="">Tất cả Lớp</option>' +
-                filteredLops.map(l => `<option value="${l.MaLop}">${l.MaLop} - ${l.TenLop}</option>`).join('');
+                filteredLops.map(l => `<option value="${escapeHtml(l.MaLop)}">${escapeHtml(l.MaLop)} - ${escapeHtml(l.TenLop)}</option>`).join('');
         }
 
-        // Áp dụng bộ lọc và từ khóa
         function applyFilters() {
             svCurrentPage = 1;
             renderStudentResultsTable();
         }
 
-        // Đặt lại bộ lọc về mặc định
         function resetFilters() {
             document.getElementById('tc-filter-nienkhoa').value = '';
             document.getElementById('tc-filter-khoa').value = '';
             document.getElementById('tc-filter-keyword').value = '';
             updateLopDropdown();
-            currentFilteredSv = allStudents;
             svCurrentPage = 1;
             renderStudentResultsTable();
         }
 
-        // Hiển thị danh sách sinh viên kết quả vào table với phân trang
         let studentLookupRequest = 0;
         async function renderStudentResultsTable() {
             const request = ++studentLookupRequest;
-            const params = new URLSearchParams({ page: svCurrentPage, pageSize: svPageSize,
+            const params = new URLSearchParams({
+                page: svCurrentPage,
+                pageSize: svPageSize,
                 maLop: document.getElementById('tc-filter-lop').value,
                 maKhoa: document.getElementById('tc-filter-khoa').value,
                 cohort: document.getElementById('tc-filter-nienkhoa').value,
                 search: document.getElementById('tc-filter-keyword').value.trim()
             });
+
             let response;
-            try { response = await apiFetch('/api/sinhvien?' + params); }
-            catch (error) { if (request === studentLookupRequest) showToast(error.message, 'error'); return; }
+            try {
+                response = await apiFetch('/api/sinhvien?' + params);
+            } catch (error) {
+                if (request === studentLookupRequest) showToast(error.message, 'error');
+                return;
+            }
             if (request !== studentLookupRequest) return;
+
             svCurrentPage = response.page;
             const totalItems = response.total, totalPages = response.totalPages;
             const startIndex = (svCurrentPage - 1) * svPageSize;
-            const paged = (response.data || []).map(s => ({ ...s, LopHanhChinh: allLops.find(l => l.MaLop === s.MaLop) || s.LopHanhChinh }));
+            const paged = (response.data || []).map(s => ({
+                ...s,
+                LopHanhChinh: allLops.find(l => l.MaLop === s.MaLop) || s.LopHanhChinh
+            }));
             const endIndex = Math.min(startIndex + paged.length, totalItems);
             currentFilteredSv = paged;
+
+            const countBadge = document.getElementById('sv-results-count');
+            if (countBadge) countBadge.textContent = `${totalItems} sinh viên`;
 
             const tbody = document.getElementById('sv-results-tbody');
             if (paged.length === 0) {
@@ -391,31 +674,45 @@
                             ? 'bg-amber-500/15 text-amber-400'
                             : 'bg-surface-hover text-text-muted';
 
+                    const safeCodeAttr = escapeHtml(s.MaSV).replace(/'/g, "\\'");
+
                     return `
                         <tr class="hover:bg-surface-hover/40 transition-colors">
                             <td class="px-5 py-3.5 text-center text-text-muted font-medium">${startIndex + idx + 1}</td>
-                            <td class="px-5 py-3.5 font-bold text-primary">${s.MaSV}</td>
+                            <td class="px-5 py-3.5 font-bold text-primary font-mono">${escapeHtml(s.MaSV)}</td>
                             <td class="px-5 py-3.5 font-medium text-text-primary">
-                                <div>${s.HoTen}</div>
-                                <div class="text-xs text-text-muted">${s.Email || ''}</div>
+                                <div>${escapeHtml(s.HoTen)}</div>
+                                <div class="text-xs text-text-muted">${escapeHtml(s.Email || '')}</div>
                             </td>
-                            <td class="px-5 py-3.5 text-text-muted">${s.GioiTinh || ''}</td>
+                            <td class="px-5 py-3.5 text-text-muted">${escapeHtml(s.GioiTinh || '')}</td>
                             <td class="px-5 py-3.5 text-text-muted">${s.NgaySinh ? new Date(s.NgaySinh).toLocaleDateString('vi-VN') : ''}</td>
                             <td class="px-5 py-3.5 font-medium text-text-primary">
-                                <div>${s.MaLop || ''}</div>
-                                <div class="text-[11px] text-text-muted">${s.LopHanhChinh?.NienKhoa || ''}</div>
+                                <div>${escapeHtml(s.MaLop || '')}</div>
+                                <div class="text-[11px] text-text-muted">${escapeHtml(s.LopHanhChinh?.NienKhoa || '')}</div>
                             </td>
                             <td class="px-5 py-3.5 text-xs text-text-muted">
-                                <div class="text-text-primary font-medium">${s.LopHanhChinh?.Nganh?.TenNganh || ''}</div>
-                                <div>${s.LopHanhChinh?.Nganh?.Khoa?.TenKhoa || ''}</div>
+                                <div class="text-text-primary font-medium">${escapeHtml(s.LopHanhChinh?.Nganh?.TenNganh || '')}</div>
+                                <div>${escapeHtml(s.LopHanhChinh?.Nganh?.Khoa?.TenKhoa || '')}</div>
                             </td>
                             <td class="px-5 py-3.5 text-center">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge}">${s.TrangThai || 'Đang học'}</span>
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge}">${escapeHtml(s.TrangThai || 'Đang học')}</span>
                             </td>
                             <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                                <button onclick="viewStudentDetail('${s.MaSV}')" class="px-3.5 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5">
-                                    <i data-lucide="award" class="w-3.5 h-3.5"></i> Xem Bảng Điểm
-                                </button>
+                                <div class="inline-flex items-center justify-end gap-1.5">
+                                    <button type="button"
+                                            onclick="viewStudentDetail('${safeCodeAttr}')"
+                                            class="px-3 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary hover:text-white text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer">
+                                        <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                                        <span>Xem Bảng Điểm</span>
+                                    </button>
+                                    <button type="button"
+                                            onclick="exportSingleStudentPdfFromRow('${safeCodeAttr}', false)"
+                                            title="In / Xem PDF bảng điểm của sinh viên ${escapeHtml(s.MaSV)} trên tab mới"
+                                            class="px-2.5 py-1.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-text-primary hover:text-primary text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer">
+                                        <i data-lucide="printer" class="w-3.5 h-3.5 text-primary"></i>
+                                        <span>In PDF</span>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `;
@@ -479,25 +776,577 @@
             renderStudentResultsTable();
         }
 
-        // Chọn xem chi tiết bảng điểm của một sinh viên
+        // =========================================================================
+        // PHẦN 2: CHỨC NĂNG B - XUẤT PDF CÁ NHÂN (TỪ DÒNG MASTER HOẶC TỪ DETAILS)
+        // =========================================================================
+
+        // 3.6. Xuất trực tiếp từ dòng trên bảng Master (không phụ thuộc vào Details hay dòng đầu tiên)
+        function exportSingleStudentPdfFromRow(maSV, download = false) {
+            const targetCode = (maSV || '').trim();
+            if (!targetCode) {
+                showToast('Không xác định được mã sinh viên cần xuất PDF!', 'error');
+                return;
+            }
+            const url = `/api/tracuudiem/${encodeURIComponent(targetCode)}/pdf${download ? '?download=true' : ''}`;
+            window.open(url, '_blank', 'noopener');
+        }
+
+        // 3.7. Xuất từ màn hình Details (chỉ hoạt động khi activeDetailStudentMaSV đã được xác định rõ)
+        function printActiveDetailStudentPdf(download = false) {
+            if (!activeDetailStudentMaSV) {
+                showToast('Vui lòng chọn một sinh viên để xem bảng điểm trước khi in!', 'warning');
+                return;
+            }
+            const url = `/api/tracuudiem/${encodeURIComponent(activeDetailStudentMaSV)}/pdf${download ? '?download=true' : ''}`;
+            window.open(url, '_blank', 'noopener');
+        }
+
+        // Chuyển từ Master -> Details của đúng sinh viên được click (Hiển thị ngay thông tin SV từ dòng đã có)
         async function viewStudentDetail(maSV) {
-            activeStudentMaSV = maSV;
-            document.getElementById('section-search-students').classList.add('hidden');
-            document.getElementById('section-student-detail').classList.remove('hidden');
-            document.getElementById('btn-back-to-list').classList.remove('hidden');
+            const code = (maSV || '').trim();
+            if (!code) return;
 
-            await loadTranscript(maSV);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            activeDetailStudentMaSV = code;
+
+            // Điền tức thì thông tin định danh sinh viên có sẵn ở bảng Master để giao diện phản hồi 0ms
+            const cachedRow = currentFilteredSv.find(s => s.MaSV && s.MaSV.toLowerCase() === code.toLowerCase());
+            if (cachedRow) {
+                document.getElementById('info-hoten').textContent = cachedRow.HoTen || code;
+                document.getElementById('info-masv').textContent = cachedRow.MaSV;
+                document.getElementById('info-lop').textContent = cachedRow.MaLop || 'N/A';
+                document.getElementById('info-nganh').textContent = cachedRow.LopHanhChinh?.Nganh?.TenNganh || 'Đang tải...';
+                document.getElementById('info-khoa').textContent = cachedRow.LopHanhChinh?.Nganh?.Khoa?.TenKhoa || 'Đang tải...';
+            } else {
+                document.getElementById('info-hoten').textContent = 'Đang tải dữ liệu...';
+                document.getElementById('info-masv').textContent = code;
+            }
+
+            document.getElementById('grad-badge').textContent = 'ĐANG TÍNH TOÁN...';
+            document.getElementById('grad-badge').className = 'px-3 py-1 rounded-full text-xs font-bold bg-primary/15 text-primary animate-pulse';
+            document.getElementById('grad-reasons').innerHTML = '<div class="text-text-muted animate-pulse">Đang tải và đối chiếu khung chương trình đào tạo...</div>';
+            document.getElementById('tc-semesters').innerHTML = `
+                <div class="bg-surface border border-surface-hover rounded-2xl p-8 text-center text-text-muted space-y-2">
+                    <div class="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div class="text-xs font-medium">Đang tải bảng điểm các học kỳ của sinh viên <strong>${escapeHtml(code)}</strong>...</div>
+                </div>`;
+            document.getElementById('tc-overall-summary').innerHTML = '';
+
+            document.getElementById('section-search-students')?.classList.add('hidden');
+            document.getElementById('section-student-detail')?.classList.remove('hidden');
+            document.getElementById('btn-back-to-list')?.classList.remove('hidden');
+            document.getElementById('btn-detail-print-pdf')?.classList.remove('hidden');
+            document.getElementById('btn-detail-download-pdf')?.classList.remove('hidden');
+            document.getElementById('btn-open-batch-pdf-modal')?.classList.add('hidden');
+
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            await loadTranscript(code);
         }
 
-        // Quay lại danh sách sinh viên
+        // Quay lại từ Details -> Master: xóa trạng thái sinh viên đang xem ở Details
         function backToList() {
-            document.getElementById('section-search-students').classList.remove('hidden');
-            document.getElementById('section-student-detail').classList.add('hidden');
-            document.getElementById('btn-back-to-list').classList.add('hidden');
+            activeDetailStudentMaSV = null;
+            document.getElementById('section-search-students')?.classList.remove('hidden');
+            document.getElementById('section-student-detail')?.classList.add('hidden');
+            document.getElementById('btn-back-to-list')?.classList.add('hidden');
+            document.getElementById('btn-detail-print-pdf')?.classList.add('hidden');
+            document.getElementById('btn-detail-download-pdf')?.classList.add('hidden');
+            document.getElementById('btn-open-batch-pdf-modal')?.classList.remove('hidden');
         }
 
-        // Tải chi tiết bảng điểm và kết quả xét tốt nghiệp từ API
+        // =========================================================================
+        // PHẦN 3: CHỨC NĂNG A - MODAL CHỌN NHIỀU SINH VIÊN & XUẤT 1 FILE PDF HÀNG LOẠT
+        // =========================================================================
+        function populateBatchModalFilterOptions() {
+            const nienKhoas = [...new Set(allLops.map(l => l.NienKhoa).filter(Boolean))].sort();
+            const selNk = document.getElementById('bm-filter-nienkhoa');
+            if (selNk) {
+                selNk.innerHTML = '<option value="">Tất cả Khóa học</option>' +
+                    nienKhoas.map(nk => `<option value="${escapeHtml(nk)}">${escapeHtml(nk)}</option>`).join('');
+            }
+
+            const selKhoa = document.getElementById('bm-filter-khoa');
+            if (selKhoa) {
+                selKhoa.innerHTML = '<option value="">Tất cả Khoa</option>' +
+                    allKhoas.map(k => `<option value="${escapeHtml(k.MaKhoa)}">${escapeHtml(k.TenKhoa)}</option>`).join('');
+            }
+
+            updateBatchModalLopDropdown();
+        }
+
+        function onBatchModalKhoaOrCohortChange() {
+            updateBatchModalLopDropdown();
+            loadBatchModalCandidates(1);
+        }
+
+        function updateBatchModalLopDropdown() {
+            const nk = document.getElementById('bm-filter-nienkhoa')?.value || '';
+            const khoa = document.getElementById('bm-filter-khoa')?.value || '';
+            const selLop = document.getElementById('bm-filter-lop');
+            if (!selLop) return;
+
+            const filtered = allLops.filter(l => {
+                const mNk = !nk || l.NienKhoa === nk;
+                const mK = !khoa || l.Nganh?.MaKhoa === khoa;
+                return mNk && mK;
+            });
+
+            selLop.innerHTML = '<option value="">Tất cả Lớp</option>' +
+                filtered.map(l => `<option value="${escapeHtml(l.MaLop)}">${escapeHtml(l.MaLop)} - ${escapeHtml(l.TenLop)}</option>`).join('');
+        }
+
+        function openBatchPdfModal() {
+            const modal = document.getElementById('batch-pdf-modal');
+            if (!modal) return;
+
+            // Đặt lại lựa chọn về rỗng mỗi khi mở lại Modal để tránh in nhầm
+            batchSelectedStudentsMap.clear();
+            hideBatchModalAlert();
+
+            // Đồng bộ bộ lọc ban đầu từ Master sang Modal nhưng KHÔNG tự động chọn bất kỳ sinh viên nào
+            const masterNk = document.getElementById('tc-filter-nienkhoa')?.value || '';
+            const masterKhoa = document.getElementById('tc-filter-khoa')?.value || '';
+            const masterLop = document.getElementById('tc-filter-lop')?.value || '';
+
+            document.getElementById('bm-filter-nienkhoa').value = masterNk;
+            document.getElementById('bm-filter-khoa').value = masterKhoa;
+            updateBatchModalLopDropdown();
+            document.getElementById('bm-filter-lop').value = masterLop;
+            document.getElementById('bm-filter-masv').value = '';
+            document.getElementById('bm-filter-hoten').value = '';
+
+            renderBatchSelectedChipsAndSummary();
+            modal.classList.remove('hidden');
+            loadBatchModalCandidates(1);
+        }
+
+        function closeBatchPdfModal() {
+            if (bmExportInProgress) return;
+            document.getElementById('batch-pdf-modal')?.classList.add('hidden');
+        }
+
+        function resetBatchModalFilters() {
+            document.getElementById('bm-filter-nienkhoa').value = '';
+            document.getElementById('bm-filter-khoa').value = '';
+            updateBatchModalLopDropdown();
+            document.getElementById('bm-filter-lop').value = '';
+            document.getElementById('bm-filter-masv').value = '';
+            document.getElementById('bm-filter-hoten').value = '';
+            hideBatchModalAlert();
+            // Lưu ý: Đổi bộ lọc không làm mất danh sách sinh viên đã chọn trước đó
+            loadBatchModalCandidates(1);
+        }
+
+        function queueBatchModalSearch() {
+            clearTimeout(bmSearchTimer);
+            bmSearchTimer = setTimeout(() => loadBatchModalCandidates(1), 250);
+        }
+
+        function showBatchModalAlert(msg, type = 'error') {
+            const box = document.getElementById('bm-alert-box');
+            if (!box) return;
+            box.classList.remove('hidden');
+            if (type === 'warning') {
+                box.className = 'p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 text-amber-400';
+            } else if (type === 'success') {
+                box.className = 'p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981]';
+            } else {
+                box.className = 'p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 bg-[#ef4444]/15 border border-[#ef4444]/30 text-[#ef4444]';
+            }
+            box.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i><span>${escapeHtml(msg)}</span>`;
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function hideBatchModalAlert() {
+            document.getElementById('bm-alert-box')?.classList.add('hidden');
+        }
+
+        function getBatchModalFilterParams(page = bmCurrentPage, includeAll = false) {
+            return new URLSearchParams({
+                cohort: document.getElementById('bm-filter-nienkhoa').value,
+                maKhoa: document.getElementById('bm-filter-khoa').value,
+                maLop: document.getElementById('bm-filter-lop').value,
+                searchMaSV: document.getElementById('bm-filter-masv').value.trim(),
+                searchHoTen: document.getElementById('bm-filter-hoten').value.trim(),
+                page: page,
+                pageSize: bmPageSize,
+                includeAllFilteredIds: includeAll ? 'true' : 'false'
+            });
+        }
+
+        async function loadBatchModalCandidates(page = 1) {
+            bmCurrentPage = page;
+            const reqId = ++bmRequestCounter;
+            const params = getBatchModalFilterParams(page, false);
+
+            try {
+                const res = await apiFetch(`/api/tracuudiem/batch-candidates?${params.toString()}`);
+                if (reqId !== bmRequestCounter) return;
+
+                bmCurrentPageRows = res.data || [];
+                bmCurrentPage = res.page || 1;
+                bmTotalItems = res.total || 0;
+                bmTotalPages = res.totalPages || 1;
+                bmMaxBatchSize = res.maxBatchSize || 50;
+
+                const maxNumEl = document.getElementById('bm-max-limit-num');
+                if (maxNumEl) maxNumEl.textContent = bmMaxBatchSize;
+
+                const btnAllFilteredText = document.getElementById('btn-select-all-filtered-text');
+                if (btnAllFilteredText) {
+                    btnAllFilteredText.textContent = `Chọn tất cả trong kết quả lọc (${bmTotalItems} SV)`;
+                }
+
+                renderBatchModalTable();
+            } catch (err) {
+                if (reqId === bmRequestCounter) {
+                    showBatchModalAlert(err.message || 'Không thể tải danh sách sinh viên!');
+                }
+            }
+        }
+
+        function renderBatchModalTable() {
+            const tbody = document.getElementById('bm-candidates-tbody');
+            const startIndex = (bmCurrentPage - 1) * bmPageSize;
+            const endIndex = Math.min(startIndex + bmCurrentPageRows.length, bmTotalItems);
+
+            if (bmCurrentPageRows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-text-muted">Không có sinh viên nào khớp với bộ lọc hiện tại.</td></tr>`;
+            } else {
+                tbody.innerHTML = bmCurrentPageRows.map((s, idx) => {
+                    const isChecked = batchSelectedStudentsMap.has(s.MaSV);
+                    const safeMaSV = escapeHtml(s.MaSV).replace(/'/g, "\\'");
+                    const safeHoTen = escapeHtml(s.HoTen).replace(/'/g, "\\'");
+                    const safeMaLop = escapeHtml(s.MaLop || '').replace(/'/g, "\\'");
+
+                    const statusBadge = s.TrangThai === 'Đang học'
+                        ? 'bg-[#10B981]/15 text-[#10B981]'
+                        : s.TrangThai === 'Bảo lưu'
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-surface-hover text-text-muted';
+
+                    return `
+                        <tr onclick="toggleBatchStudentSelection('${safeMaSV}', '${safeHoTen}', '${safeMaLop}')"
+                            class="transition-colors cursor-pointer ${isChecked ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-surface-hover/40'}">
+                            <td class="px-4 py-2.5 text-center" onclick="event.stopPropagation()">
+                                <input type="checkbox"
+                                       data-masv="${escapeHtml(s.MaSV)}"
+                                       ${isChecked ? 'checked' : ''}
+                                       onchange="toggleBatchStudentSelection('${safeMaSV}', '${safeHoTen}', '${safeMaLop}', this.checked)"
+                                       class="w-4 h-4 rounded accent-primary cursor-pointer" />
+                            </td>
+                            <td class="px-3 py-2.5 text-center text-text-muted font-medium">${startIndex + idx + 1}</td>
+                            <td class="px-4 py-2.5 font-mono font-bold text-primary">${escapeHtml(s.MaSV)}</td>
+                            <td class="px-4 py-2.5 font-semibold text-text-primary">${escapeHtml(s.HoTen)}</td>
+                            <td class="px-4 py-2.5 text-text-primary">
+                                <div>${escapeHtml(s.MaLop)}</div>
+                                <div class="text-[11px] text-text-muted">${escapeHtml(s.NienKhoa || '')}</div>
+                            </td>
+                            <td class="px-4 py-2.5 text-xs text-text-muted">
+                                <div class="font-medium text-text-primary">${escapeHtml(s.TenNganh)}</div>
+                                <div>${escapeHtml(s.TenKhoa)}</div>
+                            </td>
+                            <td class="px-4 py-2.5 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${statusBadge}">${escapeHtml(s.TrangThai)}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            syncBatchPageHeaderCheckbox();
+            renderBatchModalPagination(bmTotalItems, bmTotalPages, startIndex, endIndex);
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function syncBatchPageHeaderCheckbox() {
+            const headerCb = document.getElementById('bm-check-page-all');
+            if (!headerCb) return;
+            if (bmCurrentPageRows.length === 0) {
+                headerCb.checked = false;
+                headerCb.disabled = true;
+                return;
+            }
+            headerCb.disabled = false;
+            headerCb.checked = bmCurrentPageRows.every(s => batchSelectedStudentsMap.has(s.MaSV));
+        }
+
+        function toggleBatchStudentSelection(maSV, hoTen, maLop, forceState = null) {
+            hideBatchModalAlert();
+            const currentlyHas = batchSelectedStudentsMap.has(maSV);
+            const shouldSelect = forceState !== null ? forceState : !currentlyHas;
+
+            if (shouldSelect) {
+                if (!currentlyHas && batchSelectedStudentsMap.size >= bmMaxBatchSize) {
+                    showBatchModalAlert(`Bạn chỉ được chọn tối đa ${bmMaxBatchSize} sinh viên trong một lần xuất PDF hàng loạt!`, 'warning');
+                    renderBatchModalTable();
+                    return;
+                }
+                batchSelectedStudentsMap.set(maSV, { maSV, hoTen, maLop });
+            } else {
+                batchSelectedStudentsMap.delete(maSV);
+            }
+
+            renderBatchSelectedChipsAndSummary();
+            renderBatchModalTable();
+        }
+
+        function removeStudentFromBatchSelection(maSV) {
+            batchSelectedStudentsMap.delete(maSV);
+            hideBatchModalAlert();
+            renderBatchSelectedChipsAndSummary();
+            renderBatchModalTable();
+        }
+
+        function toggleBatchPageHeaderCheckbox(checked) {
+            if (checked) {
+                selectAllOnCurrentBatchPage();
+            } else {
+                deselectAllOnCurrentBatchPage();
+            }
+        }
+
+        function selectAllOnCurrentBatchPage() {
+            hideBatchModalAlert();
+            let added = 0;
+            for (const s of bmCurrentPageRows) {
+                if (!batchSelectedStudentsMap.has(s.MaSV)) {
+                    if (batchSelectedStudentsMap.size >= bmMaxBatchSize) {
+                        showBatchModalAlert(`Đã đạt giới hạn tối đa ${bmMaxBatchSize} sinh viên cho một lần xuất PDF!`, 'warning');
+                        break;
+                    }
+                    batchSelectedStudentsMap.set(s.MaSV, {
+                        maSV: s.MaSV,
+                        hoTen: s.HoTen,
+                        maLop: s.MaLop || '—'
+                    });
+                    added++;
+                }
+            }
+            renderBatchSelectedChipsAndSummary();
+            renderBatchModalTable();
+        }
+
+        function deselectAllOnCurrentBatchPage() {
+            hideBatchModalAlert();
+            for (const s of bmCurrentPageRows) {
+                batchSelectedStudentsMap.delete(s.MaSV);
+            }
+            renderBatchSelectedChipsAndSummary();
+            renderBatchModalTable();
+        }
+
+        async function selectAllInFilteredBatchResult() {
+            hideBatchModalAlert();
+            if (bmTotalItems === 0) {
+                showBatchModalAlert('Không có sinh viên nào trong kết quả lọc hiện tại!', 'warning');
+                return;
+            }
+
+            try {
+                const params = getBatchModalFilterParams(1, true);
+                const res = await apiFetch(`/api/tracuudiem/batch-candidates?${params.toString()}`);
+                const list = res.allFilteredStudents || [];
+
+                let reachedCap = false;
+                for (const s of list) {
+                    if (!batchSelectedStudentsMap.has(s.MaSV)) {
+                        if (batchSelectedStudentsMap.size >= bmMaxBatchSize) {
+                            reachedCap = true;
+                            break;
+                        }
+                        batchSelectedStudentsMap.set(s.MaSV, {
+                            maSV: s.MaSV,
+                            hoTen: s.HoTen,
+                            maLop: s.MaLop || '—'
+                        });
+                    }
+                }
+
+                renderBatchSelectedChipsAndSummary();
+                renderBatchModalTable();
+
+                if (res.exceededMaxBatch || reachedCap) {
+                    showBatchModalAlert(`Kết quả lọc có ${bmTotalItems} sinh viên. Hệ thống đã chọn tối đa ${bmMaxBatchSize} sinh viên theo giới hạn cho phép mỗi lần xuất.`, 'warning');
+                } else {
+                    showBatchModalAlert(`Đã chọn toàn bộ ${list.length} sinh viên thuộc kết quả lọc hiện tại.`, 'success');
+                }
+            } catch (err) {
+                showBatchModalAlert(err.message || 'Lỗi khi chọn tất cả theo kết quả lọc!');
+            }
+        }
+
+        function clearAllBatchSelections() {
+            batchSelectedStudentsMap.clear();
+            hideBatchModalAlert();
+            renderBatchSelectedChipsAndSummary();
+            renderBatchModalTable();
+        }
+
+        function renderBatchSelectedChipsAndSummary() {
+            const count = batchSelectedStudentsMap.size;
+            const badgeEl = document.getElementById('bm-selected-badge');
+            const chipsEl = document.getElementById('bm-selected-chips');
+            const footerSumEl = document.getElementById('bm-footer-summary');
+            const submitBtnText = document.getElementById('btn-submit-batch-pdf-text');
+
+            if (badgeEl) {
+                badgeEl.textContent = `Bạn đã chọn ${count} sinh viên.`;
+            }
+            if (footerSumEl) {
+                footerSumEl.innerHTML = count === 0
+                    ? `<span class="text-text-muted">Chưa chọn sinh viên nào.</span>`
+                    : `<span class="text-[#10B981] font-bold">Bạn đã chọn ${count} sinh viên.</span> Hệ thống sẽ tạo <strong>1 file PDF duy nhất</strong> chứa ${count} bảng điểm độc lập.`;
+            }
+            if (submitBtnText) {
+                submitBtnText.textContent = `Xuất PDF (${count} sinh viên)`;
+            }
+
+            if (!chipsEl) return;
+            if (count === 0) {
+                chipsEl.innerHTML = `<span class="text-xs text-text-muted italic">Chưa có sinh viên nào được chọn. Hãy tích chọn ở bảng bên dưới.</span>`;
+                return;
+            }
+
+            let orderIdx = 1;
+            const htmlParts = [];
+            batchSelectedStudentsMap.forEach((info, maSV) => {
+                const safeMaSV = escapeHtml(maSV).replace(/'/g, "\\'");
+                htmlParts.push(`
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-xs font-semibold text-text-primary">
+                        <span class="px-1.5 py-0.2 rounded bg-primary text-white text-[10px] font-bold">${orderIdx++}</span>
+                        <span class="font-mono font-bold text-primary">${escapeHtml(info.maSV)}</span>
+                        <span>- ${escapeHtml(info.hoTen)}</span>
+                        <button type="button"
+                                onclick="removeStudentFromBatchSelection('${safeMaSV}')"
+                                title="Bỏ chọn sinh viên ${escapeHtml(info.maSV)}"
+                                class="ml-0.5 text-text-muted hover:text-[#ef4444] transition-colors">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </span>
+                `);
+            });
+            chipsEl.innerHTML = htmlParts.join('');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderBatchModalPagination(totalItems, totalPages, startIndex, endIndex) {
+            const infoEl = document.getElementById('bm-pagination-info');
+            if (infoEl) {
+                infoEl.textContent = totalItems === 0
+                    ? '0 sinh viên'
+                    : `Hiển thị ${startIndex + 1}–${endIndex} / ${totalItems} sinh viên`;
+            }
+
+            const ctrlEl = document.getElementById('bm-pagination-controls');
+            if (!ctrlEl) return;
+            if (totalPages <= 1) {
+                ctrlEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            const prevDis = bmCurrentPage <= 1;
+            html += `<button type="button" onclick="loadBatchModalCandidates(${bmCurrentPage - 1})" ${prevDis ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg border border-surface-hover text-xs font-semibold ${prevDis ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-hover text-text-primary'}"><i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i></button>`;
+
+            const startP = Math.max(1, bmCurrentPage - 2);
+            const endP = Math.min(totalPages, bmCurrentPage + 2);
+            if (startP > 1) {
+                html += `<button type="button" onclick="loadBatchModalCandidates(1)" class="px-2.5 py-1 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">1</button>`;
+                if (startP > 2) html += `<span class="px-1">...</span>`;
+            }
+            for (let p = startP; p <= endP; p++) {
+                const active = p === bmCurrentPage;
+                html += `<button type="button" onclick="loadBatchModalCandidates(${p})" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${active ? 'bg-primary text-white shadow-sm' : 'border border-surface-hover hover:bg-surface-hover text-text-primary'}">${p}</button>`;
+            }
+            if (endP < totalPages) {
+                if (endP < totalPages - 1) html += `<span class="px-1">...</span>`;
+                html += `<button type="button" onclick="loadBatchModalCandidates(${totalPages})" class="px-2.5 py-1 rounded-lg border border-surface-hover text-xs font-semibold hover:bg-surface-hover text-text-primary">${totalPages}</button>`;
+            }
+
+            const nextDis = bmCurrentPage >= totalPages;
+            html += `<button type="button" onclick="loadBatchModalCandidates(${bmCurrentPage + 1})" ${nextDis ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg border border-surface-hover text-xs font-semibold ${nextDis ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-hover text-text-primary'}"><i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></button>`;
+            ctrlEl.innerHTML = html;
+        }
+
+        function changeBatchModalPageSize(size) {
+            bmPageSize = parseInt(size, 10) || 10;
+            loadBatchModalCandidates(1);
+        }
+
+        async function submitBatchTranscriptPdf() {
+            if (bmExportInProgress) return;
+            hideBatchModalAlert();
+
+            const selectedIds = Array.from(batchSelectedStudentsMap.keys());
+            if (selectedIds.length === 0) {
+                showBatchModalAlert('Vui lòng chọn ít nhất một sinh viên để xuất bảng điểm.', 'error');
+                showToast('Vui lòng chọn ít nhất một sinh viên để xuất bảng điểm.', 'warning');
+                return;
+            }
+
+            if (selectedIds.length > bmMaxBatchSize) {
+                showBatchModalAlert(`Số lượng sinh viên đã chọn (${selectedIds.length}) vượt quá giới hạn tối đa ${bmMaxBatchSize} sinh viên mỗi lần xuất.`, 'error');
+                return;
+            }
+
+            if (selectedIds.length >= 15) {
+                const ok = confirm(`Bạn đã chọn ${selectedIds.length} sinh viên. Hệ thống sẽ tổng hợp thành 1 file PDF duy nhất chứa ${selectedIds.length} bảng điểm độc lập. Tiếp tục xuất PDF?`);
+                if (!ok) return;
+            }
+
+            const btn = document.getElementById('btn-submit-batch-pdf');
+            const btnText = document.getElementById('btn-submit-batch-pdf-text');
+            bmExportInProgress = true;
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.textContent = `Đang tạo PDF (${selectedIds.length} sinh viên)...`;
+
+            try {
+                const response = await fetch('/api/tracuudiem/pdf/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentIds: selectedIds })
+                });
+
+                if (!response.ok) {
+                    const errJson = await response.json().catch(() => ({}));
+                    throw new Error(errJson.message || `Lỗi xuất PDF hàng loạt (HTTP ${response.status})`);
+                }
+
+                const blob = await response.blob();
+                if (!blob || blob.size === 0) {
+                    throw new Error('File PDF trả về bị rỗng!');
+                }
+
+                const headerFileName = response.headers.get('X-Transcript-FileName');
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const fallbackName = `BangDiem_DanhSach_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.pdf`;
+                const fileName = headerFileName || fallbackName;
+
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+
+                showToast(`Đã xuất thành công 1 file PDF chứa ${selectedIds.length} bảng điểm sinh viên!`);
+                showBatchModalAlert(`Đã tải xuống thành công file "${fileName}" (${selectedIds.length} bảng điểm sinh viên).`, 'success');
+            } catch (err) {
+                showBatchModalAlert(err.message || 'Không thể tạo file PDF hàng loạt!', 'error');
+                showToast(err.message || 'Không thể tạo file PDF hàng loạt!', 'error');
+            } finally {
+                bmExportInProgress = false;
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = `Xuất PDF (${batchSelectedStudentsMap.size} sinh viên)`;
+            }
+        }
+
+        // =========================================================================
+        // PHẦN 4: HIỂN THỊ CHI TIẾT BẢNG ĐIỂM WEB TẠI MÀN HÌNH DETAILS
+        // =========================================================================
         function formatTranscriptGpa(value) { return value == null ? '—' : Number(value).toFixed(2); }
         function transcriptSummaryRows(rows, labelSpan = 8, valueSpan = 4) {
             return rows.map(([label, value]) => `<tr class="border-t border-surface-hover bg-canvas">
@@ -546,6 +1395,8 @@
                 const tk = d.tongKetToanKhoa;
                 const xet = tk.XetTotNghiep;
 
+                activeDetailStudentMaSV = sv.MaSV;
+
                 document.getElementById('info-hoten').textContent = sv.HoTen;
                 document.getElementById('info-masv').textContent = sv.MaSV;
                 document.getElementById('info-lop').textContent = sv.MaLop || 'N/A';
@@ -574,7 +1425,7 @@
                     reasonsEl.innerHTML = `<div class="text-[#10B981] font-semibold">🎉 Chúc mừng! Sinh viên đã hoàn thành đầy đủ chuẩn đầu ra tín chỉ và GPA tối thiểu (${xet.QuyDinh.MinGPA}).</div>`;
                 } else {
                     reasonsEl.innerHTML = `<div class="font-bold text-text-primary mb-1">Các điều kiện cần hoàn thành thêm:</div>` +
-                        (xet.LyDo || []).map(r => `<div class="text-text-muted">• ${r}</div>`).join('');
+                        (xet.LyDo || []).map(r => `<div class="text-text-muted">• ${escapeHtml(r)}</div>`).join('');
                 }
 
                 const semContainer = document.getElementById('tc-semesters');
@@ -588,8 +1439,8 @@
                     <div class="bg-surface border border-surface-hover rounded-2xl overflow-hidden shadow-sm">
                         <div class="px-6 py-4 bg-surface-header border-b border-surface-hover flex flex-wrap items-center justify-between gap-4">
                             <div>
-                                <h3 class="font-bold text-base text-primary">${hk.TenHK} — Năm học ${hk.NamHoc}</h3>
-                                <span class="text-xs text-text-muted">Mã học kỳ: ${hk.MaHK}</span>
+                                <h3 class="font-bold text-base text-primary">${escapeHtml(hk.TenHK)} — Năm học ${escapeHtml(hk.NamHoc)}</h3>
+                                <span class="text-xs text-text-muted">Mã học kỳ: ${escapeHtml(hk.MaHK)}</span>
                             </div>
                             <div class="flex items-center gap-4 text-xs">
                                 <span>TC Đạt trong kỳ: <strong class="text-text-primary">${hk.TongTinChiHK} TC</strong></span>
@@ -618,21 +1469,21 @@
                                 <tbody class="divide-y divide-surface-hover">
                                     ${hk.DanhSachMon.map(m => `
                                         <tr class="hover:bg-surface-hover/40">
-                                            <td class="px-5 py-3 font-bold text-primary">${m.MaMon}</td>
-                                            <td class="px-5 py-3 font-medium text-text-primary">${m.TenMon}</td>
+                                            <td class="px-5 py-3 font-bold text-primary">${escapeHtml(m.MaMon)}</td>
+                                            <td class="px-5 py-3 font-medium text-text-primary">${escapeHtml(m.TenMon)}</td>
                                             <td class="px-4 py-3 text-center">${m.SoTinChi}</td>
-                                            <td class="px-4 py-3 text-center text-xs text-text-muted">${m.LoaiMon}</td>
+                                            <td class="px-4 py-3 text-center text-xs text-text-muted">${escapeHtml(m.LoaiMon)}</td>
                                             <td class="px-4 py-3 text-center">${m.DiemQT ?? '-'}</td>
                                             <td class="px-4 py-3 text-center">${m.DiemThiLan1 ?? '-'}</td>
                                             <td class="px-4 py-3 text-center text-amber-400">${m.DiemThiLan2 ?? '-'}</td>
                                             <td class="px-4 py-3 text-center font-extrabold text-text-primary">${m.DiemTongKet ?? '-'}</td>
                                             <td class="px-4 py-3 text-center font-bold text-primary">${m.DiemHe4 ?? '-'}</td>
-                                            <td class="px-4 py-3 text-center font-bold">${m.DiemChu ?? '-'}</td>
+                                            <td class="px-4 py-3 text-center font-bold">${escapeHtml(m.DiemChu ?? '-')}</td>
                                             <td class="px-4 py-3 text-center">
-                                                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${m.DiemTongKet == null ? 'bg-surface-hover text-text-muted' : m.QuaMon ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${m.DiemTongKet == null ? 'Chưa có điểm' : (m.GhiChu || (m.QuaMon ? 'Đạt' : 'Học lại'))}</span>
+                                                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${m.DiemTongKet == null ? 'bg-surface-hover text-text-muted' : m.QuaMon ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}">${m.DiemTongKet == null ? 'Chưa có điểm' : escapeHtml(m.GhiChu || (m.QuaMon ? 'Đạt' : 'Học lại'))}</span>
                                             </td>
                                             <td class="px-4 py-3 text-right">
-                                                ${IS_STUDENT ? `<button onclick="openAppealModal('${m.MaLHP}', '${m.TenMon}', '${sv.MaSV}')" class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 text-xs font-semibold">
+                                                ${IS_STUDENT ? `<button onclick="openAppealModal('${escapeHtml(m.MaLHP)}', '${escapeHtml(m.TenMon).replace(/'/g, "\\'")}', '${escapeHtml(sv.MaSV)}')" class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 text-xs font-semibold">
                                                     Khiếu nại
                                                 </button>` : '—'}
                                             </td>

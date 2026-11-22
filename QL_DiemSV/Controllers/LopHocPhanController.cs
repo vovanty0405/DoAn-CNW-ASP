@@ -362,8 +362,10 @@ public class LopHocPhanController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] LopHocPhan model)
     {
-        if (string.IsNullOrWhiteSpace(model.MaLHP) || string.IsNullOrWhiteSpace(model.TenLopHP))
-            return BadRequest(new { status = "error", message = "Mã LHP và Tên lớp học phần không được để trống" });
+        var error = await ValidateSectionAsync(model);
+        if (error != null) return BadRequest(new { message = error });
+        if (!ProfileValidation.Code().IsMatch(model.MaLHP.Trim()))
+            return BadRequest(new { status = "error", message = "Mã lớp học phần không hợp lệ" });
 
         model.MaLHP = model.MaLHP.Trim();
         if (await _db.LopHocPhans.AnyAsync(l => l.MaLHP == model.MaLHP))
@@ -387,6 +389,9 @@ public class LopHocPhanController : ControllerBase
         if (course == null || !await _db.HocKys.AnyAsync(x => x.MaHK == model.MaHK)) return BadRequest(new { status = "error", message = "Môn học hoặc học kỳ không tồn tại." });
         model.STC = course.SoTinChi;
         model.STCHP = course.SoTinChi;
+        model.MonHoc = null;
+        model.HocKy = null;
+        model.GiangVien = null;
         _db.LopHocPhans.Add(model);
         await _db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Lớp học phần", $"Đã tạo lớp học phần {model.MaLHP} - {model.TenLopHP}");
@@ -407,7 +412,10 @@ public class LopHocPhanController : ControllerBase
         var termSet = (await _db.HocKys.AsNoTracking().Select(h => h.MaHK).ToListAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var lecturers = (await _db.GiangViens.Select(x => x.MaGV).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var classes = (await _db.LopHanhChinhs.Select(x => x.MaLop).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         int count = 0;
+        int row = 1;
 
         foreach (var item in list)
         {
@@ -417,8 +425,12 @@ public class LopHocPhanController : ControllerBase
             item.MaLHP = item.MaLHP.Trim();
             if (existingLhpIds.Contains(item.MaLHP))
                 continue;
-            if (!courseMap.TryGetValue(item.MaMon.Trim(), out var course) || !termSet.Contains(item.MaHK.Trim()))
-                continue;
+            var error = NormalizeSection(item);
+            if (error != null) return BadRequest(new { message = $"Dòng {row}: {error}" });
+            if (!courseMap.TryGetValue(item.MaMon ?? "", out var course) || !termSet.Contains(item.MaHK ?? ""))
+                return BadRequest(new { message = $"Dòng {row}: Môn học hoặc học kỳ không tồn tại." });
+            if ((item.MaGV != null && !lecturers.Contains(item.MaGV)) || (item.MaLop != null && !classes.Contains(item.MaLop)))
+                return BadRequest(new { message = $"Dòng {row}: Giảng viên hoặc lớp hành chính không tồn tại." });
 
             existingLhpIds.Add(item.MaLHP);
             item.CauHinhDiem ??= defaultCauHinh;
@@ -431,6 +443,9 @@ public class LopHocPhanController : ControllerBase
             }
             item.STC = course.SoTinChi;
             item.STCHP = course.SoTinChi;
+            item.MonHoc = null;
+            item.HocKy = null;
+            item.GiangVien = null;
             _db.LopHocPhans.Add(item);
             count++;
         }
@@ -447,6 +462,9 @@ public class LopHocPhanController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] LopHocPhan model)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        var error = await ValidateSectionAsync(model);
+        if (error != null) return BadRequest(new { message = error });
         var existing = await _db.LopHocPhans.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
@@ -470,6 +488,7 @@ public class LopHocPhanController : ControllerBase
         existing.TrangThai = model.TrangThai;
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật Lớp học phần", $"Đã cập nhật lớp học phần {id}");
         return Ok(new { status = "success", message = "Cập nhật lớp học phần thành công", data = existing });
     }
@@ -485,13 +504,40 @@ public class LopHocPhanController : ControllerBase
 
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Lớp học phần" });
 
-        if (existing.KetQuaHocTaps.Any(ScheduleRules.HasGrades))
-            return BadRequest(new { status = "error", message = "Không thể xóa Lớp học phần đã có điểm sinh viên!" });
+        if (existing.KetQuaHocTaps.Any(ScheduleRules.HasGrades) || await _db.DonKhieuNais.AnyAsync(x => x.MaLHP == id))
+            return BadRequest(new { status = "error", message = "Không thể xóa lớp học phần đã có điểm hoặc đơn phúc khảo." });
 
         _db.LopHocPhans.Remove(existing);
         await _db.SaveChangesAsync();
         await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa Lớp học phần", $"Đã xóa lớp học phần {id}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa lớp học phần thành công" });
+    }
+
+    private static string? NormalizeSection(LopHocPhan model)
+    {
+        model.TenLopHP = ProfileValidation.Optional(model.TenLopHP);
+        model.MaMon = ProfileValidation.Optional(model.MaMon);
+        model.MaHK = ProfileValidation.Optional(model.MaHK);
+        model.MaGV = ProfileValidation.Optional(model.MaGV);
+        model.MaLop = ProfileValidation.Optional(model.MaLop);
+        model.PhongHoc = ProfileValidation.Optional(model.PhongHoc);
+        model.TrangThai = ProfileValidation.Optional(model.TrangThai) ?? "MoDangKy";
+        if (model.TenLopHP == null) return "Tên lớp học phần không được để trống.";
+        if (model.TrangThai is not ("MoDangKy" or "Đã chốt" or "Hủy")) return "Trạng thái lớp học phần không hợp lệ.";
+        return null;
+    }
+
+    private async Task<string?> ValidateSectionAsync(LopHocPhan model)
+    {
+        var error = NormalizeSection(model);
+        if (error != null) return error;
+        if (model.MaHK == null || !await _db.HocKys.AnyAsync(x => x.MaHK == model.MaHK))
+            return "Học kỳ không tồn tại.";
+        if (model.MaGV != null && !await _db.GiangViens.AnyAsync(x => x.MaGV == model.MaGV))
+            return "Giảng viên không tồn tại.";
+        if (model.MaLop != null && !await _db.LopHanhChinhs.AnyAsync(x => x.MaLop == model.MaLop))
+            return "Lớp hành chính không tồn tại.";
+        return null;
     }
 }

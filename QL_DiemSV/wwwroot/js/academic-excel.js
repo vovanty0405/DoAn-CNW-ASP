@@ -101,7 +101,15 @@ window.academicExcel = {
         XLSX.writeFile(book, name + '.xlsx');
     },
 
-    bulk(input, title, endpoint, fields, required, numbers, refresh, individual = false) {
+    validateProfileContacts(value) {
+        if (value.CCCD && !/^[0-9]{12}$/.test(value.CCCD))
+            throw new Error('CCCD phải gồm đúng 12 chữ số. Đặt cột ở kiểu Văn bản để giữ số 0 đầu.');
+        if (value.SDT && !/^[0-9]{10,11}$/.test(value.SDT))
+            throw new Error('Số điện thoại phải gồm 10 hoặc 11 chữ số. Đặt cột ở kiểu Văn bản để giữ số 0 đầu.');
+        return value;
+    },
+
+    bulk(input, title, endpoint, fields, required, numbers, refresh, individual = false, validate = null) {
         return this.importFile(input, {
             title,
             key: required[0],
@@ -115,7 +123,7 @@ window.academicExcel = {
                         throw new Error(`${key} phải là số nguyên không âm.`);
                     value[key] = numbers.includes(key) ? Number(cell) : cell;
                 }
-                return value;
+                return validate ? validate(value) : value;
             },
             async save(rows) {
                 if (!individual) return apiFetch(endpoint, { method: 'POST', body: JSON.stringify(rows) });

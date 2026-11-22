@@ -166,14 +166,14 @@
             try {
                 const [sv, gv, lhp, mh] = await Promise.all([
                     fetch('/api/sinhvien?pageSize=1').then(r => r.json()),
-                    fetch('/api/giangvien').then(r => r.json()),
+                    fetch('/api/giangvien/count').then(r => r.json()),
                     fetch('/api/lophocphan/count').then(r => r.json()),
-                    fetch('/api/monhoc').then(r => r.json())
+                    fetch('/api/monhoc/count').then(r => r.json())
                 ]);
                 document.getElementById('stat-sv').textContent = sv.total ?? 0;
-                document.getElementById('stat-gv').textContent = (gv.data || []).length;
+                document.getElementById('stat-gv').textContent = gv.total ?? 0;
                 document.getElementById('stat-lhp').textContent = lhp.total ?? 0;
-                document.getElementById('stat-mh').textContent = (mh.data || []).length;
+                document.getElementById('stat-mh').textContent = mh.total ?? 0;
             } catch (e) { }
         })();
     </script>

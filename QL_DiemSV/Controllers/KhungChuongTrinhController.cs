@@ -145,6 +145,11 @@ public class KhungChuongTrinhController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateQuyDinh(string maNganh, [FromBody] QuyDinhTotNghiep req)
     {
+        if ((long)req.TCBatBuoc + req.TCTuChon > req.TongTTC)
+            return BadRequest(new { message = "Tổng tín chỉ bắt buộc và tự chọn không được vượt tổng tín chỉ yêu cầu." });
+        if (!await _db.Nganhs.AnyAsync(n => n.MaNganh == maNganh))
+            return BadRequest(new { message = "Ngành đào tạo không tồn tại." });
+
         var existing = await _db.QuyDinhTotNghieps.FindAsync(maNganh);
         if (existing == null)
         {
@@ -178,6 +183,14 @@ public class KhungChuongTrinhController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.MaNganh) || string.IsNullOrWhiteSpace(req.MaMon))
             return BadRequest(new { status = "error", message = "Mã ngành và Mã môn không được để trống" });
 
+        if (req.HocKyDuKien < 1 || req.LoaiMon is not ("Bắt buộc" or "Tự chọn"))
+            return BadRequest(new { message = "Học kỳ dự kiến hoặc loại học phần không hợp lệ." });
+        req.MaNganh = req.MaNganh.Trim();
+        req.MaMon = req.MaMon.Trim();
+        if (!await _db.Nganhs.AnyAsync(n => n.MaNganh == req.MaNganh)
+            || !await _db.MonHocs.AnyAsync(m => m.MaMon == req.MaMon))
+            return BadRequest(new { message = "Ngành hoặc môn học không tồn tại." });
+
         if (await _db.KhungChuongTrinhs.AnyAsync(k => k.MaNganh == req.MaNganh && k.MaMon == req.MaMon))
             return BadRequest(new { status = "error", message = "Môn học này đã có trong khung đào tạo của ngành!" });
 
@@ -202,6 +215,10 @@ public class KhungChuongTrinhController : ControllerBase
         if (req == null || string.IsNullOrWhiteSpace(req.MaNganh))
             return BadRequest(new { status = "error", message = "Vui lòng chọn Ngành đào tạo!" });
 
+        req.MaNganh = req.MaNganh.Trim();
+        if (!await _db.Nganhs.AnyAsync(n => n.MaNganh == req.MaNganh))
+            return BadRequest(new { message = "Ngành đào tạo không tồn tại." });
+
         var subjectCodes = new List<string>();
         var customLoaiMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -209,7 +226,7 @@ public class KhungChuongTrinhController : ControllerBase
         {
             foreach (var item in req.Items)
             {
-                if (!string.IsNullOrWhiteSpace(item.MaMon))
+                if (!string.IsNullOrWhiteSpace(item?.MaMon))
                 {
                     var code = item.MaMon.Trim();
                     subjectCodes.Add(code);
@@ -236,8 +253,15 @@ public class KhungChuongTrinhController : ControllerBase
         if (!subjectCodes.Any())
             return BadRequest(new { status = "error", message = "Vui lòng chọn ít nhất 1 môn học để thêm vào khung đào tạo!" });
 
-        int hocKy = req.HocKy > 0 ? req.HocKy : 1;
+        if (subjectCodes.Count > 1000 || await _db.MonHocs.CountAsync(m => subjectCodes.Contains(m.MaMon)) != subjectCodes.Count)
+            return BadRequest(new { message = "Danh sách vượt 1.000 môn hoặc chứa mã môn không tồn tại." });
+
+        int hocKy = req.HocKy;
         string defaultLoai = string.IsNullOrWhiteSpace(req.LoaiHocPhan) ? "Bắt buộc" : req.LoaiHocPhan.Trim();
+
+        if (req.HocKy < 1 || defaultLoai is not ("Bắt buộc" or "Tự chọn")
+            || customLoaiMap.Values.Any(type => type is not ("Bắt buộc" or "Tự chọn")))
+            return BadRequest(new { message = "Học kỳ dự kiến hoặc loại học phần không hợp lệ." });
 
         // Lấy danh sách mã môn đã tồn tại trong khung đào tạo của ngành này
         var existingCodes = await _db.KhungChuongTrinhs
@@ -294,7 +318,10 @@ public class KhungChuongTrinhController : ControllerBase
         var existing = await _db.KhungChuongTrinhs.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy bản ghi trong khung chương trình" });
 
-        if (req.HocKyDuKien.HasValue && req.HocKyDuKien.Value > 0)
+        if (req.HocKyDuKien is < 1 || (req.LoaiMon != null && req.LoaiMon.Trim() is not ("Bắt buộc" or "Tự chọn")))
+            return BadRequest(new { message = "Học kỳ dự kiến hoặc loại học phần không hợp lệ." });
+
+        if (req.HocKyDuKien.HasValue)
             existing.HocKyDuKien = req.HocKyDuKien.Value;
 
         if (!string.IsNullOrWhiteSpace(req.LoaiMon))

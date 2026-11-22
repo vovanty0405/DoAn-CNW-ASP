@@ -20,7 +20,12 @@ public class TaiKhoanController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? role, [FromQuery] string? status)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? role,
+        [FromQuery] string? status,
+        [FromQuery] string? search = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int pageSize = 10)
     {
         var query = _db.UserAccounts.AsNoTracking()
             .Include(u => u.Role)
@@ -39,7 +44,36 @@ public class TaiKhoanController : ControllerBase
             else if (status == "inactive") query = query.Where(u => !u.IsActive);
         }
 
-        var list = await query.OrderBy(u => u.UserID).ToListAsync();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var kw = search.Trim();
+            query = query.Where(u => u.Username.Contains(kw)
+                || (u.MaGV != null && u.MaGV.Contains(kw))
+                || (u.GiangVien != null && (u.GiangVien.MaGV.Contains(kw) || u.GiangVien.HoTen.Contains(kw)))
+                || (u.SinhVien != null && (u.SinhVien.MaSV.Contains(kw) || u.SinhVien.HoTen.Contains(kw))));
+        }
+
+        var ordered = query.OrderBy(u => u.UserID);
+
+        int total = 0;
+        int totalPages = 1;
+        int currentPage = 1;
+        List<UserAccount> list;
+
+        if (page.HasValue)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            total = await ordered.CountAsync();
+            totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+            currentPage = Math.Clamp(page.Value, 1, totalPages);
+            list = await ordered.Skip((currentPage - 1) * pageSize).Take(pageSize).ToListAsync();
+        }
+        else
+        {
+            list = await ordered.ToListAsync();
+            total = list.Count;
+        }
+
         var data = list.Select(u =>
         {
             string refObj = "Quản trị hệ thống";
@@ -81,7 +115,7 @@ public class TaiKhoanController : ControllerBase
             };
         });
 
-        return Ok(new { status = "success", data });
+        return Ok(new { status = "success", data, total, page = currentPage, pageSize, totalPages });
     }
 
     public class TaiKhoanDto
@@ -104,17 +138,39 @@ public class TaiKhoanController : ControllerBase
         return null;
     }
 
+    private async Task<string?> ValidateAccountInputAsync(TaiKhoanDto req, int? accountId = null)
+    {
+        req.username = ProfileValidation.Optional(req.username);
+        req.refId = ProfileValidation.Optional(req.refId);
+        if (req.username is { Length: > 50 }) return "Tên đăng nhập tối đa 50 ký tự.";
+        if (!string.IsNullOrEmpty(req.password) && (string.IsNullOrWhiteSpace(req.password)
+            || System.Text.Encoding.UTF8.GetByteCount(req.password) > 72))
+            return "Mật khẩu không được chỉ chứa khoảng trắng hoặc vượt quá 72 byte UTF-8.";
+        if (req.username != null && await _db.UserAccounts.AnyAsync(u => u.Username == req.username && u.UserID != accountId))
+            return "Tên đăng nhập đã tồn tại.";
+        if (req.refType is not (null or "" or "Sinh Viên" or "Giảng Viên"))
+            return "Loại hồ sơ liên kết không hợp lệ.";
+        if (req.refId == null)
+            return req.refType is "Sinh Viên" or "Giảng Viên" ? "Cần chọn mã hồ sơ liên kết." : null;
+        if (req.refType == "Sinh Viên" && await _db.SinhViens.AnyAsync(s => s.MaSV == req.refId && (s.UserID == null || s.UserID == accountId)))
+            return null;
+        if (req.refType == "Giảng Viên" && await _db.GiangViens.AnyAsync(g => g.MaGV == req.refId && (g.UserID == null || g.UserID == accountId)))
+            return null;
+        return "Hồ sơ không tồn tại hoặc đã liên kết với tài khoản khác.";
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] TaiKhoanDto req)
     {
         if (string.IsNullOrWhiteSpace(req.username) || string.IsNullOrWhiteSpace(req.password))
             return BadRequest(new { status = "error", message = "Tên đăng nhập và mật khẩu không được để trống!" });
 
-        var uname = req.username.Trim();
-        if (await _db.UserAccounts.AnyAsync(u => u.Username == uname))
-            return BadRequest(new { status = "error", message = $"Tài khoản {uname} đã tồn tại!" });
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        var inputError = await ValidateAccountInputAsync(req);
+        if (inputError != null) return BadRequest(new { message = inputError });
+        var uname = req.username!;
 
-        var roleId = req.roleId ?? await _db.Roles.Where(r => r.RoleName == "SinhVien").Select(r => r.RoleID).SingleAsync();
+        var roleId = req.roleId ?? await _db.Roles.Where(r => r.RoleName == "SinhVien").Select(r => (int?)r.RoleID).SingleOrDefaultAsync();
         var faculty = string.IsNullOrWhiteSpace(req.maKhoa) ? null : req.maKhoa.Trim();
         var error = await ValidateAssignment(roleId, faculty);
         if (error != null) return BadRequest(new { message = error });
@@ -148,6 +204,7 @@ public class TaiKhoanController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Tạo tài khoản", $"Đã tạo tài khoản {uname}");
         return Ok(new { status = "success", message = "Thêm tài khoản thành công!" });
     }
@@ -158,6 +215,9 @@ public class TaiKhoanController : ControllerBase
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var ua = await _db.UserAccounts.FindAsync(id);
         if (ua == null) return NotFound(new { status = "error", message = "Không tìm thấy tài khoản" });
+
+        var inputError = await ValidateAccountInputAsync(req, id);
+        if (inputError != null) return BadRequest(new { message = inputError });
 
         var faculty = req.maKhoa == null ? ua.MaKhoa : (string.IsNullOrWhiteSpace(req.maKhoa) ? null : req.maKhoa.Trim());
         var error = await ValidateAssignment(req.roleId ?? ua.RoleID, faculty);

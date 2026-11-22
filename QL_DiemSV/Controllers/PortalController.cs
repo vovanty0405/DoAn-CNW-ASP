@@ -839,6 +839,9 @@ public class PortalController(ApplicationDbContext db) : Controller
     [Authorize(Roles = "Admin,SinhVien"), HttpPut("CapNhatHoSo")]
     public async Task<IActionResult> CapNhatHoSo([FromBody] UpdateStudentProfileDto req)
     {
+        if (!ModelState.IsValid || req == null)
+            return BadRequest(new { status = "error", message = "Dữ liệu hồ sơ không hợp lệ." });
+
         if (User.Identity?.IsAuthenticated != true)
         {
             return Unauthorized(new { status = "error", message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!" });
@@ -853,6 +856,15 @@ public class PortalController(ApplicationDbContext db) : Controller
             return BadRequest(new { status = "error", message = "Không xác định được mã sinh viên cần cập nhật!" });
         }
 
+        var identity = ProfileValidation.Optional(req.CCCD);
+        var phone = ProfileValidation.Optional(req.SDT);
+        var email = ProfileValidation.Optional(req.Email);
+        var address = ProfileValidation.Optional(req.DiaChi);
+        var gender = ProfileValidation.Optional(req.GioiTinh);
+        var validationError = ProfileValidation.FormatError(req.NgaySinh, gender, identity, phone, email, address);
+        if (validationError != null) return BadRequest(new { status = "error", message = validationError });
+
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId);
         var sv = await db.SinhViens.FirstOrDefaultAsync(s => s.MaSV == targetMaSV
             && (User.IsInRole("Admin") || s.UserID == accountId));
@@ -861,14 +873,18 @@ public class PortalController(ApplicationDbContext db) : Controller
             return NotFound(new { status = "error", message = "Không tìm thấy hồ sơ sinh viên trong hệ thống!" });
         }
 
+        var duplicateError = await ProfileValidation.DuplicateErrorAsync(db, identity, phone, studentId: sv.MaSV);
+        if (duplicateError != null) return BadRequest(new { status = "error", message = duplicateError });
+
         if (req.NgaySinh.HasValue) sv.NgaySinh = req.NgaySinh.Value;
-        if (!string.IsNullOrWhiteSpace(req.GioiTinh)) sv.GioiTinh = req.GioiTinh.Trim();
-        sv.CCCD = req.CCCD?.Trim();
-        sv.SDT = req.SDT?.Trim();
-        sv.Email = req.Email?.Trim();
-        sv.DiaChi = req.DiaChi?.Trim();
+        if (gender != null) sv.GioiTinh = gender;
+        sv.CCCD = identity;
+        sv.SDT = phone;
+        sv.Email = email;
+        sv.DiaChi = address;
 
         await db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(db, User.Identity?.Name ?? targetMaSV, "Cập nhật hồ sơ SV", $"Sinh viên {sv.HoTen} ({sv.MaSV}) đã cập nhật thông tin cá nhân trên Cổng thông tin.");
 
         return Ok(new { status = "success", message = "Đã cập nhật thông tin hồ sơ sinh viên thành công!" });

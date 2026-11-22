@@ -36,6 +36,15 @@ public class HocKyController : ControllerBase
         if (string.IsNullOrWhiteSpace(model.MaHK) || string.IsNullOrWhiteSpace(model.TenHK))
             return BadRequest(new { status = "error", message = "Mã học kỳ và Tên học kỳ không được để trống" });
 
+        model.MaHK = model.MaHK.Trim();
+        if (!ProfileValidation.Code().IsMatch(model.MaHK))
+            return BadRequest(new { message = "Mã học kỳ không hợp lệ." });
+        if (model.NamHocKetThuc != model.NamHocBatDau + 1)
+            return BadRequest(new { message = "Năm kết thúc phải liền sau năm bắt đầu." });
+        if (model.NgayBatDauTuan1 is { DayOfWeek: not DayOfWeek.Monday }
+            || model.BatDauDangKy.HasValue != model.KetThucDangKy.HasValue
+            || model.BatDauDangKy >= model.KetThucDangKy)
+            return BadRequest(new { message = "Tuần 1 phải bắt đầu vào Thứ Hai và khoảng đăng ký phải hợp lệ." });
         if (await _db.HocKys.AnyAsync(h => h.MaHK == model.MaHK))
             return BadRequest(new { status = "error", message = $"Mã học kỳ {model.MaHK} đã tồn tại!" });
 
@@ -52,7 +61,10 @@ public class HocKyController : ControllerBase
         var existing = await _db.HocKys.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Học kỳ" });
 
-        existing.TenHK = model.TenHK;
+        if (model.NamHocKetThuc != model.NamHocBatDau + 1)
+            return BadRequest(new { message = "Năm kết thúc phải liền sau năm bắt đầu." });
+
+        existing.TenHK = model.TenHK.Trim();
         existing.NamHocBatDau = model.NamHocBatDau;
         existing.NamHocKetThuc = model.NamHocKetThuc;
 

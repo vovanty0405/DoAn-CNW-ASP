@@ -90,22 +90,31 @@ public class SinhVienController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] SinhVien model)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         if (string.IsNullOrWhiteSpace(model.MaSV) || string.IsNullOrWhiteSpace(model.HoTen))
             return BadRequest(new { status = "error", message = "Mã sinh viên và Họ tên không được để trống" });
 
         model.MaSV = model.MaSV.Trim();
+        if (!ProfileValidation.Code().IsMatch(model.MaSV))
+            return BadRequest(new { message = "Mã hồ sơ chỉ nhận tối đa 20 chữ cái, chữ số, dấu gạch ngang hoặc gạch dưới." });
+        var validationError = await ValidateProfileAsync(model);
+        if (validationError != null) return BadRequest(new { message = validationError });
         if (await _db.SinhViens.AnyAsync(s => s.MaSV == model.MaSV))
             return BadRequest(new { status = "error", message = $"Mã sinh viên {model.MaSV} đã tồn tại!" });
 
         var svRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleName == "SinhVien");
+        if (svRole == null) return BadRequest(new { message = "Nhóm quyền hồ sơ chưa được cấu hình." });
         var existingAcc = await _db.UserAccounts.FirstOrDefaultAsync(u => u.Username == model.MaSV);
+        if (existingAcc != null && (existingAcc.RoleID != svRole.RoleID
+            || await _db.SinhViens.AnyAsync(x => x.UserID == existingAcc.UserID)))
+            return BadRequest(new { message = "Tên tài khoản đã được sử dụng bởi hồ sơ khác hoặc thuộc nhóm quyền khác." });
         if (existingAcc == null)
         {
             existingAcc = new UserAccount
             {
                 Username = model.MaSV,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-                RoleID = svRole?.RoleID ?? 3,
+                RoleID = svRole.RoleID,
                 IsActive = true,
                 NgayTao = DateTime.Now
             };
@@ -117,8 +126,10 @@ public class SinhVienController : ControllerBase
         if (string.IsNullOrWhiteSpace(model.MaLop)) model.MaLop = null;
         if (string.IsNullOrWhiteSpace(model.TrangThai)) model.TrangThai = "Đang học";
 
+        model.LopHanhChinh = null;
         _db.SinhViens.Add(model);
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Thêm Sinh viên", $"Đã thêm sinh viên {model.MaSV} - {model.HoTen}");
         return Ok(new { status = "success", message = "Thêm sinh viên và tạo tài khoản thành công", data = model });
     }
@@ -140,11 +151,13 @@ public class SinhVienController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<SinhVien> list)
     {
-        if (list == null || !list.Any())
-            return BadRequest(new { status = "error", message = "Danh sách sinh viên trống" });
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        if (list == null || list.Count is < 1 or > 1000)
+            return BadRequest(new { status = "error", message = "Danh sách phải có từ 1 đến 1.000 hồ sơ." });
 
         var svRole = await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.RoleName == "SinhVien");
-        int roleId = svRole?.RoleID ?? 3;
+        if (svRole == null) return BadRequest(new { message = "Nhóm quyền hồ sơ chưa được cấu hình." });
+        int roleId = svRole.RoleID;
         string defaultHash = BCrypt.Net.BCrypt.HashPassword("123456");
 
         var existingSvIds = (await _db.SinhViens.AsNoTracking().Select(s => s.MaSV).ToListAsync())
@@ -155,14 +168,36 @@ public class SinhVienController : ControllerBase
         var newAccounts = new List<UserAccount>();
         var pendingStudents = new List<(SinhVien sv, UserAccount acc)>();
 
+        var contacts = await ProfileValidation.FindContactsAsync(_db, list.Select(x => x?.CCCD), list.Select(x => x?.SDT));
+        var validReferences = (await _db.LopHanhChinhs.Select(x => x.MaLop).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        var phones = new HashSet<string>(StringComparer.Ordinal);
+        var linkedAccountIds = (await _db.SinhViens.Where(x => x.UserID != null).Select(x => x.UserID!.Value).ToListAsync()).ToHashSet();
+        int row = 1;
         foreach (var item in list)
         {
-            if (string.IsNullOrWhiteSpace(item.MaSV)) continue;
+            row++;
+            if (item == null) return BadRequest(new { message = $"Dòng {row}: Hồ sơ trống." });
+            if (string.IsNullOrWhiteSpace(item.MaSV))
+                return BadRequest(new { message = $"Dòng {row}: Mã hồ sơ không được để trống." });
             item.MaSV = item.MaSV.Trim();
             if (existingSvIds.Contains(item.MaSV)) continue;
 
+            if (!ProfileValidation.Code().IsMatch(item.MaSV))
+                return BadRequest(new { message = $"Dòng {row}: Mã hồ sơ không hợp lệ." });
+            var validationError = NormalizeAndValidate(item);
+            if (validationError == null && item.MaLop != null && !validReferences.Contains(item.MaLop))
+                validationError = "Lớp hành chính không tồn tại.";
+            validationError ??= contacts.DuplicateError(item.CCCD, item.SDT);
+            if (validationError != null) return BadRequest(new { message = $"Dòng {row} ({item.MaSV}): {validationError}" });
+            if ((item.CCCD != null && !identities.Add(item.CCCD)) || (item.SDT != null && !phones.Add(item.SDT)))
+                return BadRequest(new { message = $"Dòng {row} ({item.MaSV}): CCCD hoặc số điện thoại bị trùng trong tệp." });
+
             existingSvIds.Add(item.MaSV);
-            if (!existingAccounts.TryGetValue(item.MaSV, out var ua))
+            if (existingAccounts.TryGetValue(item.MaSV, out var ua)
+                && (ua.RoleID != roleId || linkedAccountIds.Contains(ua.UserID)))
+                return BadRequest(new { message = $"Dòng {row}: Tên tài khoản đã được sử dụng bởi hồ sơ khác hoặc thuộc nhóm quyền khác." });
+            if (ua == null)
             {
                 ua = new UserAccount
                 {
@@ -190,6 +225,7 @@ public class SinhVienController : ControllerBase
         foreach (var (sv, ua) in pendingStudents)
         {
             sv.UserID = ua.UserID;
+            sv.LopHanhChinh = null;
             _db.SinhViens.Add(sv);
         }
 
@@ -198,6 +234,7 @@ public class SinhVienController : ControllerBase
         {
             await _db.SaveChangesAsync();
         }
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Sinh viên", $"Đã import {count} sinh viên từ Excel");
         return Ok(new { status = "success", message = $"Đã thêm thành công {count} sinh viên" });
     }
@@ -206,8 +243,12 @@ public class SinhVienController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(string id, [FromBody] SinhVien model)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var existing = await _db.SinhViens.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Sinh viên" });
+
+        var validationError = await ValidateProfileAsync(model, existing.MaSV);
+        if (validationError != null) return BadRequest(new { message = validationError });
 
         existing.HoTen = model.HoTen;
         existing.NgaySinh = model.NgaySinh;
@@ -220,6 +261,7 @@ public class SinhVienController : ControllerBase
         existing.TrangThai = model.TrangThai;
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Cập nhật Sinh viên", $"Đã cập nhật sinh viên {id}");
         return Ok(new { status = "success", message = "Cập nhật sinh viên thành công", data = existing });
     }
@@ -228,15 +270,16 @@ public class SinhVienController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(string id)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var existing = await _db.SinhViens.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Sinh viên" });
 
-        if (await _db.KetQuaHocTaps.AnyAsync(k => k.MaSV == id && (k.DiemTongKet != null || k.DiemCK != null || k.DiemThiLan1 != null)))
+        var emptyEnrollments = await _db.KetQuaHocTaps.Where(k => k.MaSV == id).ToListAsync();
+        if (emptyEnrollments.Any(ScheduleRules.HasGrades) || await _db.DonKhieuNais.AnyAsync(x => x.MaSV == id))
         {
-            return BadRequest(new { status = "error", message = $"Không thể xóa sinh viên {id} vì đã phát sinh kết quả điểm học tập trên hệ thống! Vui lòng chuyển trạng thái sang 'Thôi học' hoặc 'Bảo lưu'." });
+            return BadRequest(new { status = "error", message = $"Không thể xóa sinh viên {id} vì đã có điểm hoặc đơn phúc khảo trên hệ thống! Vui lòng chuyển trạng thái sang 'Thôi học' hoặc 'Bảo lưu'." });
         }
 
-        var emptyEnrollments = await _db.KetQuaHocTaps.Where(k => k.MaSV == id).ToListAsync();
         if (emptyEnrollments.Count > 0)
         {
             _db.KetQuaHocTaps.RemoveRange(emptyEnrollments);
@@ -256,7 +299,35 @@ public class SinhVienController : ControllerBase
             }
         }
 
+        await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Xóa Sinh viên", $"Đã xóa sinh viên {id}", "Cảnh báo");
         return Ok(new { status = "success", message = "Xóa sinh viên thành công" });
+    }
+
+    private async Task<string?> ValidateProfileAsync(SinhVien model, string? existingId = null)
+    {
+        var error = NormalizeAndValidate(model);
+        if (error != null) return error;
+        if (model.MaLop != null && !await _db.LopHanhChinhs.AnyAsync(x => x.MaLop == model.MaLop))
+            return "Lớp hành chính không tồn tại.";
+
+        return await ProfileValidation.DuplicateErrorAsync(_db, model.CCCD, model.SDT, studentId: existingId);
+    }
+
+    private static string? NormalizeAndValidate(SinhVien model)
+    {
+        model.HoTen = model.HoTen?.Trim() ?? "";
+        if (model.HoTen.Length == 0) return "Họ tên không được để trống.";
+
+        model.CCCD = ProfileValidation.Optional(model.CCCD);
+        model.SDT = ProfileValidation.Optional(model.SDT);
+        model.Email = ProfileValidation.Optional(model.Email);
+        model.GioiTinh = ProfileValidation.Optional(model.GioiTinh);
+        model.MaLop = ProfileValidation.Optional(model.MaLop);
+        model.DiaChi = ProfileValidation.Optional(model.DiaChi);
+        model.TrangThai = ProfileValidation.Optional(model.TrangThai) ?? "Đang học";
+        if (model.TrangThai is not ("Đang học" or "Bảo lưu" or "Đã tốt nghiệp" or "Thôi học"))
+            return "Trạng thái học tập không hợp lệ.";
+        return ProfileValidation.FormatError(model.NgaySinh, model.GioiTinh, model.CCCD, model.SDT, model.Email, model.DiaChi);
     }
 }

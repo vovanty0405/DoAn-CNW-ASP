@@ -1366,12 +1366,12 @@
 
                             <div class="kqht-form-row-2">
                                 <div class="kqht-form-group">
-                                    <label for="pfCCCD">Số CCCD / CMND</label>
-                                    <input type="text" id="pfCCCD" class="kqht-form-control" value="@Model.CCCD" placeholder="Nhập số căn cước công dân..." maxlength="20" />
+                                    <label for="pfCCCD">Số CCCD</label>
+                                    <input type="text" id="pfCCCD" class="kqht-form-control" value="@Model.CCCD" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" title="Nhập đúng 12 chữ số" />
                                 </div>
                                 <div class="kqht-form-group">
                                     <label for="pfSDT">Số điện thoại liên hệ</label>
-                                    <input type="tel" id="pfSDT" class="kqht-form-control" value="@Model.SDT" placeholder="Nhập số điện thoại..." maxlength="20" />
+                                    <input type="tel" id="pfSDT" class="kqht-form-control" value="@Model.SDT" inputmode="numeric" maxlength="11" pattern="[0-9]{10,11}" title="Nhập 10 hoặc 11 chữ số" />
                                 </div>
                             </div>
 

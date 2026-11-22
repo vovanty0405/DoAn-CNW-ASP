@@ -1,106 +1,724 @@
 @{
     Layout = "_Layout";
+    ViewData["Title"] = "Cổng Đăng Nhập Học Vụ Số";
 }
 
-<div class="min-h-screen w-full flex items-center justify-center p-4 bg-canvas relative overflow-hidden">
-    <div class="w-full max-w-4xl bg-surface border border-surface-hover rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 z-10">
-        <!-- Left Banner -->
-        <div class="lg:col-span-5 bg-surface-header p-8 border-b lg:border-b-0 lg:border-r border-surface-hover flex flex-col justify-between">
-            <div>
-                <div class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-primary text-xs font-bold mb-6">
-                    <i data-lucide="graduation-cap" class="w-4 h-4"></i> Academic Ledger 2.0
+<style>
+    .edu-login-shell {
+        --edu-navy: #0f3d75;
+        --edu-navy-dark: #0a2952;
+        --edu-accent: #0284c7;
+        --edu-gold: #d97706;
+        --edu-border: #cbd5e1;
+        --edu-border-subtle: #e2e8f0;
+        --edu-surface: #ffffff;
+        --edu-canvas: #f1f5f9;
+        --edu-text: #0f172a;
+        --edu-muted: #475569;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html:not(.light) .edu-login-shell {
+        --edu-navy: #1e40af;
+        --edu-navy-dark: #0f172a;
+        --edu-accent: #38bdf8;
+        --edu-gold: #f59e0b;
+        --edu-border: #1e293b;
+        --edu-border-subtle: #334155;
+        --edu-surface: #0f172a;
+        --edu-canvas: #090d16;
+        --edu-text: #f8fafc;
+        --edu-muted: #94a3b8;
+    }
+
+    .edu-grid-bg {
+        background-color: var(--edu-canvas);
+        background-image:
+            radial-gradient(at 12% 15%, rgba(15, 61, 117, 0.10) 0px, transparent 50%),
+            radial-gradient(at 88% 85%, rgba(2, 132, 199, 0.08) 0px, transparent 50%),
+            linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+    }
+
+    .edu-card-frame {
+        background: var(--edu-surface);
+        border: 1px solid var(--edu-border);
+        border-top: 4px solid #0f3d75;
+        box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.15);
+    }
+
+    html:not(.light) .edu-card-frame {
+        border-top-color: #38bdf8;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65);
+    }
+
+    .edu-banner-panel {
+        background: linear-gradient(155deg, #0f3d75 0%, #0a2547 55%, #081c36 100%);
+        color: #f8fafc;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .edu-banner-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 85% 20%, rgba(56, 189, 248, 0.16), transparent 45%),
+            linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        background-size: 100% 100%, 24px 24px, 24px 24px;
+        pointer-events: none;
+    }
+
+    .edu-input {
+        background-color: var(--edu-canvas);
+        border: 1px solid var(--edu-border);
+        color: var(--edu-text);
+        border-radius: 8px;
+        transition: all 0.18s ease;
+    }
+
+    .edu-input:focus {
+        border-color: #0284c7;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+        outline: none;
+    }
+
+    .edu-input:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .edu-primary-btn {
+        background: linear-gradient(135deg, #0f3d75 0%, #0284c7 100%);
+        color: #ffffff;
+        border-radius: 8px;
+        font-weight: 700;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 14px rgba(15, 61, 117, 0.25);
+    }
+
+    .edu-primary-btn:hover:not(:disabled) {
+        filter: brightness(1.08);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(2, 132, 199, 0.32);
+    }
+
+    .edu-primary-btn:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    .edu-primary-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .edu-demo-chip {
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        transition: all 0.18s ease;
+    }
+
+    .edu-demo-chip:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: #38bdf8;
+        transform: translateY(-1px);
+    }
+
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
+    }
+</style>
+
+<div class="edu-login-shell edu-grid-bg min-h-screen w-full flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative">
+    <!-- Top Institutional Bar -->
+    <header class="w-full max-w-5xl mx-auto flex items-center justify-between py-2">
+        <a href="/portal" class="inline-flex items-center gap-2.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors">
+            <span class="w-7 h-7 rounded-lg bg-surface border border-surface-hover flex items-center justify-center shadow-sm">
+                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+            </span>
+            <span>Quay về Cổng thông tin Sinh viên (Portal)</span>
+        </a>
+
+        <div class="flex items-center gap-2">
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-surface-hover text-[11px] font-medium text-text-muted">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Hệ thống Đào tạo Trực tuyến
+            </span>
+            <button type="button" onclick="quickToggleTheme()" class="p-2 rounded-lg bg-surface border border-surface-hover text-text-muted hover:text-primary transition-colors" title="Chuyển chế độ Sáng / Tối">
+                <i data-lucide="sun-moon" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Center Card -->
+    <div class="w-full max-w-5xl mx-auto my-auto py-4">
+        <div class="edu-card-frame rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+
+            <!-- Left Column: Academic Institution Identity & Protected Demo Vault -->
+            <div class="lg:col-span-5 edu-banner-panel p-7 sm:p-9 flex flex-col justify-between">
+                <div class="relative z-10">
+                    <!-- University Seal & Badge -->
+                    <div class="flex items-center justify-between gap-2 mb-6">
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/10 border border-white/20 text-sky-200 text-xs font-bold tracking-wide uppercase">
+                            <i data-lucide="graduation-cap" class="w-4 h-4 text-sky-300"></i>
+                            <span>Academic Ledger 2.0</span>
+                        </div>
+                        <span class="text-[11px] font-mono text-slate-300/80 px-2 py-0.5 rounded bg-black/25 border border-white/10">
+                            ISO/IEC 27001
+                        </span>
+                    </div>
+
+                    <p class="text-xs font-bold uppercase tracking-widest text-sky-300/90 mb-1.5">
+                        Cổng Thông Tin Đào Tạo Đại Học
+                    </p>
+                    <h1 class="text-2xl sm:text-[26px] font-extrabold text-white leading-tight mb-3">
+                        Hệ Thống Quản Lý Điểm &amp; Học Vụ Số
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-200/85 leading-relaxed mb-6">
+                        Nền tảng quản trị đào tạo theo học chế tín chỉ, tra cứu kết quả học tập, xét chuẩn đầu ra tốt nghiệp và phúc khảo trực tuyến dành cho Giảng viên, Sinh viên &amp; Phòng Đào tạo.
+                    </p>
+
+                    <!-- Academic Pillars -->
+                    <div class="space-y-2.5 border-t border-white/15 pt-5 text-xs text-slate-200">
+                        <div class="flex items-start gap-2.5">
+                            <div class="w-6 h-6 rounded-md bg-sky-400/15 border border-sky-300/30 flex items-center justify-center shrink-0 mt-0.5">
+                                <i data-lucide="award" class="w-3.5 h-3.5 text-sky-300"></i>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-white">Quản trị Điểm số &amp; Xét Tốt nghiệp</div>
+                                <div class="text-slate-300/80 text-[11px]">Tính điểm động theo trọng số (10% - 30% - 60%) và đối chiếu khung CTĐT tự động.</div>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-2.5">
+                            <div class="w-6 h-6 rounded-md bg-emerald-400/15 border border-emerald-300/30 flex items-center justify-center shrink-0 mt-0.5">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-300"></i>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-white">Bảo mật Đa lớp &amp; Khôi phục OTP</div>
+                                <div class="text-slate-300/80 text-[11px]">Giới hạn số lần đăng nhập sai chống dò mật khẩu &amp; xác thực OTP qua Email.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <h1 class="text-2xl font-extrabold text-text-primary leading-snug mb-3">
-                    Hệ Thống Quản Lý Điểm Sinh Viên
-                </h1>
-                <p class="text-sm text-text-muted leading-relaxed">
-                    Nền tảng quản trị đào tạo tín chỉ, xét điều kiện tốt nghiệp, nhập điểm động theo trọng số và phúc khảo trực tuyến được xây dựng trên kiến trúc <strong class="text-text-primary">ASP.NET Core MVC & SQL Server</strong>.
-                </p>
+
+                <!-- Demo Accounts Vault (Protected by Eye Button + Passcode 123456) -->
+                <div class="relative z-10 mt-8 pt-5 border-t border-white/15">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-300"></i>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-200">
+                                Tài khoản Demo Hệ thống
+                            </span>
+                        </div>
+                        <button type="button"
+                                id="btn-toggle-demo-vault"
+                                onclick="handleDemoEyeClick()"
+                                title="Nhấn để mở khóa / ẩn danh sách tài khoản Demo"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-sky-200 transition-all cursor-pointer">
+                            <i id="demo-eye-icon" data-lucide="eye" class="w-3.5 h-3.5"></i>
+                            <span id="demo-eye-label">Hiện Demo</span>
+                        </button>
+                    </div>
+
+                    <!-- Locked state banner -->
+                    <div id="demo-locked-hint" class="mt-2.5 p-3 rounded-lg bg-black/25 border border-white/10 flex items-center justify-between gap-2 text-xs text-slate-300">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-300 shrink-0"></i>
+                            <span>Danh sách tài khoản Demo đang được ẩn bảo mật. Nhấn biểu tượng <strong>Con mắt</strong> để mở khóa.</span>
+                        </div>
+                    </div>
+
+                    <!-- Unlocked Passcode Box (inline prompt when clicking eye) -->
+                    <div id="demo-passcode-box" class="hidden mt-2.5 p-3 rounded-lg bg-slate-900/90 border border-sky-400/40 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-semibold text-sky-200 flex items-center gap-1.5">
+                                <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-300"></i>
+                                Nhập mật khẩu mở khóa Demo
+                            </span>
+                            <button type="button" onclick="closeDemoPasscodePrompt()" class="text-slate-400 hover:text-white">
+                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input id="demo-vault-password"
+                                   type="password"
+                                   placeholder="Nhập mật khẩu bảo vệ..."
+                                   onkeydown="if(event.key==='Enter'){event.preventDefault();verifyDemoPasscode();}"
+                                   class="w-full px-2.5 py-1.5 rounded bg-slate-800 border border-slate-600 text-xs text-white placeholder-slate-400 focus:border-sky-400 outline-none font-mono" />
+                            <button type="button"
+                                    onclick="verifyDemoPasscode()"
+                                    class="px-3 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shrink-0 transition-colors">
+                                Mở khóa
+                            </button>
+                        </div>
+                        <div id="demo-passcode-error" class="hidden text-[11px] text-rose-300 font-medium"></div>
+                    </div>
+
+                    <!-- Unlocked Demo Accounts Grid -->
+                    <div id="demo-accounts-grid" class="hidden mt-3 space-y-2">
+                        <div class="text-[11px] text-sky-200/90 flex items-center justify-between">
+                            <span>Click vào thẻ để tự động điền thông tin:</span>
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">Đã mở khóa</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <button type="button" onclick="fillDemo('admin','admin123')" class="edu-demo-chip p-2.5 text-left">
+                                <div class="font-bold text-sky-300 flex items-center justify-between">
+                                    <span>Quản trị viên</span>
+                                    <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-70"></i>
+                                </div>
+                                <div class="text-slate-300 text-[11px] font-mono mt-0.5">admin / admin123</div>
+                            </button>
+                            <button type="button" onclick="fillDemo('GV001','123456')" class="edu-demo-chip p-2.5 text-left">
+                                <div class="font-bold text-emerald-300 flex items-center justify-between">
+                                    <span>Giảng viên</span>
+                                    <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-70"></i>
+                                </div>
+                                <div class="text-slate-300 text-[11px] font-mono mt-0.5">GV001 / 123456</div>
+                            </button>
+                            <button type="button" onclick="fillDemo('SV001','123456')" class="edu-demo-chip p-2.5 text-left">
+                                <div class="font-bold text-amber-300 flex items-center justify-between">
+                                    <span>Sinh viên</span>
+                                    <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-70"></i>
+                                </div>
+                                <div class="text-slate-300 text-[11px] font-mono mt-0.5">SV001 / 123456</div>
+                            </button>
+                            <button type="button" onclick="fillDemo('khaothi','123456')" class="edu-demo-chip p-2.5 text-left">
+                                <div class="font-bold text-purple-300 flex items-center justify-between">
+                                    <span>Phòng Khảo thí</span>
+                                    <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-70"></i>
+                                </div>
+                                <div class="text-slate-300 text-[11px] font-mono mt-0.5">khaothi / 123456</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Quick Demo Accounts -->
-            <div class="mt-8 pt-6 border-t border-surface-hover">
-                <div class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Tài khoản Demo (Click để điền nhanh)</div>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <button type="button" onclick="fillDemo('admin','admin123')" class="p-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-left transition-all">
-                        <div class="font-bold text-primary">Quản trị viên</div>
-                        <div class="text-text-muted text-[11px]">admin / admin123</div>
+            <!-- Right Column: Authentication Form -->
+            <div class="lg:col-span-7 p-7 sm:p-10 lg:p-11 flex flex-col justify-center bg-surface">
+                <!-- Header -->
+                <div class="mb-6 pb-4 border-b border-surface-hover flex items-start justify-between gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary mb-1">
+                            <i data-lucide="landmark" class="w-3.5 h-3.5"></i>
+                            <span>Xác thực Tập trung (SSO)</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-text-primary tracking-tight">Đăng nhập Hệ thống</h2>
+                        <p class="text-xs sm:text-sm text-text-muted mt-1">
+                            Sử dụng Mã số Sinh viên, Mã Giảng viên hoặc Tài khoản Quản trị được cấp
+                        </p>
+                    </div>
+                    <div class="hidden sm:flex flex-col items-end text-right shrink-0">
+                        <span class="text-[11px] font-semibold uppercase tracking-wider text-text-muted"> Bảo vệ đăng nhập</span>
+                        <span id="attempt-indicator-badge" class="mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 tabular-nums">
+                            <i data-lucide="shield" class="w-3 h-3"></i>
+                            <span id="attempt-indicator-text">Tối đa 5 lần thử</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Lockout Countdown Alert -->
+                <div id="login-lockout-banner" class="hidden mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/35 text-amber-700 dark:text-amber-300 text-xs space-y-1.5">
+                    <div class="flex items-center justify-between font-bold text-sm">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="timer-off" class="w-4 h-4 text-amber-500 shrink-0"></i>
+                            <span>Tạm khóa đăng nhập bảo mật</span>
+                        </span>
+                        <span id="lockout-timer-badge" class="px-2.5 py-0.5 rounded bg-amber-500/20 font-mono text-xs font-extrabold tabular-nums">05:00</span>
+                    </div>
+                    <p id="lockout-message-detail" class="leading-relaxed">
+                        Bạn đã nhập sai thông tin quá số lần quy định. Vui lòng đợi hết thời gian đếm ngược hoặc sử dụng chức năng <strong>Quên mật khẩu</strong> để đặt lại bằng OTP.
+                    </p>
+                </div>
+
+                <!-- Standard Error Alert -->
+                <div id="login-error" class="hidden mb-4 p-3.5 rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 text-[#ef4444] text-xs sm:text-sm font-medium flex items-start gap-2.5">
+                    <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                    <div id="login-error-text" class="flex-1"></div>
+                </div>
+
+                <form id="login-form" onsubmit="submitLogin(event)" class="space-y-5">
+                    <div>
+                        <label for="username" class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                            Tên đăng nhập / Mã SV / Mã GV <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <i data-lucide="user-check" class="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                            <input id="username"
+                                   type="text"
+                                   required
+                                   autocomplete="username"
+                                   placeholder="VD: SV001, GV001 hoặc admin..."
+                                   class="edu-input w-full pl-10 pr-4 py-3 text-sm font-medium" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="password" class="block text-xs font-bold uppercase tracking-wider text-text-muted">
+                                Mật khẩu <span class="text-rose-500">*</span>
+                            </label>
+                            <button type="button"
+                                    onclick="openForgotPasswordModal()"
+                                    class="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer">
+                                <i data-lucide="mail-question" class="w-3.5 h-3.5"></i>
+                                <span>Quên mật khẩu? (Nhận OTP)</span>
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <i data-lucide="lock" class="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                            <input id="password"
+                                   type="password"
+                                   required
+                                   autocomplete="current-password"
+                                   placeholder="Nhập mật khẩu của bạn..."
+                                   class="edu-input w-full pl-10 pr-11 py-3 text-sm font-medium" />
+                            <button type="button"
+                                    onclick="toggleMainPasswordVisibility()"
+                                    title="Hiện / Ẩn mật khẩu"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-primary transition-colors">
+                                <i id="main-pwd-eye" data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="btn-submit"
+                            type="submit"
+                            class="edu-primary-btn w-full py-3.5 px-6 text-sm flex items-center justify-center gap-2 cursor-pointer">
+                        <i data-lucide="log-in" class="w-4 h-4"></i>
+                        <span id="btn-submit-text">Đăng Nhập Hệ Thống Đào Tạo</span>
                     </button>
-                    <button type="button" onclick="fillDemo('GV001','123456')" class="p-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-left transition-all">
-                        <div class="font-bold text-[#10B981]">Giảng viên</div>
-                        <div class="text-text-muted text-[11px]">GV001 / 123456</div>
-                    </button>
-                    <button type="button" onclick="fillDemo('SV001','123456')" class="p-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-left transition-all">
-                        <div class="font-bold text-amber-400">Sinh viên</div>
-                        <div class="text-text-muted text-[11px]">SV001 / 123456</div>
-                    </button>
-                    <button type="button" onclick="fillDemo('khaothi','123456')" class="p-2.5 rounded-xl bg-canvas border border-surface-hover hover:border-primary text-left transition-all">
-                        <div class="font-bold text-purple-400">Phòng Khảo thí</div>
-                        <div class="text-text-muted text-[11px]">khaothi / 123456</div>
+                </form>
+
+                <!-- Footer Help Info -->
+                <div class="mt-7 pt-5 border-t border-surface-hover flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
+                    <div class="flex items-center gap-1.5">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-primary shrink-0"></i>
+                        <span>Hỗ trợ kỹ thuật Phòng Đào tạo: <strong>voty365@gmail.com</strong></span>
+                    </div>
+                    <button type="button" onclick="openForgotPasswordModal()" class="text-primary font-semibold hover:underline">
+                        Khôi phục mật khẩu qua OTP →
                     </button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Right Form -->
-        <div class="lg:col-span-7 p-8 sm:p-10 flex flex-col justify-center">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-text-primary">Đăng nhập hệ thống</h2>
-                <p class="text-sm text-text-muted mt-1">Vui lòng nhập thông tin tài khoản đào tạo của bạn</p>
+    <!-- Bottom Copyright -->
+    <footer class="w-full max-w-5xl mx-auto text-center py-2 text-xs text-text-muted">
+        © @DateTime.Now.Year Hệ thống Quản lý Điểm &amp; Học vụ Số Academic Ledger • Xây dựng trên ASP.NET Core 8.0 MVC &amp; SQL Server
+    </footer>
+</div>
+
+<!-- MODAL: QUÊN MẬT KHẨU & XÁC THỰC OTP QUA EMAIL -->
+<div id="forgot-password-modal" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-surface border border-surface-hover rounded-2xl shadow-2xl overflow-hidden" style="border-top: 4px solid #0f3d75;">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 bg-surface-header border-b border-surface-hover flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+                    <i data-lucide="mail-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-extrabold text-text-primary leading-tight">Khôi phục Mật khẩu bằng OTP</h3>
+                    <p class="text-[11px] text-text-muted">Xác thực mã OTP 6 số gửi qua Email học vụ</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeForgotPasswordModal()" class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 space-y-4">
+            <!-- Notice about Demo Email Routing -->
+            <div class="p-3 rounded-lg bg-sky-500/10 border border-sky-500/25 text-xs text-text-primary leading-relaxed flex items-start gap-2.5">
+                <i data-lucide="mail" class="w-4 h-4 text-sky-500 shrink-0 mt-0.5"></i>
+                <div>
+                    Mã xác thực OTP sẽ được gửi trực tiếp về hộp thư quản trị đào tạo:
+                    <strong class="font-mono text-primary underline">voty365@gmail.com</strong>
+                </div>
             </div>
 
-            <div id="login-error" class="hidden mb-4 p-3.5 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/30 text-[#ef4444] text-sm font-medium"></div>
+            <!-- Alert box inside Modal -->
+            <div id="forgot-modal-alert" class="hidden p-3 rounded-lg text-xs font-medium"></div>
 
-            <form id="login-form" onsubmit="submitLogin(event)" class="space-y-5">
+            <!-- STEP 1: Enter Username & Request OTP -->
+            <div id="forgot-step-1" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">Tên đăng nhập / Mã SV / Mã GV</label>
+                    <label for="forgot-username" class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        Tên đăng nhập / Mã SV / Mã GV cần lấy lại mật khẩu <span class="text-rose-500">*</span>
+                    </label>
                     <div class="relative">
                         <i data-lucide="user" class="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                        <input id="username" type="text" required placeholder="Nhập tên đăng nhập..."
-                               class="w-full bg-canvas border border-surface-hover rounded-xl pl-10 pr-4 py-3 text-sm text-text-primary focus:border-primary outline-none transition-colors" />
+                        <input id="forgot-username"
+                               type="text"
+                               placeholder="VD: SV001, GV001, admin..."
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();requestForgotPasswordOtp();}"
+                               class="edu-input w-full pl-10 pr-4 py-2.5 text-sm font-medium" />
                     </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button"
+                            onclick="closeForgotPasswordModal()"
+                            class="px-4 py-2.5 rounded-lg border border-surface-hover text-xs font-semibold text-text-muted hover:text-text-primary transition-colors">
+                        Hủy bỏ
+                    </button>
+                    <button type="button"
+                            id="btn-send-otp"
+                            onclick="requestForgotPasswordOtp()"
+                            class="edu-primary-btn px-5 py-2.5 text-xs flex items-center gap-2 cursor-pointer">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span id="btn-send-otp-text">Gửi mã OTP qua Email</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: Verify OTP & Set New Password -->
+            <div id="forgot-step-2" class="hidden space-y-4">
+                <div class="flex items-center justify-between text-xs bg-canvas px-3 py-2 rounded-lg border border-surface-hover">
+                    <span class="text-text-muted">Tài khoản khôi phục: <strong id="forgot-target-user" class="text-text-primary font-mono"></strong></span>
+                    <button type="button" onclick="backToForgotStep1()" class="text-primary font-semibold hover:underline">Đổi tài khoản</button>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">Mật khẩu</label>
-                    <div class="relative">
-                        <i data-lucide="lock" class="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                        <input id="password" type="password" required placeholder="Nhập mật khẩu..."
-                               class="w-full bg-canvas border border-surface-hover rounded-xl pl-10 pr-4 py-3 text-sm text-text-primary focus:border-primary outline-none transition-colors" />
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="forgot-otp-code" class="block text-xs font-bold uppercase tracking-wider text-text-muted">
+                            Mã xác thực OTP (6 chữ số) <span class="text-rose-500">*</span>
+                        </label>
+                        <button type="button" onclick="requestForgotPasswordOtp()" class="text-[11px] font-semibold text-primary hover:underline">
+                            Gửi lại mã OTP
+                        </button>
                     </div>
+                    <input id="forgot-otp-code"
+                           type="text"
+                           maxlength="6"
+                           inputmode="numeric"
+                           placeholder="Nhập 6 số OTP trong email..."
+                           class="edu-input w-full px-4 py-2.5 text-center text-base font-mono font-extrabold tracking-[0.35em]" />
                 </div>
 
-                <button id="btn-submit" type="submit"
-                        class="w-full py-3 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2">
-                    <i data-lucide="log-in" class="w-4 h-4"></i>
-                    <span>Đăng Nhập Hệ Thống</span>
-                </button>
-            </form>
+                <div>
+                    <label for="forgot-new-password" class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        Mật khẩu mới (Tối thiểu 6 ký tự) <span class="text-rose-500">*</span>
+                    </label>
+                    <input id="forgot-new-password"
+                           type="password"
+                           placeholder="Nhập mật khẩu mới..."
+                           class="edu-input w-full px-3.5 py-2.5 text-sm" />
+                </div>
+
+                <div>
+                    <label for="forgot-confirm-password" class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                        Xác nhận mật khẩu mới <span class="text-rose-500">*</span>
+                    </label>
+                    <input id="forgot-confirm-password"
+                           type="password"
+                           placeholder="Nhập lại mật khẩu mới..."
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();submitResetPasswordWithOtp();}"
+                           class="edu-input w-full px-3.5 py-2.5 text-sm" />
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button"
+                            onclick="closeForgotPasswordModal()"
+                            class="px-4 py-2.5 rounded-lg border border-surface-hover text-xs font-semibold text-text-muted hover:text-text-primary transition-colors">
+                        Đóng
+                    </button>
+                    <button type="button"
+                            id="btn-confirm-reset"
+                            onclick="submitResetPasswordWithOtp()"
+                            class="edu-primary-btn px-5 py-2.5 text-xs flex items-center gap-2 cursor-pointer">
+                        <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                        <span id="btn-confirm-reset-text">Xác nhận Đặt lại Mật khẩu</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
+        let demoVaultUnlocked = false;
+        let lockoutCountdownInterval = null;
+
+        // 1. Bảo mật danh sách Tài khoản Demo bằng biểu tượng Con mắt + mật khẩu (123456)
+        function handleDemoEyeClick() {
+            const grid = document.getElementById('demo-accounts-grid');
+            const hint = document.getElementById('demo-locked-hint');
+            const passBox = document.getElementById('demo-passcode-box');
+            const errEl = document.getElementById('demo-passcode-error');
+            const input = document.getElementById('demo-vault-password');
+
+            if (demoVaultUnlocked) {
+                // Đang mở -> bấm mắt sẽ ẩn lại
+                demoVaultUnlocked = false;
+                grid.classList.add('hidden');
+                passBox.classList.add('hidden');
+                hint.classList.remove('hidden');
+                updateDemoEyeButton(false);
+                return;
+            }
+
+            // Chưa mở -> hiện ô nhập mật khẩu
+            hint.classList.add('hidden');
+            passBox.classList.remove('hidden');
+            errEl.classList.add('hidden');
+            input.value = '';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeDemoPasscodePrompt() {
+            document.getElementById('demo-passcode-box').classList.add('hidden');
+            if (!demoVaultUnlocked) {
+                document.getElementById('demo-locked-hint').classList.remove('hidden');
+            }
+        }
+
+        function verifyDemoPasscode() {
+            const input = document.getElementById('demo-vault-password');
+            const errEl = document.getElementById('demo-passcode-error');
+            const val = (input.value || '').trim();
+
+            if (val === '123456') {
+                demoVaultUnlocked = true;
+                document.getElementById('demo-passcode-box').classList.add('hidden');
+                document.getElementById('demo-locked-hint').classList.add('hidden');
+                document.getElementById('demo-accounts-grid').classList.remove('hidden');
+                updateDemoEyeButton(true);
+                window.showToast('Đã mở khóa danh sách tài khoản Demo!');
+            } else {
+                errEl.textContent = 'Mật khẩu mở khóa Demo không đúng! Vui lòng thử lại.';
+                errEl.classList.remove('hidden');
+                input.select();
+            }
+        }
+
+        function updateDemoEyeButton(unlocked) {
+            const label = document.getElementById('demo-eye-label');
+            const icon = document.getElementById('demo-eye-icon');
+            if (label) label.textContent = unlocked ? 'Ẩn Demo' : 'Hiện Demo';
+            if (icon) {
+                icon.setAttribute('data-lucide', unlocked ? 'eye-off' : 'eye');
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+
         function fillDemo(u, p) {
-            document.getElementById('username').value = u;
-            document.getElementById('password').value = p;
+            const uInput = document.getElementById('username');
+            const pInput = document.getElementById('password');
+            if (!uInput.disabled) {
+                uInput.value = u;
+                pInput.value = p;
+                uInput.focus();
+            }
+        }
+
+        function toggleMainPasswordVisibility() {
+            const pwdInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('main-pwd-eye');
+            const isPwd = pwdInput.type === 'password';
+            pwdInput.type = isPwd ? 'text' : 'password';
+            if (eyeIcon) {
+                eyeIcon.setAttribute('data-lucide', isPwd ? 'eye-off' : 'eye');
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+
+        // 2. Xử lý Giới hạn số lần đăng nhập & Đếm ngược tạm khóa (Lockout Timer)
+        function updateAttemptBadge(remaining, max = 5) {
+            const badge = document.getElementById('attempt-indicator-badge');
+            const text = document.getElementById('attempt-indicator-text');
+            if (!badge || !text) return;
+
+            if (remaining === 0) {
+                badge.className = 'mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30 tabular-nums';
+                text.textContent = 'Đã khóa tạm thời';
+            } else if (remaining <= 2) {
+                badge.className = 'mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30 tabular-nums';
+                text.textContent = `Còn ${remaining}/${max} lần thử`;
+            } else {
+                badge.className = 'mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 tabular-nums';
+                text.textContent = `Còn ${remaining}/${max} lần thử`;
+            }
+        }
+
+        function startLockoutCountdown(seconds, customMessage) {
+            const banner = document.getElementById('login-lockout-banner');
+            const timerBadge = document.getElementById('lockout-timer-badge');
+            const detail = document.getElementById('lockout-message-detail');
+            const btnSubmit = document.getElementById('btn-submit');
+            const pwdInput = document.getElementById('password');
+
+            if (lockoutCountdownInterval) clearInterval(lockoutCountdownInterval);
+
+            banner.classList.remove('hidden');
+            if (customMessage && detail) detail.textContent = customMessage;
+            btnSubmit.disabled = true;
+            pwdInput.disabled = true;
+            updateAttemptBadge(0);
+
+            let remaining = Number(seconds) || 300;
+            const renderTime = (sec) => {
+                const m = String(Math.floor(sec / 60)).padStart(2, '0');
+                const s = String(sec % 60).padStart(2, '0');
+                if (timerBadge) timerBadge.textContent = `${m}:${s}`;
+            };
+
+            renderTime(remaining);
+            lockoutCountdownInterval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(lockoutCountdownInterval);
+                    banner.classList.add('hidden');
+                    btnSubmit.disabled = false;
+                    pwdInput.disabled = false;
+                    updateAttemptBadge(5, 5);
+                } else {
+                    renderTime(remaining);
+                }
+            }, 1000);
         }
 
         async function submitLogin(e) {
             e.preventDefault();
             const errBox = document.getElementById('login-error');
+            const errText = document.getElementById('login-error-text');
             const btn = document.getElementById('btn-submit');
+            const btnText = document.getElementById('btn-submit-text');
+
             errBox.classList.add('hidden');
             btn.disabled = true;
+            if (btnText) btnText.textContent = 'Đang xác thực...';
 
             try {
                 const username = document.getElementById('username').value.trim();
                 const password = document.getElementById('password').value;
-                const res = await window.apiFetch('/api/auth/login', {
+
+                const response = await fetch('/api/auth/login', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
+
+                const res = await response.json().catch(() => ({}));
+
+                if (!response.ok || res.status === 'error') {
+                    if (typeof res.remainingAttempts === 'number') {
+                        updateAttemptBadge(res.remainingAttempts, res.maxAttempts || 5);
+                    }
+                    if (response.status === 429 || res.locked) {
+                        startLockoutCountdown(res.retryAfterSeconds || 300, res.message);
+                        return;
+                    }
+                    throw new Error(res.message || 'Đăng nhập thất bại!');
+                }
 
                 if (res.data?.accessToken) {
                     localStorage.setItem('accessToken', res.data.accessToken);
@@ -109,10 +727,144 @@
                 window.showToast('Đăng nhập thành công!');
                 window.location.href = '/';
             } catch (err) {
-                errBox.textContent = err.message || 'Đăng nhập thất bại!';
+                errText.textContent = err.message || 'Đăng nhập thất bại!';
                 errBox.classList.remove('hidden');
             } finally {
+                if (!document.getElementById('password').disabled) {
+                    btn.disabled = false;
+                }
+                if (btnText) btnText.textContent = 'Đăng Nhập Hệ Thống Đào Tạo';
+            }
+        }
+
+        // 3. Xử lý Quên mật khẩu & Gửi OTP qua Email (voty365@gmail.com)
+        function showForgotAlert(message, type = 'error') {
+            const box = document.getElementById('forgot-modal-alert');
+            if (!box) return;
+            box.classList.remove('hidden');
+            if (type === 'success') {
+                box.className = 'p-3 rounded-lg text-xs font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
+            } else {
+                box.className = 'p-3 rounded-lg text-xs font-medium bg-rose-500/10 border border-rose-500/30 text-rose-500';
+            }
+            box.textContent = message;
+        }
+
+        function openForgotPasswordModal() {
+            const modal = document.getElementById('forgot-password-modal');
+            const loginUser = document.getElementById('username').value.trim();
+            const forgotUser = document.getElementById('forgot-username');
+
+            if (loginUser) forgotUser.value = loginUser;
+            document.getElementById('forgot-modal-alert').classList.add('hidden');
+            backToForgotStep1();
+            modal.classList.remove('hidden');
+            setTimeout(() => forgotUser.focus(), 50);
+        }
+
+        function closeForgotPasswordModal() {
+            document.getElementById('forgot-password-modal').classList.add('hidden');
+        }
+
+        function backToForgotStep1() {
+            document.getElementById('forgot-step-1').classList.remove('hidden');
+            document.getElementById('forgot-step-2').classList.add('hidden');
+            document.getElementById('forgot-modal-alert').classList.add('hidden');
+        }
+
+        async function requestForgotPasswordOtp() {
+            const uname = document.getElementById('forgot-username').value.trim();
+            const btn = document.getElementById('btn-send-otp');
+            const btnText = document.getElementById('btn-send-otp-text');
+
+            if (!uname) {
+                showForgotAlert('Vui lòng nhập Tên đăng nhập / Mã SV / Mã GV cần khôi phục!');
+                return;
+            }
+
+            btn.disabled = true;
+            if (btnText) btnText.textContent = 'Đang gửi OTP...';
+            document.getElementById('forgot-modal-alert').classList.add('hidden');
+
+            try {
+                const res = await window.apiFetch('/api/auth/forgot-password/send-otp', {
+                    method: 'POST',
+                    body: JSON.stringify({ username: uname })
+                });
+
+                document.getElementById('forgot-target-user').textContent = uname;
+                document.getElementById('forgot-step-1').classList.add('hidden');
+                document.getElementById('forgot-step-2').classList.remove('hidden');
+                document.getElementById('forgot-otp-code').value = '';
+                document.getElementById('forgot-new-password').value = '';
+                document.getElementById('forgot-confirm-password').value = '';
+
+                showForgotAlert(res.message || 'Đã gửi mã OTP tới voty365@gmail.com!', 'success');
+                window.showToast('Đã gửi mã OTP tới email voty365@gmail.com');
+                setTimeout(() => document.getElementById('forgot-otp-code').focus(), 60);
+            } catch (err) {
+                showForgotAlert(err.message || 'Không thể gửi mã OTP!');
+            } finally {
                 btn.disabled = false;
+                if (btnText) btnText.textContent = 'Gửi mã OTP qua Email';
+            }
+        }
+
+        async function submitResetPasswordWithOtp() {
+            const username = document.getElementById('forgot-username').value.trim();
+            const otpCode = document.getElementById('forgot-otp-code').value.trim();
+            const newPassword = document.getElementById('forgot-new-password').value;
+            const confirmPassword = document.getElementById('forgot-confirm-password').value;
+            const btn = document.getElementById('btn-confirm-reset');
+            const btnText = document.getElementById('btn-confirm-reset-text');
+
+            if (!otpCode || otpCode.length !== 6) {
+                showForgotAlert('Vui lòng nhập đủ 6 chữ số của mã xác thực OTP!');
+                return;
+            }
+            if (!newPassword || newPassword.length < 6) {
+                showForgotAlert('Mật khẩu mới phải có ít nhất 6 ký tự!');
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                showForgotAlert('Mật khẩu xác nhận không khớp!');
+                return;
+            }
+
+            btn.disabled = true;
+            if (btnText) btnText.textContent = 'Đang cập nhật...';
+
+            try {
+                const res = await window.apiFetch('/api/auth/forgot-password/reset', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username,
+                        otpCode,
+                        newPassword,
+                        confirmPassword
+                    })
+                });
+
+                window.showToast(res.message || 'Đặt lại mật khẩu thành công!');
+                closeForgotPasswordModal();
+
+                // Nếu tài khoản đang bị khóa đếm ngược thì mở khóa luôn trên giao diện
+                if (lockoutCountdownInterval) clearInterval(lockoutCountdownInterval);
+                document.getElementById('login-lockout-banner').classList.add('hidden');
+                document.getElementById('login-error').classList.add('hidden');
+                document.getElementById('password').disabled = false;
+                document.getElementById('btn-submit').disabled = false;
+                updateAttemptBadge(5, 5);
+
+                // Điền sẵn tài khoản vừa đổi mật khẩu
+                document.getElementById('username').value = username;
+                document.getElementById('password').value = '';
+                document.getElementById('password').focus();
+            } catch (err) {
+                showForgotAlert(err.message || 'Xác thực OTP thất bại!');
+            } finally {
+                btn.disabled = false;
+                if (btnText) btnText.textContent = 'Xác nhận Đặt lại Mật khẩu';
             }
         }
     </script>

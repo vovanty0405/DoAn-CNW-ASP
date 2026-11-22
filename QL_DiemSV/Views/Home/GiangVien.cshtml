@@ -35,13 +35,13 @@
     <div class="admin-filter-card bg-surface border border-surface-hover rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input id="gv-search" oninput="renderGvTable()" type="text" placeholder="Tìm Mã GV, Họ tên, Email..."
+            <input id="gv-search" oninput="queueGvSearch()" type="text" placeholder="Tìm Mã GV, Họ tên, Email..."
                    class="w-full bg-canvas border border-surface-hover rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary focus:border-primary outline-none" />
         </div>
-        <select id="gv-khoa" onchange="renderGvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+        <select id="gv-khoa" onchange="renderGvTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
             <option value="">Tất cả Khoa</option>
         </select>
-        <select id="gv-hocvi" onchange="renderGvTable()" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
+        <select id="gv-hocvi" onchange="renderGvTable(true)" class="bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary focus:border-primary outline-none">
             <option value="">Tất cả Học vị</option>
             <option value="Cử nhân">Cử nhân / Kỹ sư</option>
             <option value="Thạc sĩ">Thạc sĩ</option>
@@ -119,7 +119,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Mã Giảng Viên *</label>
-                    <input id="g-magv" required class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
+                    <input id="g-magv" required maxlength="20" pattern="[A-Za-z0-9_\-]{1,20}" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Họ và Tên *</label>
@@ -145,7 +145,11 @@
                 </div>
                 <div>
                     <label class="block text-xs text-text-muted mb-1">Số điện thoại</label>
-                    <input id="g-sdt" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
+                    <input id="g-sdt" type="tel" inputmode="numeric" maxlength="11" pattern="[0-9]{10,11}" title="Nhập 10 hoặc 11 chữ số" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label for="g-cccd" class="block text-xs text-text-muted mb-1">Số CCCD</label>
+                    <input id="g-cccd" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" title="Nhập đúng 12 chữ số" class="w-full bg-canvas border border-surface-hover rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary" />
                 </div>
             </div>
             <div class="pt-4 border-t border-surface-hover flex justify-end gap-3">
@@ -275,16 +279,17 @@
 
         let gvList = [], khoas = [], editingMaGV = null, editingMaKhoa = null;
         let gvCurrentPage = 1, gvPageSize = 10;
-        let gvSortCol = 'magv', gvSortDir = 'asc';
+        let gvSortCol = 'magv', gvSortDir = 'asc', gvSortParam = 'magv_asc';
+        let gvRequest = 0, gvSearchTimer;
         let pendingDeleteAction = null;
 
+        function queueGvSearch() {
+            clearTimeout(gvSearchTimer);
+            gvSearchTimer = setTimeout(() => renderGvTable(true), 250);
+        }
+
         async function loadData() {
-            const sortVal = document.getElementById('gv-sort')?.value || 'magv_asc';
-            const [resGv, resKhoa] = await Promise.all([
-                apiFetch(`/api/giangvien?sort=${encodeURIComponent(sortVal)}`),
-                apiFetch('/api/khoa')
-            ]);
-            gvList = resGv.data || [];
+            const resKhoa = await apiFetch('/api/khoa');
             khoas = resKhoa.data || [];
 
             const prevGvKhoa = document.getElementById('gv-khoa').value;
@@ -292,11 +297,12 @@
             document.getElementById('gv-khoa').value = prevGvKhoa;
             document.getElementById('g-makhoa').innerHTML = khoas.map(k => `<option value="${k.MaKhoa}">${k.TenKhoa}</option>`).join('');
 
-            renderGvTable();
+            await renderGvTable();
             renderKhoaTable();
         }
 
         async function onGvSortDropdownChange(val) {
+            gvSortParam = val;
             if (val === 'newest' || val === 'oldest') {
                 gvSortCol = '';
             } else {
@@ -305,10 +311,7 @@
                 gvSortDir = parts[1] || 'asc';
             }
             updateGvSortIcons();
-            const resGv = await apiFetch(`/api/giangvien?sort=${encodeURIComponent(val)}`);
-            gvList = resGv.data || [];
-            gvCurrentPage = 1;
-            renderGvTable();
+            await renderGvTable(true);
         }
 
         async function sortGvByColumn(col) {
@@ -319,15 +322,13 @@
                 gvSortDir = 'asc';
             }
             const sortKey = `${gvSortCol}_${gvSortDir}`;
+            gvSortParam = sortKey;
             const selectEl = document.getElementById('gv-sort');
             if (selectEl && [...selectEl.options].some(o => o.value === sortKey)) {
                 selectEl.value = sortKey;
             }
             updateGvSortIcons();
-            const resGv = await apiFetch(`/api/giangvien?sort=${encodeURIComponent(sortKey)}`);
-            gvList = resGv.data || [];
-            gvCurrentPage = 1;
-            renderGvTable();
+            await renderGvTable(true);
         }
 
         function updateGvSortIcons() {
@@ -344,29 +345,34 @@
             });
         }
 
-        function getFilteredGv() {
-            const q = document.getElementById('gv-search').value.toLowerCase().trim();
-            const maKhoa = document.getElementById('gv-khoa').value;
-            const hocVi = document.getElementById('gv-hocvi').value;
-
-            return gvList.filter(g => {
-                const mQ = !q || g.MaGV.toLowerCase().includes(q) || g.HoTen.toLowerCase().includes(q) || (g.Email || '').toLowerCase().includes(q);
-                const mK = !maKhoa || g.MaKhoa === maKhoa;
-                const mH = !hocVi || (g.HocVi || '').includes(hocVi);
-                return mQ && mK && mH;
+        async function renderGvTable(resetPage = false) {
+            if (resetPage) gvCurrentPage = 1;
+            const request = ++gvRequest;
+            const params = new URLSearchParams({
+                page: gvCurrentPage,
+                pageSize: gvPageSize,
+                search: document.getElementById('gv-search').value.trim(),
+                maKhoa: document.getElementById('gv-khoa').value,
+                hocVi: document.getElementById('gv-hocvi').value,
+                sort: gvSortParam
             });
-        }
 
-        function renderGvTable() {
-            const filtered = getFilteredGv();
-            const totalItems = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(totalItems / gvPageSize));
-            if (gvCurrentPage > totalPages) gvCurrentPage = totalPages;
-            if (gvCurrentPage < 1) gvCurrentPage = 1;
+            let response;
+            try {
+                response = await apiFetch('/api/giangvien?' + params.toString());
+            } catch (err) {
+                if (request === gvRequest) showToast(err.message, 'error');
+                return;
+            }
+            if (request !== gvRequest) return;
 
+            gvList = response.data || [];
+            gvCurrentPage = response.page || 1;
+            const totalItems = response.total ?? gvList.length;
+            const totalPages = response.totalPages || 1;
             const startIndex = (gvCurrentPage - 1) * gvPageSize;
-            const endIndex = Math.min(startIndex + gvPageSize, totalItems);
-            const paged = filtered.slice(startIndex, endIndex);
+            const endIndex = Math.min(startIndex + gvList.length, totalItems);
+            const paged = gvList;
 
             const tbody = document.getElementById('gv-tbody');
             if (paged.length === 0) {
@@ -464,6 +470,7 @@
             document.getElementById('g-makhoa').value = gv ? (gv.MaKhoa || khoas[0]?.MaKhoa || '') : (khoas[0]?.MaKhoa || '');
             document.getElementById('g-email').value = gv ? (gv.Email || '') : '';
             document.getElementById('g-sdt').value = gv ? (gv.SDT || '') : '';
+            document.getElementById('g-cccd').value = gv ? (gv.CCCD || '') : '';
             document.getElementById('gv-modal').classList.remove('hidden');
         }
 
@@ -479,7 +486,8 @@
                 HocVi: document.getElementById('g-hocvi').value,
                 MaKhoa: document.getElementById('g-makhoa').value,
                 Email: document.getElementById('g-email').value.trim(),
-                SDT: document.getElementById('g-sdt').value.trim()
+                SDT: document.getElementById('g-sdt').value.trim(),
+                CCCD: document.getElementById('g-cccd').value.trim()
             };
             try {
                 if (editingMaGV) await apiFetch(`/api/giangvien/${editingMaGV}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -664,7 +672,7 @@
 
         function importGvExcel(e) {
             return academicExcel.bulk(e.target, 'Xem trước danh sách giảng viên', '/api/giangvien/bulk',
-                ['MaGV', 'HoTen', 'HocVi', 'MaKhoa', 'Email', 'SDT'], ['MaGV', 'HoTen'], [], loadData);
+                ['MaGV', 'HoTen', 'HocVi', 'MaKhoa', 'Email', 'SDT', 'CCCD'], ['MaGV', 'HoTen'], [], loadData, false, academicExcel.validateProfileContacts);
         }
 
         loadData();

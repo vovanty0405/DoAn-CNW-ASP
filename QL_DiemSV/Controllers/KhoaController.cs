@@ -41,6 +41,9 @@ public class KhoaController : ControllerBase
         if (string.IsNullOrWhiteSpace(model.MaKhoa) || string.IsNullOrWhiteSpace(model.TenKhoa))
             return BadRequest(new { status = "error", message = "Mã khoa và Tên khoa không được để trống" });
 
+        model.MaKhoa = model.MaKhoa.Trim();
+        model.TenKhoa = model.TenKhoa.Trim();
+        if (!ProfileValidation.Code().IsMatch(model.MaKhoa)) return BadRequest(new { message = "Mã khoa không hợp lệ." });
         if (await _db.Khoas.AnyAsync(k => k.MaKhoa == model.MaKhoa))
             return BadRequest(new { status = "error", message = $"Mã khoa {model.MaKhoa} đã tồn tại!" });
 
@@ -57,7 +60,7 @@ public class KhoaController : ControllerBase
         var existing = await _db.Khoas.FindAsync(id);
         if (existing == null) return NotFound(new { status = "error", message = "Không tìm thấy Khoa" });
 
-        existing.TenKhoa = model.TenKhoa;
+        existing.TenKhoa = model.TenKhoa.Trim();
         existing.NgayThanhLap = model.NgayThanhLap;
         existing.TruongKhoa = model.TruongKhoa;
 
