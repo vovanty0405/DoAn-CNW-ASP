@@ -2,6 +2,36 @@
     Layout = "_Layout";
 }
 
+<style>
+    #mh-selected-tags .mh-prereq-chip {
+        background: #1e40af !important;
+        border: 1px solid #60a5fa !important;
+        color: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
+    }
+    #mh-selected-tags .mh-prereq-chip strong,
+    #mh-selected-tags .mh-prereq-chip span {
+        color: #ffffff !important;
+    }
+    #mh-selected-tags .mh-prereq-remove {
+        color: #ffffff !important;
+        background: transparent;
+        border-radius: 4px;
+    }
+    #mh-selected-tags .mh-prereq-remove:hover {
+        background: #172554 !important;
+    }
+    #mh-selected-tags .mh-prereq-remove:focus-visible {
+        outline: 2px solid #ffffff;
+        outline-offset: 2px;
+    }
+    #prereq-count-badge {
+        background: #dbeafe !important;
+        border-color: #93c5fd !important;
+        color: #1e3a8a !important;
+    }
+</style>
+
 <div class="max-w-[1600px] mx-auto space-y-6">
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -513,9 +543,9 @@
                 const subj = catalog.find(x => x.MaMon.toUpperCase() === code.toUpperCase());
                 const name = subj ? subj.TenMon : code;
                 html += `
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold group animate-fadeIn">
-                        <span><strong class="font-mono text-amber-200">${code}</strong> - ${name}</span>
-                        <button type="button" onclick="removePrereqTag('${code}')" title="Xóa môn này" class="text-amber-400 hover:text-white hover:bg-amber-500/30 rounded p-0.5 transition-colors">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg mh-prereq-chip text-xs font-semibold group animate-fadeIn">
+                        <span><strong class="font-mono">${code}</strong> - ${name}</span>
+                        <button type="button" onclick="removePrereqTag('${code}')" title="Xóa môn này" class="mh-prereq-remove p-1 transition-colors">
                             <i data-lucide="x" class="w-3.5 h-3.5"></i>
                         </button>
                     </span>

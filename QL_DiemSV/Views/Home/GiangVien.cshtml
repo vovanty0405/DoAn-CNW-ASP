@@ -663,16 +663,35 @@
             }
         }
 
-        function exportGvExcel() {
-            const ws = XLSX.utils.json_to_sheet(gvList.map(g => ({ MaGV: g.MaGV, HoTen: g.HoTen, HocVi: g.HocVi, MaKhoa: g.MaKhoa, Email: g.Email, SDT: g.SDT })));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'GiangVien');
-            XLSX.writeFile(wb, 'DanhSach_GiangVien.xlsx');
+        async function exportGvExcel() {
+            try {
+                const response = await apiFetch('/api/giangvien');
+                const rows = response.data.map(g => ({
+                    MaGV: g.MaGV, HoTen: g.HoTen,
+                    NgaySinh: g.NgaySinh ? g.NgaySinh.substring(0, 10) : '',
+                    GioiTinh: g.GioiTinh ?? '', HocVi: g.HocVi ?? '', MaKhoa: g.MaKhoa ?? '',
+                    Email: g.Email ?? '', SDT: g.SDT == null ? '' : String(g.SDT),
+                    CCCD: g.CCCD == null ? '' : String(g.CCCD)
+                }));
+                academicExcel.exportFile(rows, 'DanhSach_GiangVien',
+                    ['MaGV', 'HoTen', 'NgaySinh', 'GioiTinh', 'HocVi', 'MaKhoa', 'Email', 'SDT', 'CCCD']);
+            } catch (error) { showToast(error.message, 'error'); }
         }
 
         function importGvExcel(e) {
             return academicExcel.bulk(e.target, 'Xem trước danh sách giảng viên', '/api/giangvien/bulk',
-                ['MaGV', 'HoTen', 'HocVi', 'MaKhoa', 'Email', 'SDT', 'CCCD'], ['MaGV', 'HoTen'], [], loadData, false, academicExcel.validateProfileContacts);
+                ['MaGV', 'HoTen', 'NgaySinh', 'GioiTinh', 'HocVi', 'MaKhoa', 'Email', 'SDT', 'CCCD'],
+                ['MaGV', 'HoTen'], [], loadData, false,
+                value => academicExcel.validateProfileContacts({
+                    ...value, NgaySinh: academicExcel.profileDate(value.NgaySinh)
+                }), {
+                    existingKeys: async codes => (await apiFetch('/api/giangvien/bulk/existing', {
+                        method: 'POST', body: JSON.stringify(codes)
+                    })).data,
+                    verifyRows: async rows => (await apiFetch('/api/giangvien/bulk/preview', {
+                        method: 'POST', body: JSON.stringify(rows)
+                    })).data
+                });
         }
 
         loadData();

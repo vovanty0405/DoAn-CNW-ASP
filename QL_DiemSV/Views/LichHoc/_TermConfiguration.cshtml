@@ -34,7 +34,7 @@
     </form>
     <p id="term-edit-message" class="notice muted" role="status" aria-live="polite">Chọn Sửa để cập nhật thông tin học kỳ hoặc Xóa để gỡ bỏ.</p>
     <div class="scroll">
-        <table id="term-table">
+        <table id="term-table" data-schedule-pagination="Phân trang danh sách học kỳ">
             <thead><tr><th>Tên học kỳ</th><th>Tuần 1 bắt đầu</th><th>Thời gian đăng ký môn</th><th>Đơn giá TC</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
             @foreach(var term in Model.Terms){

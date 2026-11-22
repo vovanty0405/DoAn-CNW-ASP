@@ -159,6 +159,59 @@ public class GiangVienController : ControllerBase
         return Ok(new { status = "success", message = "Thêm giảng viên và tạo tài khoản thành công", data = model });
     }
 
+    [HttpPost("bulk/existing"), Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetExistingImportCodes([FromBody] List<string> codes, CancellationToken cancellationToken)
+    {
+        if (codes.Count > 1000) return BadRequest(new { message = "Tối đa 1.000 mã mỗi lần kiểm tra." });
+        var normalized = codes.Select(c => (c ?? "").Trim()).Distinct().ToArray();
+        var data = await _db.GiangViens.AsNoTracking().Where(x => normalized.Contains(x.MaGV))
+            .Select(x => x.MaGV).ToListAsync(cancellationToken);
+        return Ok(new { data });
+    }
+
+    [HttpPost("bulk/preview"), Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PreviewImport([FromBody] List<GiangVien> list)
+    {
+        if (list == null || list.Count is < 1 or > 1000 || list.Any(x => x == null))
+            return BadRequest(new { message = "Danh sách cần từ 1 đến 1.000 hồ sơ hợp lệ." });
+        var contacts = await ProfileValidation.FindContactsAsync(_db, list.Select(x => x.CCCD), list.Select(x => x.SDT));
+        var references = (await _db.Khoas.AsNoTracking().Select(x => x.MaKhoa).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var codes = list.Select(x => x.MaGV.Trim()).ToArray();
+        var existing = (await _db.GiangViens.AsNoTracking().Where(x => codes.Contains(x.MaGV))
+            .Select(x => x.MaGV).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        var phones = new HashSet<string>(StringComparer.Ordinal);
+        var data = new List<object>();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var item = list[i];
+            var code = item.MaGV.Trim();
+            string? error = null;
+            bool duplicate = !seen.Add(code) || existing.Contains(code);
+            if (duplicate) error = $"Mã {code} đã có trong hệ thống hoặc bị lặp trong tệp.";
+            else
+            {
+                error = NormalizeAndValidate(item);
+                if (!ProfileValidation.Code().IsMatch(code)) error = "Mã hồ sơ không hợp lệ.";
+                if (error == null && item.MaKhoa != null && !references.Contains(item.MaKhoa))
+                    error = "Khoa không tồn tại.";
+                error ??= contacts.DuplicateError(item.CCCD, item.SDT);
+                if (error == null && ((item.CCCD != null && identities.Contains(item.CCCD))
+                    || (item.SDT != null && phones.Contains(item.SDT))))
+                    error = "CCCD hoặc số điện thoại trùng với dòng mới khác trong tệp.";
+                if (error == null)
+                {
+                    if (item.CCCD != null) identities.Add(item.CCCD);
+                    if (item.SDT != null) phones.Add(item.SDT);
+                }
+            }
+            data.Add(new { index = i, error, duplicate });
+        }
+        return Ok(new { data });
+    }
+
     [HttpPost("bulk")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<GiangVien> list)
@@ -248,7 +301,7 @@ public class GiangVienController : ControllerBase
         }
         await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Giảng viên", $"Đã import {count} giảng viên từ Excel");
-        return Ok(new { status = "success", message = $"Đã thêm thành công {count} giảng viên" });
+        return Ok(new { status = "success", added = count, skipped = list.Count - count, message = $"Đã nhập {count} dòng mới · Bỏ qua {list.Count - count} dòng trùng mã." });
     }
 
     [HttpPut("{id}")]

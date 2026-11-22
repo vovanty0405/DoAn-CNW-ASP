@@ -1,5 +1,5 @@
 window.academicExcel = {
-    async importFile(input, { title, map, save, refresh, key, existingKeys }) {
+    async importFile(input, { title, map, save, refresh, key, existingKeys, verifyRows }) {
         const file = input.files[0];
         input.value = '';
         if (!file) return;
@@ -24,14 +24,32 @@ window.academicExcel = {
                 const valid = entries.filter(e => !e.error);
                 const keys = [...new Set(valid.map(e => normalize(e.value[key])))];
                 const existing = new Set(existingKeys && keys.length ? (await existingKeys(keys)).map(normalize) : []);
-                const seen = new Set();
+                const seen = new Map();
                 for (const entry of valid) {
                     const code = normalize(entry.value[key]);
                     if (seen.has(code) || existing.has(code)) {
                         entry.duplicate = true;
-                        entry.error = seen.has(code) ? 'Trùng trong tệp' : 'Đã có trong hệ thống';
+                        entry.error = seen.has(code)
+                            ? `Mã ${code} trùng với dòng ${seen.get(code)} trong tệp.`
+                            : `Mã ${code} đã có trong hệ thống.`;
                     }
-                    seen.add(code);
+                    if (!seen.has(code)) seen.set(code, entry.row);
+                }
+            }
+            if (verifyRows) {
+                const candidates = entries.filter(e => !e.error);
+                if (candidates.length) {
+                    const checks = await verifyRows(candidates.map(e => e.value));
+                    if (!Array.isArray(checks) || checks.length !== candidates.length)
+                        throw new Error('Máy chủ chưa kiểm tra đủ các dòng. Hãy thử lại.');
+                    const indexes = new Set();
+                    for (const check of checks) {
+                        if (!Number.isInteger(check.index) || !candidates[check.index] || indexes.has(check.index))
+                            throw new Error('Kết quả kiểm tra danh sách không hợp lệ.');
+                        indexes.add(check.index);
+                        candidates[check.index].error = check.error || '';
+                        candidates[check.index].duplicate = Boolean(check.duplicate);
+                    }
                 }
             }
             const accepted = entries.filter(e => !e.error).map(e => e.value);
@@ -109,13 +127,39 @@ window.academicExcel = {
         return value;
     },
 
-    bulk(input, title, endpoint, fields, required, numbers, refresh, individual = false, validate = null) {
+    profileDate(value) {
+        if (value === undefined || value === null || value === '') return null;
+        let year, month, day;
+        if (typeof value === 'number') {
+            const date = XLSX.SSF.parse_date_code(value);
+            if (!date) throw new Error('Ngày sinh Excel không hợp lệ.');
+            [year, month, day] = [date.y, date.m, date.d];
+        } else {
+            const text = String(value).trim();
+            const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+            const local = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+            if (iso) [year, month, day] = iso.slice(1).map(Number);
+            else if (local) [day, month, year] = local.slice(1).map(Number);
+            else throw new Error('Ngày sinh cần có dạng yyyy-MM-dd hoặc dd/MM/yyyy.');
+        }
+        const date = new Date(Date.UTC(year, month - 1, day));
+        if (year < 1900 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day)
+            throw new Error('Ngày sinh không tồn tại.');
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    },
+
+    bulk(input, title, endpoint, fields, required, numbers, refresh, individual = false, validate = null, importChecks = {}) {
         return this.importFile(input, {
             title,
             key: required[0],
+            ...importChecks,
             map(row) {
                 const value = {};
                 for (const key of fields) {
+                    if (key === 'NgaySinh') {
+                        value[key] = academicExcel.profileDate(row[key]);
+                        continue;
+                    }
                     const cell = String(row[key] ?? '').trim();
                     if (required.includes(key) && !cell) throw new Error(`Thiếu cột hoặc giá trị ${key}.`);
                     if (!cell) continue;

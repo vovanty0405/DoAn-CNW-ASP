@@ -147,6 +147,49 @@ public class SinhVienController : ControllerBase
         return Ok(new { data });
     }
 
+    [HttpPost("bulk/preview"), Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PreviewImport([FromBody] List<SinhVien> list)
+    {
+        if (list == null || list.Count is < 1 or > 1000 || list.Any(x => x == null))
+            return BadRequest(new { message = "Danh sách cần từ 1 đến 1.000 hồ sơ hợp lệ." });
+        var contacts = await ProfileValidation.FindContactsAsync(_db, list.Select(x => x.CCCD), list.Select(x => x.SDT));
+        var references = (await _db.LopHanhChinhs.AsNoTracking().Select(x => x.MaLop).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var codes = list.Select(x => x.MaSV.Trim()).ToArray();
+        var existing = (await _db.SinhViens.AsNoTracking().Where(x => codes.Contains(x.MaSV))
+            .Select(x => x.MaSV).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        var phones = new HashSet<string>(StringComparer.Ordinal);
+        var data = new List<object>();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var item = list[i];
+            var code = item.MaSV.Trim();
+            string? error = null;
+            bool duplicate = !seen.Add(code) || existing.Contains(code);
+            if (duplicate) error = $"Mã {code} đã có trong hệ thống hoặc bị lặp trong tệp.";
+            else
+            {
+                error = NormalizeAndValidate(item);
+                if (!ProfileValidation.Code().IsMatch(code)) error = "Mã hồ sơ không hợp lệ.";
+                if (error == null && item.MaLop != null && !references.Contains(item.MaLop))
+                    error = "Lớp hành chính không tồn tại.";
+                error ??= contacts.DuplicateError(item.CCCD, item.SDT);
+                if (error == null && ((item.CCCD != null && identities.Contains(item.CCCD))
+                    || (item.SDT != null && phones.Contains(item.SDT))))
+                    error = "CCCD hoặc số điện thoại trùng với dòng mới khác trong tệp.";
+                if (error == null)
+                {
+                    if (item.CCCD != null) identities.Add(item.CCCD);
+                    if (item.SDT != null) phones.Add(item.SDT);
+                }
+            }
+            data.Add(new { index = i, error, duplicate });
+        }
+        return Ok(new { data });
+    }
+
     [HttpPost("bulk")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkCreate([FromBody] List<SinhVien> list)
@@ -236,7 +279,7 @@ public class SinhVienController : ControllerBase
         }
         await transaction.CommitAsync();
         GradeHelper.GhiNhatKy(_db, User.Identity?.Name, "Import Excel Sinh viên", $"Đã import {count} sinh viên từ Excel");
-        return Ok(new { status = "success", message = $"Đã thêm thành công {count} sinh viên" });
+        return Ok(new { status = "success", added = count, skipped = list.Count - count, message = $"Đã nhập {count} dòng mới · Bỏ qua {list.Count - count} dòng trùng mã." });
     }
 
     [HttpPut("{id}")]

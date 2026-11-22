@@ -560,7 +560,9 @@
                 'NgaySinh': s.NgaySinh ? s.NgaySinh.substring(0, 10) : '',
                 'MaLop': s.MaLop,
                 'Email': s.Email,
-                'SDT': s.SDT,
+                'SDT': s.SDT == null ? '' : String(s.SDT),
+                'CCCD': s.CCCD == null ? '' : String(s.CCCD),
+                'DiaChi': s.DiaChi,
                 'TrangThai': s.TrangThai
             }));
             const ws = XLSX.utils.json_to_sheet(rows);
@@ -576,12 +578,17 @@
                 existingKeys: async codes => (await apiFetch('/api/sinhvien/bulk/existing', {
                     method: 'POST', body: JSON.stringify(codes)
                 })).data,
+                verifyRows: async rows => (await apiFetch('/api/sinhvien/bulk/preview', {
+                    method: 'POST', body: JSON.stringify(rows)
+                })).data,
                 map: row => {
                     const MaSV = String(row.MaSV || row['Mã SV'] || '').trim();
                     const HoTen = String(row.HoTen || row['Họ Tên'] || '').trim();
                     const MaLop = String(row.MaLop || row['Mã Lớp'] || '').trim();
-                    if (!MaSV || !HoTen || !MaLop) throw new Error('Cần mã sinh viên, họ tên và mã lớp.');
-                    return academicExcel.validateProfileContacts({ MaSV, HoTen, MaLop, GioiTinh: row.GioiTinh || row['Giới tính'] || 'Nam',
+                    if (!MaSV || !HoTen) throw new Error('Cần mã sinh viên và họ tên.');
+                    return academicExcel.validateProfileContacts({ MaSV, HoTen, MaLop,
+                        NgaySinh: academicExcel.profileDate(row.NgaySinh ?? row['Ngày sinh']),
+                        DiaChi: String(row.DiaChi ?? row['Địa chỉ'] ?? '').trim(), GioiTinh: row.GioiTinh || row['Giới tính'] || 'Nam',
                         Email: String(row.Email || ''), SDT: String(row.SDT ?? row['Số điện thoại'] ?? '').trim(),
                         CCCD: String(row.CCCD ?? row['Số CCCD'] ?? '').trim(), TrangThai: row.TrangThai || 'Đang học' });
                 },

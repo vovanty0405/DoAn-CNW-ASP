@@ -536,7 +536,7 @@
             Chọn Sửa để cập nhật hoặc đổi mã phòng. Mã phòng mới sẽ được cập nhật vào lịch đang liên kết.
         </p>
         <div class="scroll">
-            <table>
+            <table data-schedule-pagination="Phân trang danh sách phòng học">
                 <thead>
                     <tr>
                         <th>Mã phòng</th>
@@ -597,6 +597,7 @@
 
 @section Scripts {
     <script src="~/js/schedule-admin.js" asp-append-version="true"></script>
+    <script src="~/js/schedule-pagination.js" asp-append-version="true"></script>
     <script src="~/js/term-configuration.js" asp-append-version="true"></script>
     <script>
         const SECTIONS_DATA = @Html.Raw(JsonSerializer.Serialize(sectionsClientData));
