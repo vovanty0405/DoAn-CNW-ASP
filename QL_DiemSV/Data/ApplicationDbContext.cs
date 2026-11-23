@@ -45,7 +45,8 @@ public class ApplicationDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<LopHocPhan>().HasIndex(x => x.MaHK);
         modelBuilder.Entity<ClassSchedule>().HasIndex(x => new { x.MaLHP, x.Thu });
-        modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaSV, x.MaLHP });
+        modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaSV, x.MaLHP })
+            .IsUnique().HasFilter("[MaSV] IS NOT NULL AND [MaLHP] IS NOT NULL");
         modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaLHP, x.DiemTongKet });
         modelBuilder.Entity<KhungChuongTrinh>().HasIndex(x => x.MaNganh);
         modelBuilder.Entity<Article>().HasIndex(x => new { x.TrangThai, x.GhimDauTrang, x.NgayDang, x.Id })

@@ -469,3 +469,33 @@ html.enterprise {
         to { opacity: 1; transform: translateY(0); }
     }
 }
+
+/* Article reading colors: enterprise Portal uses light panels even with dark preference. */
+.portal-body .article-detail-main .article-rich-text {
+    --article-ink: #e2e8f0;
+    --article-heading: #f8fafc;
+    --article-link: #7dd3fc;
+    color: var(--article-ink) !important;
+    font-size: 16px;
+    line-height: 1.8;
+}
+html.light .portal-body .article-detail-main .article-rich-text,
+html.enterprise .portal-body .article-detail-main .article-rich-text {
+    --article-ink: #1e293b;
+    --article-heading: #0f172a;
+    --article-link: #075985;
+}
+.portal-body .article-detail-main .article-rich-text :is(p,span,div,li,td,th,blockquote) {
+    color: var(--article-ink) !important;
+    opacity: 1;
+}
+.portal-body .article-detail-main .article-rich-text :is(h1,h2,h3,h4,h5,h6,strong,b) {
+    color: var(--article-heading) !important;
+}
+.portal-body .article-detail-main .article-rich-text a,
+.portal-body .article-detail-main .article-rich-text a * {
+    color: var(--article-link) !important;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.portal-body .article-detail-main .article-rich-text p { margin-bottom: 14px; }

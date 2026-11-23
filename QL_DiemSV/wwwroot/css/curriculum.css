@@ -16,3 +16,28 @@ html.dark:not(.enterprise) .curriculum-section-content,html:not(.light) .academi
 .academic input.input-locked,.academic select.input-locked,.academic input:disabled,.academic select:disabled{background-color:#f1f5f9!important;color:#64748b!important;cursor:not-allowed!important;opacity:.75;border-style:dashed!important}
 html.dark:not(.enterprise) .academic input.input-locked,html.dark:not(.enterprise) .academic select.input-locked,html:not(.light) .academic input.input-locked,html:not(.light) .academic select.input-locked{background-color:#1e293b!important;color:#94a3b8!important}
 @media(max-width:760px){.curriculum-detail-page{padding:0 8px}.curriculum-detail-page>h1{font-size:22px}.curriculum-section-content table{min-width:100%}.curriculum-section-content table th,.curriculum-section-content table td{padding:8px 10px!important}}
+
+/* Word-style ribbon and readable table headings in both application themes. */
+.academic .word-ribbon{gap:0;padding:0 0 10px;border-radius:10px;background:var(--color-surface);align-items:stretch}
+.curriculum-ribbon-tabs{display:flex;flex:0 0 100%;gap:4px;padding:4px 12px;margin-bottom:8px;border-bottom:1px solid var(--color-surface-hover)}
+.academic .word-ribbon .curriculum-ribbon-tabs button{border:0;border-radius:0;background:transparent;padding:8px 16px;font-size:14px;font-weight:600;color:var(--color-text-primary);border-bottom:3px solid transparent}
+.academic .word-ribbon .curriculum-ribbon-tabs button[aria-selected=true]{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.academic .word-ribbon .ribbon-group{padding:6px 12px;min-width:0}
+.academic .word-ribbon .ribbon-group[hidden]{display:none}
+.academic .word-ribbon .ribbon-group>div{max-width:420px;gap:6px;min-height:72px;align-content:center}
+.academic .word-ribbon button,.academic .word-ribbon select,.academic .word-ribbon summary{font-size:12px;min-height:32px}
+.academic .word-ribbon button[data-action=bold]{font-weight:800}
+.academic .word-ribbon button[data-action=italic]{font-style:italic}
+.academic .word-ribbon button[data-action=underline]{text-decoration:underline}
+.academic .curriculum-rich{color:var(--color-text-primary);background:var(--color-canvas);font-size:15px}
+html.enterprise .academic .curriculum-section-content,
+html.light .academic .curriculum-section-content{--curriculum-table-border:#94a3b8;--curriculum-table-heading:#e8effa;--curriculum-heading-ink:#172554}
+html:not(.light):not(.enterprise) .academic .curriculum-section-content{--curriculum-table-border:#64748b;--curriculum-table-heading:#273449;--curriculum-heading-ink:#f1f5f9}
+.academic .curriculum-section-content table thead :is(th,td),
+.academic .curriculum-section-content table tr:first-child :is(th,td),
+.academic .curriculum-section-content table tfoot td,
+.academic .curriculum-section-content table .curriculum-total-row :is(th,td){color:var(--curriculum-heading-ink)!important;background-color:var(--curriculum-table-heading)!important}
+.academic .curriculum-section-content table thead :is(th,td) *,
+.academic .curriculum-section-content table tr:first-child :is(th,td) *{color:inherit!important;background-color:transparent!important}
+html.enterprise .academic .curriculum-rich{color:#1e293b;background:#fff}
+@media(max-width:760px){.academic .word-ribbon .ribbon-group{width:100%;border-right:0;border-bottom:1px solid var(--color-surface-hover)}.academic .word-ribbon .ribbon-group>div{max-width:none;min-height:0}.academic .word-ribbon .ribbon-group>small{text-align:left}}

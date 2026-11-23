@@ -14,6 +14,18 @@
     html.dark .gradebook-open { color: #a7f3d0; background-color: #064e3b; border-color: #059669; }
     html.dark .gradebook-locked { color: #fecaca; background-color: #450a0a; border-color: #dc2626; }
     html.dark .gradebook-pending { color: #fde68a; background-color: #451a03; border-color: #b45309; }
+    /* Explicit colors preserve contrast with both application themes. */
+    #step-detail-gradebook .gradebook-ratio { color:#e0e7ff; background:#312e81; border:1px solid #818cf8; }
+    #step-detail-gradebook .gradebook-ratio:hover { background:#3730a3; }
+    #step-detail-gradebook .gradebook-ratio * { color:inherit; }
+    #step-detail-gradebook .gradebook-import { color:#cffafe; background:#164e63; border:1px solid #22d3ee; font-weight:600; }
+    #step-detail-gradebook .gradebook-import:hover { background:#155e75; }
+    #step-detail-gradebook .gradebook-import:focus-within,
+    #step-detail-gradebook .gradebook-ratio:focus-visible { outline:2px solid #0891b2; outline-offset:3px; }
+    html.light #step-detail-gradebook .gradebook-ratio { color:#3730a3; background:#e0e7ff; border-color:#a5b4fc; }
+    html.light #step-detail-gradebook .gradebook-ratio:hover { background:#c7d2fe; }
+    html.light #step-detail-gradebook .gradebook-import { color:#155e75; background:#cffafe; border-color:#67e8f9; }
+    html.light #step-detail-gradebook .gradebook-import:hover { background:#a5f3fc; }
 </style>
 
 <div class="space-y-6 animate-fade-in">
@@ -178,7 +190,7 @@
                 </button>
 
                 <button type="button" id="btn-config-tyle" onclick="openTyLeModal()"
-                        class="btn bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
+                        class="btn gradebook-ratio rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5">
                     <i data-lucide="percent" class="w-4 h-4 text-indigo-400"></i>
                     <span>Cấu hình tỷ lệ Học phần (QT / Thi)</span>
                 </button>
@@ -189,7 +201,7 @@
                     <span id="btn-config-cols-label">Cấu hình cột QT (100%)</span>
                 </button>
 
-                <label class="btn btn-secondary cursor-pointer">Nhập Excel bảng điểm
+                <label class="btn gradebook-import cursor-pointer rounded-xl text-sm px-3.5 py-2 flex items-center gap-1.5"><i data-lucide="file-up" class="w-4 h-4"></i>Nhập Excel bảng điểm
                     <input type="file" accept=".xlsx,.xls" class="sr-only" onchange="importGradeWorkbook(this)" />
                 </label>
                 <button type="button" onclick="exportBangDiemExcel()"
@@ -242,7 +254,7 @@
                         </div>
                     </div>
                     <button type="button" onclick="openTyLeModal()" title="Nhấn để thay đổi tỷ lệ điểm học phần"
-                            class="px-3 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 flex items-center gap-2 transition-colors text-left">
+                            class="gradebook-ratio px-3 py-2 rounded-lg flex items-center gap-2 transition-colors text-left">
                         <i data-lucide="scale" class="w-4 h-4 text-indigo-400"></i>
                         <div>
                             <div class="text-[10px] text-indigo-300 uppercase">Tỷ lệ Học phần</div>
@@ -1683,15 +1695,27 @@
             return showToast('Sổ điểm chưa mở để nhập.', 'warning');
         }
         const students = new Map(currentRows.map(row => [String(row.maSV).toUpperCase(), row]));
-        const seen = new Set();
         const columns = currentCauHinh.map(col => [`${col.name} (${col.weight}%)`, col.id]);
         const exam = `Thi Lần 1 (${currentTyLeThi}%)`;
         return academicExcel.importFile(input, {
             title: 'Xem trước bảng điểm Excel',
+            key: 'MaSV',
+            verifyRows(values) {
+                return values.map((value, index) => {
+                    const row = students.get(value.MaSV);
+                    const current = Object.fromEntries(columns.map(([field, id]) => [field, row.chiTietDiemQT?.[id]]));
+                    current[exam] = row.diemThiLan1;
+                    current['Thi Lần 2'] = row.diemThiLan2;
+                    const changed = Object.keys(value).some(field => field !== 'MaSV'
+                        && (current[field] === null || current[field] === undefined || current[field] === ''
+                            || Number(current[field]) !== value[field]));
+                    return { index, duplicate: !changed,
+                        error: changed ? '' : 'Điểm trùng bảng hiện tại, không thay đổi — bỏ qua.' };
+                });
+            },
             map(row) {
                 const code = String(row['Mã SV'] ?? row.MaSV ?? '').trim().toUpperCase();
                 if (!students.has(code)) throw new Error('Mã sinh viên không thuộc lớp.');
-                if (seen.has(code)) throw new Error('Mã sinh viên bị trùng trong tệp.');
                 const value = { MaSV: code };
                 for (const field of [...columns.map(c => c[0]), exam, 'Thi Lần 2']) {
                     if (!(field in row)) continue;
@@ -1703,7 +1727,6 @@
                     value[field] = score;
                 }
                 if (Object.keys(value).length === 1) throw new Error('Không có điểm ở cột khớp với bảng điểm hiện tại.');
-                seen.add(code);
                 return value;
             },
             save(values) {

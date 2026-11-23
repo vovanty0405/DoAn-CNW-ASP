@@ -53,6 +53,7 @@
     );
 }
 
+<link rel="stylesheet" href="~/css/schedule-editor.css" asp-append-version="true" />
 <div class="academic space-y-6">
     <!-- Header & Quick Navigation -->
     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -87,8 +88,8 @@
 
     @if (TempData["Error"] is string error)
     {
-        <div class="p-4 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-sm flex items-center gap-2.5" role="alert">
-            <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 shrink-0"></i>
+        <div class="schedule-conflict-alert" role="alert">
+            <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
             <span>@error</span>
         </div>
     }
@@ -370,7 +371,7 @@
     <!-- POPUP MODAL: BIỂU MẪU ĐIỀU PHỐI CHI TIẾT                              -->
     <!-- ===================================================================== -->
     <div id="schedule-editor-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-        <div class="panel w-full max-w-6xl bg-surface border border-surface-hover rounded-2xl shadow-2xl p-6 space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+        <div class="schedule-editor-dialog panel w-full max-w-6xl bg-surface border border-surface-hover rounded-2xl shadow-2xl p-6 space-y-5 my-8 max-h-[92vh] overflow-y-auto">
             <!-- Modal Header -->
             <div class="flex items-start justify-between gap-4 border-b border-surface-hover pb-4">
                 <div>
@@ -411,7 +412,11 @@
                     <label>Sĩ số tối đa<input name="capacity" id="modal-input-capacity" type="number" min="1" value="@(s.SiSoToiDa ?? 40)" required /></label>
                 </div>
 
-                <div class="scroll">
+                <div class="schedule-editor-heading">
+                    <div><strong>Danh sách buổi học</strong><p class="muted">Mỗi dòng là một buổi học. Thêm buổi, điền lịch rồi nhấn Lưu thông tin &amp; Lịch học.</p></div>
+                    <button type="button" id="add-schedule">+ Thêm buổi học</button>
+                </div>
+                <div class="scroll schedule-editor-scroll">
                     <table class="editor">
                         <thead>
                             <tr>
@@ -437,7 +442,7 @@
                 </p>
 
                 <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-surface-hover">
-                    <button type="button" id="add-schedule" class="secondary">+ Thêm buổi học</button>
+                    <span class="muted">Thêm hoặc xóa dòng chỉ có hiệu lực sau khi lưu.</span>
                     <div class="flex items-center gap-2">
                         <button type="button" class="secondary" onclick="closeScheduleModal()">Đóng</button>
                         <button type="submit">💾 Lưu thông tin & Lịch học</button>
@@ -447,11 +452,11 @@
 
             <template id="schedule-template">
                 <tr>
-                    <td>
+                    <td data-label="Thực hành">
                         <input type="hidden" data-field="MaLHP" value="" />
                         <input data-field="LoaiBuoiHoc" type="checkbox" value="true" aria-label="Thực hành" />
                     </td>
-                    <td>
+                    <td data-label="Thứ">
                         <select data-field="Thu">
                             @for (int d = 2; d <= 8; d++)
                             {
@@ -459,9 +464,9 @@
                             }
                         </select>
                     </td>
-                    <td><input data-field="TietBatDau" type="number" min="1" max="12" value="1" required /></td>
-                    <td><input data-field="SoTiet" type="number" min="1" max="12" value="3" required /></td>
-                    <td>
+                    <td data-label="Tiết bắt đầu"><input data-field="TietBatDau" type="number" min="1" max="12" value="1" required /></td>
+                    <td data-label="Số tiết"><input data-field="SoTiet" type="number" min="1" max="12" value="3" required /></td>
+                    <td data-label="Phòng học">
                         <select data-field="PhongHoc" required>
                             @foreach (var r in Model.Rooms)
                             {
@@ -469,7 +474,7 @@
                             }
                         </select>
                     </td>
-                    <td>
+                    <td data-label="Giảng viên">
                         <select data-field="MaGV" required>
                             @foreach (var t in Model.Teachers)
                             {
@@ -477,7 +482,7 @@
                             }
                         </select>
                     </td>
-                    <td>
+                    <td data-label="Loại lịch">
                         <select data-field="LoaiLich">
                             @foreach (var type in RoomMatrixRules.ScheduleTypes)
                             {
@@ -485,9 +490,9 @@
                             }
                         </select>
                     </td>
-                    <td><input data-field="ChuoiTuanHoc" value="1-15" required maxlength="200" /></td>
-                    <td><input data-field="TuanBaoNghi" maxlength="200" placeholder="VD: 3,5" aria-label="Tuần báo nghỉ" /></td>
-                    <td><button type="button" class="secondary" onclick="this.closest('tr').remove()">Xóa</button></td>
+                    <td data-label="Tuần học"><input data-field="ChuoiTuanHoc" value="1-15" required maxlength="200" /></td>
+                    <td data-label="Tuần báo nghỉ"><input data-field="TuanBaoNghi" maxlength="200" placeholder="VD: 3,5" aria-label="Tuần báo nghỉ" /></td>
+                    <td data-label="Thao tác"><button type="button" class="secondary" onclick="this.closest('tr').remove()">Xóa</button></td>
                 </tr>
             </template>
         </div>

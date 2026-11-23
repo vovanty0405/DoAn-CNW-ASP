@@ -2,7 +2,20 @@
 'use strict';
 const scheduleForm=document.getElementById('schedule-form');
 if(scheduleForm){
- document.getElementById('add-schedule').addEventListener('click',()=>document.getElementById('schedule-rows').append(document.getElementById('schedule-template').content.cloneNode(true)));
+ document.getElementById('add-schedule').addEventListener('click',()=>{
+  const body=document.getElementById('schedule-rows');
+  const previous=body.lastElementChild;
+  const fragment=document.getElementById('schedule-template').content.cloneNode(true);
+  const row=fragment.querySelector('tr');
+  row.querySelector('[data-field="MaLHP"]').value=document.getElementById('modal-input-id').value;
+  for(const field of ['MaGV','ChuoiTuanHoc']){
+   const old=previous?.querySelector(`[data-field="${field}"]`);
+   if(old) row.querySelector(`[data-field="${field}"]`).value=old.value;
+  }
+  body.append(fragment);
+  row.scrollIntoView({behavior:'smooth',block:'nearest'});
+  row.querySelector('[data-field="Thu"]').focus({preventScroll:true});
+ });
  scheduleForm.addEventListener('submit',event=>{
   const rows=[...document.querySelectorAll('#schedule-rows tr')];
   for(const row of rows){

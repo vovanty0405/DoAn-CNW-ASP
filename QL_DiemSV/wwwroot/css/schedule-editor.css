@@ -1,0 +1,39 @@
+/* Scoped schedule editor: keep all fields visible without horizontal scrolling. */
+#schedule-editor-modal{padding:12px;overflow:hidden}
+.academic #schedule-editor-modal .schedule-editor-dialog{width:calc(100vw - 24px);max-width:1760px;max-height:94dvh;margin:0;padding:20px;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;min-width:0}
+#schedule-editor-modal .schedule-editor-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 12px}
+#schedule-editor-modal .schedule-editor-heading p{font-size:12px;margin-top:4px}
+#schedule-editor-modal #add-schedule{white-space:nowrap;font-weight:700}
+.academic #schedule-editor-modal .toolbar{display:grid;grid-template-columns:1fr 1fr .7fr .8fr 2fr 1fr}
+.academic #schedule-editor-modal label{min-width:0}
+.academic #schedule-editor-modal input:not([type=checkbox]),.academic #schedule-editor-modal select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:12px;padding:8px 6px}
+.academic #schedule-editor-modal .schedule-editor-scroll{overflow:visible;min-width:0}
+.academic #schedule-editor-modal table.editor{width:100%;min-width:0;table-layout:fixed}
+.academic #schedule-editor-modal table.editor th,.academic #schedule-editor-modal table.editor td{padding:7px 4px;min-width:0;overflow-wrap:anywhere}
+#schedule-editor-modal table.editor th:nth-child(1){width:4%}
+#schedule-editor-modal table.editor th:nth-child(2){width:8%}
+#schedule-editor-modal table.editor th:nth-child(3),#schedule-editor-modal table.editor th:nth-child(4){width:6%}
+#schedule-editor-modal table.editor th:nth-child(5),#schedule-editor-modal table.editor th:nth-child(6){width:19%}
+#schedule-editor-modal table.editor th:nth-child(7){width:10%}
+#schedule-editor-modal table.editor th:nth-child(8),#schedule-editor-modal table.editor th:nth-child(9){width:11%}
+#schedule-editor-modal table.editor th:nth-child(10){width:6%}
+@media(max-width:1200px){
+ .academic #schedule-editor-modal .toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #schedule-editor-modal table.editor thead{display:none}
+ #schedule-editor-modal table.editor,#schedule-editor-modal table.editor tbody{display:block}
+ .academic #schedule-editor-modal table.editor tr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:14px;margin-bottom:14px;border:1px solid var(--color-surface-hover);border-radius:12px;background:var(--color-canvas)}
+ .academic #schedule-editor-modal table.editor td{display:block;border:0;padding:0}
+ #schedule-editor-modal table.editor td::before{content:attr(data-label);display:block;font-size:12px;color:var(--color-text-muted);margin-bottom:5px}
+ #schedule-editor-modal table.editor td:nth-child(5),#schedule-editor-modal table.editor td:nth-child(6){grid-column:span 2}
+}
+@media(max-width:600px){
+ .academic #schedule-editor-modal .schedule-editor-dialog{padding:12px}
+ .academic #schedule-editor-modal .toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .academic #schedule-editor-modal table.editor tr{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* Error contrast follows the application's html.light theme switch. */
+.academic .schedule-conflict-alert{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border:1px solid #be5362;border-left:4px solid #fb7185;border-radius:12px;background:#351b25;color:#ffe4e6;font-size:14px;font-weight:600;line-height:1.6;overflow-wrap:anywhere}
+.academic .schedule-conflict-alert svg{color:#fda4af;flex-shrink:0;margin-top:2px}
+html.light .academic .schedule-conflict-alert{background:#fff1f2;color:#881337;border-color:#fda4af;border-left-color:#be123c}
+html.light .academic .schedule-conflict-alert svg{color:#be123c}

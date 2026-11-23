@@ -84,6 +84,23 @@ form.querySelectorAll('.curriculum-section').forEach((section,index)=>{
  }
  ribbon.querySelectorAll('button').forEach(button=>{button.addEventListener('mousedown',e=>e.preventDefault());button.addEventListener('click',()=>{if(button.dataset.rows){const rows=Number(button.dataset.rows),cols=Number(button.dataset.cols);insert('<table><tbody>'+Array.from({length:rows},()=>'<tr>'+('<td><br></td>'.repeat(cols))+'</tr>').join('')+'</tbody></table><p><br></p>');button.closest('details').open=false;}else action(button.dataset.action,null);});});
  ribbon.querySelectorAll('select,input').forEach(control=>control.addEventListener('change',()=>{action(control.dataset.action,control.value);if(control.dataset.action==='table')control.value='';}));
+ // Word-style tabs reorganize the existing commands without replacing saved HTML.
+ const groups=[...ribbon.querySelectorAll('.ribbon-group')];
+ const tabs=document.createElement('div');tabs.className='curriculum-ribbon-tabs';
+ tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Nhóm công cụ soạn thảo');
+ const tabButtons=[];
+ function showRibbonTab(which){
+  groups.forEach((group,i)=>{group.hidden=(which==='insert'?i!==4:i===4);});
+  tabButtons.forEach(button=>{const active=button.dataset.tab===which;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;});
+ }
+ for(const [key,label] of [['home','Trang đầu'],['insert','Chèn']]){
+  const tab=document.createElement('button');tab.type='button';tab.textContent=label;tab.dataset.tab=key;tab.setAttribute('role','tab');
+  tab.addEventListener('mousedown',event=>event.preventDefault());
+  tab.addEventListener('click',()=>showRibbonTab(key));
+  tab.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();const other=tabButtons.find(b=>b!==tab);showRibbonTab(other.dataset.tab);other.focus();}});
+  tabButtons.push(tab);tabs.append(tab);
+ }
+ ribbon.prepend(tabs);showRibbonTab('home');
  rich.addEventListener('mouseup',remember);rich.addEventListener('keyup',remember);rich.addEventListener('input',()=>{remember();sync();});
  rich.addEventListener('click',e=>{const cell=e.target.closest('td,th');if(!cell)return;activeCell=cell;if(!e.ctrlKey&&!e.metaKey){selected.forEach(c=>c.classList.remove('editor-cell-selected'));selected.clear();}if(selected.has(cell)){selected.delete(cell);cell.classList.remove('editor-cell-selected');}else{selected.add(cell);cell.classList.add('editor-cell-selected');}say('Ctrl/⌘ + click các ô liền nhau, sau đó chọn Gộp ô.');});
  rich.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();action(e.shiftKey||e.key.toLowerCase()==='y'?'redo':'undo');}});

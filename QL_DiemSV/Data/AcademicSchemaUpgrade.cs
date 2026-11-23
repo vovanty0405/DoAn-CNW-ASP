@@ -119,6 +119,18 @@ public static class AcademicSchemaUpgrade
         }
         catch { }
 
+        // Required integrity upgrade: fail visibly rather than delete duplicate grades.
+        db.Database.ExecuteSqlRaw("""
+            SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET CONCAT_NULL_YIELDS_NULL ON; SET ARITHABORT ON; SET NUMERIC_ROUNDABORT OFF;
+            IF EXISTS (SELECT 1 FROM dbo.KetQuaHocTap WHERE MaSV IS NOT NULL AND MaLHP IS NOT NULL GROUP BY MaSV, MaLHP HAVING COUNT(*) > 1)
+                THROW 51001, N'Có dữ liệu kết quả học tập trùng sinh viên và lớp học phần. Cần đối chiếu trước khi tạo UNIQUE; không tự xóa điểm.', 1;
+            IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.KetQuaHocTap') AND name = N'IX_KetQuaHocTap_MaSV_MaLHP' AND is_unique = 0)
+                DROP INDEX IX_KetQuaHocTap_MaSV_MaLHP ON dbo.KetQuaHocTap;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.KetQuaHocTap') AND name = N'IX_KetQuaHocTap_MaSV_MaLHP' AND is_unique = 1)
+                CREATE UNIQUE INDEX IX_KetQuaHocTap_MaSV_MaLHP ON dbo.KetQuaHocTap(MaSV, MaLHP)
+                WHERE MaSV IS NOT NULL AND MaLHP IS NOT NULL;
+            """);
+
         SeedDefaultArticlesIfEmpty(db);
         SeedMissingStudentGradesIfAny(db);
     }

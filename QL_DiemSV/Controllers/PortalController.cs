@@ -528,7 +528,7 @@ public class PortalController(ApplicationDbContext db) : Controller
 
         // Scalar projection to avoid selecting nvarchar(max) ChiTietDiemQT / CauHinhDiem
         var rawGrades = await db.KetQuaHocTaps.AsNoTracking()
-            .Where(k => k.MaSV == targetMaSV && k.LopHocPhan != null && k.LopHocPhan.MonHoc != null && k.LopHocPhan.HocKy != null)
+            .Where(k => k.MaSV == targetMaSV && k.LopHocPhan != null && k.LopHocPhan.TrangThaiNhapDiem == "Đã khóa" && k.LopHocPhan.MonHoc != null && k.LopHocPhan.HocKy != null)
             .Select(k => new
             {
                 k.MaKQ,

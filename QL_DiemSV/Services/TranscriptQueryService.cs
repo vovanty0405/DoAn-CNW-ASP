@@ -10,12 +10,10 @@ namespace QL_DiemSV.Services;
 public sealed class TranscriptQueryService
 {
     private readonly ApplicationDbContext _db;
-    private readonly IMemoryCache _cache;
 
     public TranscriptQueryService(ApplicationDbContext db, IMemoryCache cache)
     {
         _db = db;
-        _cache = cache;
     }
 
     public sealed record QueryResult(
@@ -70,7 +68,7 @@ public sealed class TranscriptQueryService
         string? GhiChu);
 
     /// <summary>
-    /// Lấy bảng điểm của 1 sinh viên, kiểm tra phân quyền nghiêm ngặt & tận dụng cache tốc độ cao.
+    /// Lấy bảng điểm của 1 sinh viên, kiểm tra phạm vi và đọc kết quả đã công bố trực tiếp từ SQL.
     /// </summary>
     public async Task<QueryResult> GetSingleAsync(
         string maSV,
@@ -87,8 +85,8 @@ public sealed class TranscriptQueryService
     }
 
     /// <summary>
-    /// Lấy bảng điểm cho 1 hoặc nhiều sinh viên với SQL Projection gọn nhẹ và MemoryCache,
-    /// giúp cả màn hình Xem Bảng Điểm lẫn Xuất PDF phản hồi tức thì.
+    /// Lấy bảng điểm cho 1 hoặc nhiều sinh viên với SQL Projection gọn nhẹ, không cache dữ liệu học tập,
+    /// để JSON và PDF đều phản ánh dữ liệu đã lưu ở lần yêu cầu mới.
     /// </summary>
     public async Task<QueryResult> GetBatchAsync(
         IEnumerable<string> rawStudentIds,
@@ -179,27 +177,13 @@ public sealed class TranscriptQueryService
                 new());
         }
 
-        // 2. Kiểm tra những sinh viên nào đã có sẵn TranscriptDocumentDto trong Cache (30 giây)
-        // Khi người dùng vừa bấm "Xem Bảng Điểm" xong rồi bấm "In Bảng Điểm (PDF)", dữ liệu lấy từ RAM trong 0ms!
+        // Read each transcript from SQL on every request; never reuse unpublished/stale grades.
         var cachedDocs = new Dictionary<string, TranscriptDocumentDto>(StringComparer.OrdinalIgnoreCase);
-        var uncachedStudentIds = new List<string>();
-
-        foreach (var code in orderedIds)
-        {
-            var docCacheKey = $"TRANSCRIPT_DOC_V2:{code.ToUpperInvariant()}";
-            if (_cache.TryGetValue(docCacheKey, out TranscriptDocumentDto? cachedDoc) && cachedDoc != null)
-            {
-                cachedDocs[code] = cachedDoc;
-            }
-            else
-            {
-                uncachedStudentIds.Add(code);
-            }
-        }
+        var uncachedStudentIds = orderedIds;
 
         if (uncachedStudentIds.Count > 0)
         {
-            // 3. Lấy Khung chương trình & Quy định tốt nghiệp của các ngành (có cache 2 phút theo MaNganh)
+            // 3. Lấy Khung chương trình & Quy định tốt nghiệp của các ngành (đọc mới theo MaNganh)
             var neededMajors = uncachedStudentIds
                 .Select(code => studentByCode[code].MaNganh)
                 .Where(m => !string.IsNullOrWhiteSpace(m))
@@ -209,11 +193,12 @@ public sealed class TranscriptQueryService
 
             var majorConfigMap = await GetOrLoadMajorConfigsAsync(neededMajors, cancellationToken);
 
-            // 4. Truy vấn phẳng (Flat Projection) chỉ các cột điểm cần thiết của những sinh viên chưa có trong cache
+            // 4. Truy vấn phẳng (Flat Projection) chỉ các cột cần thiết của các sổ điểm đã khóa
             // Không kéo cột chuỗi JSON ChiTietDiemQT hay CauHinhDiem
             var flatGrades = await _db.KetQuaHocTaps.AsNoTracking()
                 .Where(k => k.MaSV != null && uncachedStudentIds.Contains(k.MaSV)
-                    && k.LopHocPhan != null && k.LopHocPhan.HocKy != null && k.LopHocPhan.MonHoc != null)
+                    && k.LopHocPhan != null && k.LopHocPhan.TrangThaiNhapDiem == "Đã khóa"
+                    && k.LopHocPhan.HocKy != null && k.LopHocPhan.MonHoc != null)
                 .Select(k => new GradeFlatRow(
                     k.MaKQ,
                     k.MaSV!,
@@ -255,7 +240,6 @@ public sealed class TranscriptQueryService
 
                 var doc = BuildTranscriptDocument(sv, majorEntry, studentFlatRows);
                 cachedDocs[code] = doc;
-                _cache.Set($"TRANSCRIPT_DOC_V2:{sv.MaSV.ToUpperInvariant()}", doc, TimeSpan.FromSeconds(30));
             }
         }
 
@@ -268,20 +252,7 @@ public sealed class TranscriptQueryService
         CancellationToken cancellationToken)
     {
         var result = new Dictionary<string, MajorCurriculumCacheEntry>(StringComparer.OrdinalIgnoreCase);
-        var missingMajors = new List<string>();
-
-        foreach (var major in majorCodes)
-        {
-            var key = $"MAJOR_CURR_CFG:{major.ToUpperInvariant()}";
-            if (_cache.TryGetValue(key, out MajorCurriculumCacheEntry? cached) && cached != null)
-            {
-                result[major] = cached;
-            }
-            else
-            {
-                missingMajors.Add(major);
-            }
-        }
+        var missingMajors = majorCodes;
 
         if (missingMajors.Count == 0)
             return result;
@@ -311,7 +282,6 @@ public sealed class TranscriptQueryService
 
             var entry = new MajorCurriculumCacheEntry(courseTypes, reqTong, reqBB, reqTC, reqGpa);
             result[major] = entry;
-            _cache.Set($"MAJOR_CURR_CFG:{major.ToUpperInvariant()}", entry, TimeSpan.FromMinutes(2));
         }
 
         return result;
