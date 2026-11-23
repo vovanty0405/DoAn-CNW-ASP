@@ -40,9 +40,14 @@ tools/
 Tài Liệu/
 /docs/
 /temp-ui-skill/
+/scripts/
+/script/
+/outputs/
+/output/
 
 ## Các file tài liệu Markdown và script SQL loại trừ
 *.md
+!/README.md
 *.sql
 
 ## Ngoại lệ: Giữ lại duy nhất file script CSDL này
