@@ -157,6 +157,7 @@ public class PortalKetQuaHocTapViewModel
     public double PhanTramBatBuoc => TCBatBuoc > 0 ? Math.Min(100.0, Math.Round((double)TCBatBuocDat / TCBatBuoc * 100.0, 1)) : 100.0;
     public double PhanTramTuChon => TCTuChon > 0 ? Math.Min(100.0, Math.Round((double)TCTuChonDat / TCTuChon * 100.0, 1)) : 100.0;
     public string TrangThaiTotNghiepText { get; set; } = "";
+    public QL_DiemSV.Services.GraduationRules.Gaps? GraduationDetails { get; set; }
     public List<string> ChiTietDieuKien { get; set; } = new();
 
     // Filtering & Semesters

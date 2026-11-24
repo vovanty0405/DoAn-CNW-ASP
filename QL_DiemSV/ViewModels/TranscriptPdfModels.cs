@@ -42,6 +42,7 @@ public sealed class TranscriptOverallSummaryDto
 
 public sealed class TranscriptGraduationEligibilityDto
 {
+    public GraduationRules.Gaps? ChiTiet { get; init; }
     public bool DuDieuKien { get; init; }
     public List<string> LyDo { get; init; } = new();
     public TranscriptGraduationRuleDto QuyDinh { get; init; } = new();

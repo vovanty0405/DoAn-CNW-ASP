@@ -76,7 +76,7 @@
                     <i data-lucide="filter" class="w-4 h-4 text-primary"></i> Bộ Lọc Tìm Kiếm Sinh Viên
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <!-- Dropdown Khóa học (Niên khóa) -->
                     <div>
                         <label class="block text-xs font-medium text-text-muted mb-1.5">Khóa học (Niên khóa)</label>
@@ -101,6 +101,17 @@
                         </select>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-medium text-text-muted mb-1.5">Điều kiện tốt nghiệp</label>
+                        <select id="tc-filter-graduation" onchange="applyFilters()" class="w-full bg-canvas border border-surface-hover rounded-xl px-3.5 py-2.5 text-sm text-text-primary">
+                            <option value="">Tất cả</option>
+                            <option value="eligible">Đủ điều kiện</option>
+                            <option value="ineligible">Chưa đủ điều kiện</option>
+                            <option value="missing-gpa">Thiếu GPA</option>
+                            <option value="missing-credits">Thiếu tín chỉ</option>
+                            <option value="missing-required">Nợ môn bắt buộc</option>
+                        </select>
+                    </div>
                     <!-- Search Input: Mã SV hoặc Họ tên -->
                     <div>
                         <label class="block text-xs font-medium text-text-muted mb-1.5">Tìm kiếm nhanh</label>
@@ -154,12 +165,13 @@
                                 <th class="px-5 py-3.5 font-semibold">Lớp hành chính</th>
                                 <th class="px-5 py-3.5 font-semibold">Ngành / Khoa</th>
                                 <th class="px-5 py-3.5 font-semibold text-center">Trạng thái</th>
+                                <th class="px-5 py-3.5 font-semibold text-center">Điều kiện tốt nghiệp</th>
                                 <th class="px-5 py-3.5 font-semibold text-right">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody id="sv-results-tbody" class="divide-y divide-surface-hover">
                             <tr>
-                                <td colspan="9" class="p-8 text-center text-text-muted">Đang tải danh sách sinh viên...</td>
+                                <td colspan="10" class="p-8 text-center text-text-muted">Đang tải danh sách sinh viên...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -624,6 +636,7 @@
             document.getElementById('tc-filter-nienkhoa').value = '';
             document.getElementById('tc-filter-khoa').value = '';
             document.getElementById('tc-filter-keyword').value = '';
+            document.getElementById('tc-filter-graduation').value = '';
             updateLopDropdown();
             svCurrentPage = 1;
             renderStudentResultsTable();
@@ -638,6 +651,8 @@
                 maLop: document.getElementById('tc-filter-lop').value,
                 maKhoa: document.getElementById('tc-filter-khoa').value,
                 cohort: document.getElementById('tc-filter-nienkhoa').value,
+                includeGraduation: true,
+                graduationStatus: document.getElementById('tc-filter-graduation').value,
                 search: document.getElementById('tc-filter-keyword').value.trim()
             });
 
@@ -665,7 +680,7 @@
 
             const tbody = document.getElementById('sv-results-tbody');
             if (paged.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-text-muted">Không tìm thấy sinh viên nào phù hợp với điều kiện lọc</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-text-muted">Không tìm thấy sinh viên nào phù hợp với điều kiện lọc</td></tr>`;
             } else {
                 tbody.innerHTML = paged.map((s, idx) => {
                     const statusBadge = s.TrangThai === 'Đang học'
@@ -696,6 +711,9 @@
                             </td>
                             <td class="px-5 py-3.5 text-center">
                                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge}">${escapeHtml(s.TrangThai || 'Đang học')}</span>
+                            </td>
+                            <td class="px-5 py-3.5 text-center whitespace-nowrap">
+                                <span style="display:inline-block;padding:5px 10px;border-radius:8px;background:${s.GraduationEligible ? '#dcfce7' : '#fff7ed'};color:${s.GraduationEligible ? '#166534' : '#9a3412'};font-weight:600">${s.GraduationEligible ? 'Đủ điều kiện' : 'Chưa đủ điều kiện'}</span>
                             </td>
                             <td class="px-5 py-3.5 text-right whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-1.5">
@@ -1372,7 +1390,7 @@
         function overallTranscriptSummary(totals) {
             return `<div class="px-6 py-4 bg-surface-header border-b border-surface-hover">
                 <h3 class="font-bold text-base text-primary">Tổng kết điểm đến hiện tại</h3>
-                <p class="text-xs text-text-muted mt-2">Chỉ tính điểm tổng kết đã có; môn 0 tín chỉ không ảnh hưởng GPA. Tích lũy lấy điểm cao nhất mỗi môn, không cộng lặp tín chỉ học lại/cải thiện.</p>
+                <p class="text-xs text-text-muted mt-2">Tín chỉ đăng ký gồm cả môn chưa công bố điểm. GPA và tín chỉ đạt chỉ tính điểm đã công bố; môn 0 tín chỉ không ảnh hưởng GPA. Tích lũy lấy điểm cao nhất mỗi môn, không cộng lặp tín chỉ học lại/cải thiện.</p>
                 </div><table class="w-full text-sm"><tbody>${transcriptSummaryRows([
                     ['Điểm trung bình tích lũy hệ 10', formatTranscriptGpa(totals.GPAHe10)],
                     ['Điểm trung bình tích lũy hệ 4', formatTranscriptGpa(totals.GPAHe4)],
@@ -1380,9 +1398,9 @@
                     ['Tổng tín chỉ đã có điểm tổng kết (không trùng môn)', totals.TinChiDaCoDiem],
                     ['Tổng tín chỉ đạt / tích lũy', totals.TinChiDat],
                     ['Số tín chỉ chưa đạt', totals.TinChiKhongDat],
-                    ['Số tín chỉ của môn chưa có điểm tổng kết', totals.TinChiChuaCoDiem],
+                    ['Số tín chỉ của môn chưa có điểm tổng kết được công bố', totals.TinChiChuaCoDiem],
                     ['Số môn đã có điểm tổng kết', totals.SoMonDaCoDiem],
-                    ['Số môn chưa có điểm tổng kết', totals.SoMonChuaCoDiem],
+                    ['Số môn chưa có điểm tổng kết được công bố', totals.SoMonChuaCoDiem],
                     ['Xếp loại học lực hiện tại', totals.XepLoai]
                 ], 1, 1)}</tbody></table>`;
         }
@@ -1428,6 +1446,17 @@
                         (xet.LyDo || []).map(r => `<div class="text-text-muted">• ${escapeHtml(r)}</div>`).join('');
                 }
 
+                const gaps = xet.ChiTiet;
+                if (gaps) {
+                    reasonsEl.innerHTML += `<details class="mt-3"><summary class="font-bold cursor-pointer text-primary">Xem chi tiết điều kiện còn thiếu</summary>
+                        <div class="mt-3 space-y-2 text-text-primary">
+                        <p>Tín chỉ còn thiếu: tổng ${gaps.ThieuTongTinChi} TC; bắt buộc ${gaps.ThieuTinChiBatBuoc} TC; tự chọn ${gaps.ThieuTinChiTuChon} TC. Các mức thiếu này không cộng dồn với nhau.</p>
+                        <p>GPA hệ 4: ${gaps.GpaHienTai == null ? 'Chưa có điểm công bố để tính GPA' : Number(gaps.GpaHienTai).toFixed(2)} / yêu cầu ${Number(gaps.GpaYeuCau).toFixed(2)}${gaps.GpaConThieu == null ? '' : '; còn thiếu ' + Number(gaps.GpaConThieu).toFixed(2)}.</p>
+                        <p class="text-xs text-text-muted">Chênh lệch GPA không phải số điểm cần cộng vào một môn. GPA phụ thuộc điểm và tín chỉ các môn được công bố.</p>
+                        <p class="font-bold">Môn bắt buộc chưa đạt: ${gaps.MonBatBuocChuaDat.length}</p>
+                        ${gaps.MonBatBuocChuaDat.length ? `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th>Mã môn</th><th>Tên môn</th><th>TC</th><th>Kết quả công bố</th></tr></thead><tbody>${gaps.MonBatBuocChuaDat.map(m => `<tr><td>${escapeHtml(m.MaMon)}</td><td>${escapeHtml(m.TenMon)}</td><td>${m.SoTinChi}</td><td>${m.DiemDaCongBo == null ? 'Chưa có điểm được công bố' : Number(m.DiemDaCongBo).toFixed(1) + ' / 10 — Chưa đạt'}</td></tr>`).join('')}</tbody></table></div>` : '<p>Đã hoàn thành các môn bắt buộc trong khung.</p>'}
+                        </div></details>`;
+                }
                 const semContainer = document.getElementById('tc-semesters');
                 const hks = d.ketQuaTheoHocKy || [];
                 if (hks.length === 0) {

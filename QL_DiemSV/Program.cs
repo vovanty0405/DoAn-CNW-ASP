@@ -102,6 +102,7 @@ builder.Services.AddControllersWithViews()
     });
 
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PasswordChangeOtp>();
 builder.Services.AddSingleton<AcademicEmailNotifications>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<AcademicEmailNotifications>());
 builder.Services.AddScoped<QL_DiemSV.Services.CourseCatalogCache>();

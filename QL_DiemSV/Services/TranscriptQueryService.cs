@@ -11,6 +11,43 @@ public sealed class TranscriptQueryService
 {
     private readonly ApplicationDbContext _db;
 
+    public sealed record GraduationStatus(bool Eligible, bool MissingGpa, bool MissingCredits, bool MissingRequired);
+    public async Task<Dictionary<string, bool>> GraduationStatusesAsync(IQueryable<SinhVien> students, CancellationToken ct = default)
+        => (await GraduationAssessmentsAsync(students, ct)).ToDictionary(p => p.Key, p => p.Value.Eligible, StringComparer.OrdinalIgnoreCase);
+
+    public async Task<Dictionary<string, GraduationStatus>> GraduationAssessmentsAsync(
+        IQueryable<SinhVien> scopedStudents, CancellationToken ct = default)
+    {
+        var students = await scopedStudents.Select(s => new { s.MaSV,
+            MaNganh = s.LopHanhChinh != null ? s.LopHanhChinh.MaNganh : null }).ToListAsync(ct);
+        var configs = await GetOrLoadMajorConfigsAsync(students.Where(s => s.MaNganh != null)
+            .Select(s => s.MaNganh!).Distinct().ToList(), ct);
+        // Join the scoped SQL query rather than issuing one transcript request per student.
+        var rows = await _db.KetQuaHocTaps.AsNoTracking()
+            .Where(k => scopedStudents.Any(s => s.MaSV == k.MaSV)
+                && k.LopHocPhan != null && k.LopHocPhan.TrangThaiNhapDiem == "Đã khóa"
+                && k.LopHocPhan.MonHoc != null && k.LopHocPhan.HocKy != null)
+            .Select(k => new { k.MaSV, k.MaKQ, k.DiemTongKet,
+                k.LopHocPhan!.MonHoc!.MaMon, k.LopHocPhan.MonHoc.SoTinChi }).ToListAsync(ct);
+        var byStudent = rows.ToLookup(r => r.MaSV, StringComparer.OrdinalIgnoreCase);
+        return students.ToDictionary(s => s.MaSV, s =>
+        {
+            var config = s.MaNganh != null && configs.TryGetValue(s.MaNganh, out var found) ? found
+                : new MajorCurriculumCacheEntry(new(StringComparer.OrdinalIgnoreCase), 120, 100, 20, 2);
+            var grades = byStudent[s.MaSV].Select(r => new KetQuaHocTap {
+                MaKQ = r.MaKQ, DiemTongKet = r.DiemTongKet,
+                LopHocPhan = new LopHocPhan { MaMon = r.MaMon,
+                    MonHoc = new MonHoc { MaMon = r.MaMon, SoTinChi = r.SoTinChi } }
+            }).ToList();
+            var totals = TranscriptStatistics.Calculate(grades, cumulative: true);
+            var result = GraduationRules.Evaluate(grades, config.CourseTypes, totals.GPAHe4,
+                config.ReqTongTC, config.ReqTCBatBuoc, config.ReqTCTuChon, config.ReqMinGPA);
+            return new GraduationStatus(result.Eligible, !totals.GPAHe4.HasValue || totals.GPAHe4 < config.ReqMinGPA,
+                result.PassedCredits < config.ReqTongTC || result.RequiredCredits < config.ReqTCBatBuoc || result.ElectiveCredits < config.ReqTCTuChon,
+                result.MissingRequiredCourses > 0);
+        }, StringComparer.OrdinalIgnoreCase);
+    }
+
     public TranscriptQueryService(ApplicationDbContext db, IMemoryCache cache)
     {
         _db = db;
@@ -27,7 +64,10 @@ public sealed class TranscriptQueryService
         int ReqTongTC,
         int ReqTCBatBuoc,
         int ReqTCTuChon,
-        double ReqMinGPA);
+        double ReqMinGPA)
+    {
+        public List<KhungChuongTrinh> Curriculum { get; init; } = new();
+    }
 
     private sealed record StudentMetaRow(
         string MaSV,
@@ -227,6 +267,9 @@ public sealed class TranscriptQueryService
                 .GroupBy(g => g.MaSV, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
+            var pendingByStudent = (await TranscriptStatistics.PendingEnrollmentsAsync(
+                _db, uncachedStudentIds, cancellationToken)).ToLookup(k => k.MaSV, StringComparer.OrdinalIgnoreCase);
+
             foreach (var code in uncachedStudentIds)
             {
                 var sv = studentByCode[code];
@@ -238,7 +281,7 @@ public sealed class TranscriptQueryService
                     ? rows
                     : new List<GradeFlatRow>();
 
-                var doc = BuildTranscriptDocument(sv, majorEntry, studentFlatRows);
+                var doc = BuildTranscriptDocument(sv, majorEntry, studentFlatRows, pendingByStudent[code]);
                 cachedDocs[code] = doc;
             }
         }
@@ -280,7 +323,7 @@ public sealed class TranscriptQueryService
             var courseTypes = GraduationRules.CourseTypes(kRows);
             var (reqTong, reqBB, reqTC, reqGpa) = GraduationRules.Requirements(kRows, qd);
 
-            var entry = new MajorCurriculumCacheEntry(courseTypes, reqTong, reqBB, reqTC, reqGpa);
+            var entry = new MajorCurriculumCacheEntry(courseTypes, reqTong, reqBB, reqTC, reqGpa) { Curriculum = kRows };
             result[major] = entry;
         }
 
@@ -290,7 +333,7 @@ public sealed class TranscriptQueryService
     private static TranscriptDocumentDto BuildTranscriptDocument(
         StudentMetaRow sv,
         MajorCurriculumCacheEntry majorCfg,
-        List<GradeFlatRow> flatRows)
+        List<GradeFlatRow> flatRows, IEnumerable<KetQuaHocTap> pendingEnrollments)
     {
         var khungCT = majorCfg.CourseTypes;
         int reqTongTC = majorCfg.ReqTongTC;
@@ -398,7 +441,7 @@ public sealed class TranscriptQueryService
             })
             .ToList();
 
-        var overallTotals = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
+        var overallTotals = TranscriptStatistics.Calculate(ketQuas.Concat(pendingEnrollments), cumulative: true);
         var graduation = GraduationRules.Evaluate(
             ketQuas,
             khungCT,
@@ -454,6 +497,8 @@ public sealed class TranscriptQueryService
                 XetTotNghiep = new TranscriptGraduationEligibilityDto
                 {
                     DuDieuKien = graduation.Eligible,
+                    ChiTiet = GraduationRules.Describe(ketQuas, majorCfg.Curriculum, overallTotals.GPAHe4,
+                        reqTongTC, reqTCBatBuoc, reqTCTuChon, reqMinGPA),
                     LyDo = lyDoKhongDat,
                     QuyDinh = new TranscriptGraduationRuleDto
                     {

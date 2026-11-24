@@ -20,8 +20,10 @@ public class SinhVienController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? maLop, int page = 1, int pageSize = 20,
-        string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null, string? sort = null)
+    public async Task<IActionResult> GetAll([FromServices] TranscriptQueryService transcriptQuery,
+        [FromQuery] string? maLop, int page = 1, int pageSize = 20,
+        string? search = null, string? maNganh = null, string? maKhoa = null, string? status = null, string? cohort = null, string? sort = null,
+        bool includeGraduation = false, string? graduationStatus = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = await StudentLookupScope.StudentsAsync(_db, User);
@@ -58,10 +60,26 @@ public class SinhVienController : ControllerBase
             _ => query.OrderBy(s => s.MaSV)
         };
 
-        var total = await query.CountAsync();
+        if (!string.IsNullOrEmpty(graduationStatus) && graduationStatus is not ("eligible" or "ineligible" or "missing-gpa" or "missing-credits" or "missing-required"))
+            return BadRequest(new { message = "Điều kiện tốt nghiệp không hợp lệ." });
+        var ct = HttpContext.RequestAborted;
+        Dictionary<string, TranscriptQueryService.GraduationStatus>? graduation = null;
+        if (!string.IsNullOrEmpty(graduationStatus))
+        {
+            graduation = await transcriptQuery.GraduationAssessmentsAsync(query, ct);
+            var ids = graduation.Where(p => (graduationStatus switch {
+                "eligible" => p.Value.Eligible, "ineligible" => !p.Value.Eligible,
+                "missing-gpa" => p.Value.MissingGpa, "missing-credits" => p.Value.MissingCredits,
+                "missing-required" => p.Value.MissingRequired, _ => false })).Select(p => p.Key).ToList();
+            query = query.Where(s => ids.Contains(s.MaSV));
+        }
+        var total = await query.CountAsync(ct);
         var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
         page = Math.Clamp(page, 1, totalPages);
-        var data = await query.Skip((page - 1) * pageSize).Take(pageSize)
+        var pageQuery = query.Skip((page - 1) * pageSize).Take(pageSize);
+        if (includeGraduation && graduation == null)
+            graduation = await transcriptQuery.GraduationAssessmentsAsync(pageQuery, ct);
+        var rows = await pageQuery
             .Select(s => new
             {
                 s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.TrangThai,
@@ -69,6 +87,9 @@ public class SinhVienController : ControllerBase
                 CCCD = canViewIdentity ? s.CCCD : null, DiaChi = canViewIdentity ? s.DiaChi : null,
                 LopHanhChinh = s.LopHanhChinh == null ? null : new { s.LopHanhChinh.MaLop, s.LopHanhChinh.TenLop, s.LopHanhChinh.MaNganh, s.LopHanhChinh.NienKhoa }
             }).ToListAsync();
+        var data = rows.Select(s => new { s.MaSV, s.HoTen, s.NgaySinh, s.GioiTinh, s.MaLop, s.TrangThai,
+            s.Email, s.SDT, s.CCCD, s.DiaChi, s.LopHanhChinh,
+            GraduationEligible = graduation != null ? (bool?)graduation[s.MaSV].Eligible : null });
         return Ok(new { status = "success", data, total, page, pageSize, totalPages });
     }
 

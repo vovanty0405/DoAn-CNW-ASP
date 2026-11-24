@@ -625,7 +625,8 @@ public class PortalController(ApplicationDbContext db) : Controller
         }
 
         var khungLookup = GraduationRules.CourseTypes(khungCT);
-        var cumulativeStats = TranscriptStatistics.Calculate(ketQuas, cumulative: true);
+        var pendingEnrollments = await TranscriptStatistics.PendingEnrollmentsAsync(db, new List<string> { targetMaSV });
+        var cumulativeStats = TranscriptStatistics.Calculate(ketQuas.Concat(pendingEnrollments), cumulative: true);
         var graduation = GraduationRules.Evaluate(ketQuas, khungLookup, cumulativeStats.GPAHe4,
             tongTTC, tcBatBuoc, tcTuChon, minGPA);
         int tcBatBuocDat = graduation.RequiredCredits, tcTuChonDat = graduation.ElectiveCredits;
@@ -820,6 +821,8 @@ public class PortalController(ApplicationDbContext db) : Controller
         vm.DuDieuKienTotNghiep = duDieuKien;
         vm.TrangThaiTotNghiepText = trangThaiText;
         vm.ChiTietDieuKien = chiTietDieuKien;
+        vm.GraduationDetails = GraduationRules.Describe(ketQuas, khungCT, cumulativeStats.GPAHe4,
+            tongTTC, tcBatBuoc, tcTuChon, minGPA);
         vm.Complaints = rawComplaints;
 
         return View(vm);
@@ -890,15 +893,34 @@ public class PortalController(ApplicationDbContext db) : Controller
         return Ok(new { status = "success", message = "Đã cập nhật thông tin hồ sơ sinh viên thành công!" });
     }
 
+    [Authorize, HttpPost("DoiMatKhau/GuiMa"), ValidateAntiForgeryToken, EnableRateLimiting("TranscriptVerification")]
+    public async Task<IActionResult> SendChangePasswordOtp([FromBody] ChangeStudentPasswordDto req,
+        [FromServices] PasswordChangeOtp otp, [FromServices] ILogger<PortalController> logger)
+    {
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id)) return Unauthorized();
+        var account = await db.UserAccounts.SingleOrDefaultAsync(u => u.UserID == id && u.IsActive);
+        if (account == null || !StudentPasswordMatches(req.CurrentPassword ?? "", account.PasswordHash))
+            return BadRequest(new { message = "Mật khẩu hiện tại không chính xác." });
+        try {
+            await otp.SendAsync(id, account.PasswordHash, HttpContext.RequestAborted);
+            return Ok(new { message = "Đã gửi mã đến email nhận được cấu hình cho hệ thống Demo. Mã có hiệu lực 5 phút." });
+        } catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (Exception ex) {
+            logger.LogWarning("Không gửi được OTP đổi mật khẩu. Loại lỗi: {Type}", ex.GetType().Name);
+            return StatusCode(503, new { message = "Không gửi được mã xác thực. Vui lòng kiểm tra cấu hình email hoặc thử lại sau." });
+        }
+    }
+
     public class ChangeStudentPasswordDto
     {
         public string? CurrentPassword { get; set; }
         public string? NewPassword { get; set; }
         public string? ConfirmPassword { get; set; }
+        public string? OtpCode { get; set; }
     }
 
-    [Authorize, HttpPost("DoiMatKhau")]
-    public async Task<IActionResult> DoiMatKhau([FromBody] ChangeStudentPasswordDto req)
+    [Authorize, HttpPost("DoiMatKhau"), ValidateAntiForgeryToken, EnableRateLimiting("TranscriptVerification")]
+    public async Task<IActionResult> DoiMatKhau([FromBody] ChangeStudentPasswordDto req, [FromServices] PasswordChangeOtp otp)
     {
         if (User.Identity?.IsAuthenticated != true)
         {
@@ -924,8 +946,8 @@ public class PortalController(ApplicationDbContext db) : Controller
             return BadRequest(new { status = "error", message = "Mật khẩu mới và xác nhận mật khẩu không khớp!" });
         }
 
-        var uname = User.Identity?.Name;
-        var user = await db.UserAccounts.FirstOrDefaultAsync(u => u.Username == uname);
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var accountId)) return Unauthorized();
+        var user = await db.UserAccounts.FirstOrDefaultAsync(u => u.UserID == accountId && u.IsActive);
         if (user == null)
         {
             return NotFound(new { status = "error", message = "Không tìm thấy tài khoản đăng nhập!" });
@@ -949,6 +971,8 @@ public class PortalController(ApplicationDbContext db) : Controller
             return BadRequest(new { status = "error", message = "Mật khẩu hiện tại không chính xác!" });
         }
 
+        if (!otp.Consume(user.UserID, user.PasswordHash, req.OtpCode))
+            return BadRequest(new { status = "error", message = "Mã xác thực sai, đã dùng hoặc hết hạn. Vui lòng yêu cầu mã mới nếu cần." });
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPwd);
         await db.SaveChangesAsync();
         GradeHelper.GhiNhatKy(db, user.Username, "Đổi mật khẩu", $"Người dùng {user.Username} đã đổi mật khẩu trên Cổng thông tin.");

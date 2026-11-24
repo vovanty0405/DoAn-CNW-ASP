@@ -106,12 +106,14 @@ public class LopHocPhanController : ControllerBase
         return Ok(new { status = "success", data, total, page, pageSize, totalPages, maHK, open = summary?.Open ?? 0, locked = summary?.Locked ?? 0 });
     }
 
-    // Lightweight dropdown data, scoped to exactly one semester. Not used for table rows.
+    // Lightweight dropdown data. All semesters must be requested explicitly.
     [HttpGet("options")]
-    public async Task<IActionResult> Options(string? maHK = null)
+    public async Task<IActionResult> Options(string? maHK = null, bool allTerms = false)
     {
-        maHK = await AcademicQueries.ResolveTermAsync(_db, maHK);
-        var data = await VisibleSections().Where(l => maHK != null && l.MaHK == maHK)
+        maHK = allTerms ? null : await AcademicQueries.ResolveTermAsync(_db, maHK);
+        var query = VisibleSections();
+        if (!allTerms) query = query.Where(l => maHK != null && l.MaHK == maHK);
+        var data = await query
             .OrderBy(l => l.MaLHP).Select(l => new { l.MaLHP, l.TenLopHP, l.MaMon, l.MaHK }).ToListAsync();
         return Ok(new { status = "success", data, maHK });
     }

@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
 using QL_DiemSV.Models;
+using QL_DiemSV.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace QL_DiemSV.Services;
 
@@ -19,6 +21,28 @@ public sealed record TranscriptTotals
 
 public static class TranscriptStatistics
 {
+    // Read registration metadata only: unpublished grades must never enter a transcript.
+    public static async Task<List<KetQuaHocTap>> PendingEnrollmentsAsync(
+        ApplicationDbContext db, List<string> studentIds, CancellationToken ct = default)
+    {
+        var rows = await db.KetQuaHocTaps.AsNoTracking()
+            .Where(k => k.MaSV != null && studentIds.Contains(k.MaSV)
+                && k.LopHocPhan != null && (k.LopHocPhan.TrangThaiNhapDiem == null
+                    || k.LopHocPhan.TrangThaiNhapDiem != "Đã khóa")
+                && k.LopHocPhan.MonHoc != null && k.LopHocPhan.HocKy != null)
+            .Select(k => new { k.MaKQ, k.MaSV, k.MaLHP,
+                k.LopHocPhan!.MonHoc!.MaMon, k.LopHocPhan.MonHoc.SoTinChi })
+            .ToListAsync(ct);
+        return rows.Select(r => new KetQuaHocTap
+        {
+            MaKQ = r.MaKQ, MaSV = r.MaSV, MaLHP = r.MaLHP,
+            LopHocPhan = new LopHocPhan
+            {
+                MonHoc = new MonHoc { MaMon = r.MaMon, SoTinChi = r.SoTinChi }
+            }
+        }).ToList();
+    }
+
     public static int TermOrder(HocKy term)
     {
         var match = Regex.Match(term.TenHK, @"\d+");

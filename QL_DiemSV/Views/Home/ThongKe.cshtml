@@ -107,6 +107,8 @@
         </div>
         <div class="min-w-0 bg-surface border border-surface-hover rounded-2xl p-5">
             <h3 class="font-bold text-sm text-text-primary mb-4">Xu Hướng GPA Qua Các Học Kỳ</h3>
+            <p class="text-xs text-text-muted mb-2">Trung bình điểm có trọng số tín chỉ theo học kỳ. Biểu đồ không áp dụng bộ lọc Học kỳ, vẫn giữ các bộ lọc khác.</p>
+            <p id="trend-status" class="text-xs mb-2" style="color:#92400e;" role="status"></p>
             <div class="relative h-64 min-w-0">
                 <canvas id="chart-xuhuong"></canvas>
             </div>
@@ -274,12 +276,12 @@
 
         function reloadSectionOptions() {
             if (!filtersReady) return runReportRequest(initFilters);
+            const selectedTerm = document.getElementById('f-hk').value;
             return runReportRequest(async signal => {
-                const response = await apiFetch('/api/lophocphan/options?' + new URLSearchParams({ maHK: document.getElementById('f-hk').value }), { signal });
+                const response = await apiFetch('/api/lophocphan/options?' + new URLSearchParams({ maHK: selectedTerm, allTerms: selectedTerm === '' }), { signal });
                 signal.throwIfAborted();
                 allLhps = response.data || [];
-                loadedSectionTerm = response.maHK || '';
-                document.getElementById('f-hk').value = loadedSectionTerm;
+                loadedSectionTerm = selectedTerm;
                 populateDependentSelects();
                 await loadDashboardData(signal);
             });
@@ -416,13 +418,17 @@
                 }
             });
 
+            const trend = d.xuHuongGPA || [];
+            document.getElementById('trend-status').textContent = trend.length === 0
+                ? 'Chưa có điểm có tín chỉ trong phạm vi đã chọn.'
+                : trend.length === 1 ? 'Chỉ có một học kỳ có dữ liệu nên chưa thể nối đường xu hướng. Bỏ lọc lớp học phần hoặc mở rộng phạm vi để so sánh.' : '';
             chartXuHuong = new Chart(document.getElementById('chart-xuhuong'), {
                 type: 'line',
                 data: {
                     labels: d.xuHuongGPA.map(x => x.TenHK),
                     datasets: [
-                        { label: 'GPA Hệ 10', data: d.xuHuongGPA.map(x => x.GPA_He10), borderColor: '#4d8eff', tension: 0.3 },
-                        { label: 'GPA Hệ 4', data: d.xuHuongGPA.map(x => x.GPA_He4), borderColor: '#10B981', tension: 0.3 }
+                        { label: 'GPA Hệ 10', data: trend.map(x => x.GPA_He10), borderColor: '#2563eb', backgroundColor: '#2563eb', pointRadius: 4, pointHoverRadius: 6, tension: 0.3 },
+                        { label: 'GPA Hệ 4', data: trend.map(x => x.GPA_He4), borderColor: '#059669', backgroundColor: '#059669', pointRadius: 4, pointHoverRadius: 6, tension: 0.3 }
                     ]
                 },
                 options: {

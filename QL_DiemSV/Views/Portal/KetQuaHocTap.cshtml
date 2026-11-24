@@ -950,9 +950,29 @@
                             <span>@Model.TrangThaiTotNghiepText</span>
                         </div>
                     }
+                    @if (!Model.DuDieuKienTotNghiep && Model.GraduationDetails != null)
+                    {
+                        <button type="button" class="kqht-btn-primary" style="margin-top:10px;" onclick="const detail=document.getElementById('graduationMissingDetails');detail.open=true;detail.scrollIntoView({behavior:'smooth',block:'center'});">Xem chi tiết còn thiếu</button>
+                    }
                 </div>
             </div>
 
+            @if (Model.GraduationDetails is { } gaps)
+            {
+                <details id="graduationMissingDetails" style="margin:16px 0;padding:16px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;color:#1e293b;">
+                    <summary style="cursor:pointer;font-weight:700;color:#1e40af;">Xem chi tiết điều kiện còn thiếu</summary>
+                    <p>Tín chỉ còn thiếu: tổng @gaps.ThieuTongTinChi TC; bắt buộc @gaps.ThieuTinChiBatBuoc TC; tự chọn @gaps.ThieuTinChiTuChon TC. Các mức thiếu không cộng dồn.</p>
+                    <p>GPA hệ 4: @(gaps.GpaHienTai?.ToString("0.00") ?? "Chưa có điểm công bố") / yêu cầu @gaps.GpaYeuCau.ToString("0.00"); chênh lệch còn thiếu: @(gaps.GpaConThieu?.ToString("0.00") ?? "Chưa xác định").</p>
+                    <p>Chênh lệch GPA không phải số điểm cần cộng vào một môn; GPA phụ thuộc điểm và tín chỉ các môn được công bố.</p>
+                    <p><strong>Môn bắt buộc chưa đạt: @gaps.MonBatBuocChuaDat.Count</strong></p>
+                    <div style="overflow-x:auto;"><table style="width:100%;color:#1e293b;"><thead><tr><th>Mã môn</th><th>Tên môn</th><th>TC</th><th>Kết quả công bố</th></tr></thead><tbody>
+                    @foreach (var course in gaps.MonBatBuocChuaDat)
+                    {
+                        <tr><td>@course.MaMon</td><td>@course.TenMon</td><td>@course.SoTinChi</td><td>@(course.DiemDaCongBo.HasValue ? course.DiemDaCongBo.Value.ToString("0.0") + " / 10 — Chưa đạt" : "Chưa có điểm được công bố")</td></tr>
+                    }
+                    </tbody></table></div>
+                </details>
+            }
             <div class="kqht-metrics-grid">
                 <!-- KPI 1: Tiến độ tích lũy tín chỉ động theo QuyDinhTotNghiep -->
                 <div class="kqht-metric-box">
@@ -1413,6 +1433,7 @@
                         </div>
 
                         <form id="portalPasswordForm" onsubmit="submitStudentPasswordChange(event)">
+                            @Html.AntiForgeryToken()
                             <div class="kqht-form-group">
                                 <label for="pwCurrent">Mật khẩu hiện tại *</label>
                                 <input type="password" id="pwCurrent" class="kqht-form-control" required placeholder="Nhập mật khẩu đang sử dụng..." autocomplete="current-password" />
@@ -1428,6 +1449,14 @@
                                 <input type="password" id="pwConfirm" class="kqht-form-control" required minlength="6" placeholder="Nhập lại mật khẩu mới..." autocomplete="new-password" />
                             </div>
 
+                            <div class="kqht-form-group">
+                                <label for="pwOtp">Mã xác thực email *</label>
+                                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                                    <input id="pwOtp" class="kqht-form-control" style="flex:1;min-width:140px;" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Nhập mã 6 chữ số" />
+                                    <button type="button" id="pwSendOtp" class="kqht-btn-primary" onclick="sendPasswordOtp()">Gửi mã xác thực</button>
+                                </div>
+                                <small>Mã được gửi đến email nhận cấu hình của hệ thống Demo, có hiệu lực 5 phút.</small>
+                            </div>
                             <div id="pwAlertBox" class="kqht-alert-box"></div>
 
                             <div style="display:flex; justify-content:flex-end; margin-top:14px;">
@@ -1719,6 +1748,32 @@
         }
     }
 
+    async function sendPasswordOtp() {
+        const button = document.getElementById('pwSendOtp');
+        const alertBox = document.getElementById('pwAlertBox');
+        button.disabled = true;
+        try {
+            const response = await fetch('/Portal/DoiMatKhau/GuiMa', {
+                method: 'POST', headers: { 'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('#portalPasswordForm input[name="__RequestVerificationToken"]').value },
+                body: JSON.stringify({ currentPassword: document.getElementById('pwCurrent').value })
+            });
+            const data = await response.json();
+            alertBox.className = 'kqht-alert-box ' + (response.ok ? 'success' : 'error');
+            alertBox.textContent = data.message || 'Không gửi được mã.';
+            if (response.ok) {
+                let remaining = 60;
+                button.textContent = 'Gửi lại sau 60 giây';
+                const timer = setInterval(() => {
+                    button.textContent = --remaining > 0 ? `Gửi lại sau ${remaining} giây` : 'Gửi mã xác thực';
+                    if (remaining <= 0) { clearInterval(timer); button.disabled = false; }
+                }, 1000);
+                return;
+            }
+        } catch { alertBox.className = 'kqht-alert-box error'; alertBox.textContent = 'Không kết nối được máy chủ.'; }
+        button.disabled = false;
+    }
+
     async function submitStudentPasswordChange(e) {
         e.preventDefault();
         const btn = document.getElementById('pwSubmitBtn');
@@ -1742,8 +1797,8 @@
         try {
             const res = await fetch('/Portal/DoiMatKhau', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('#portalPasswordForm input[name="__RequestVerificationToken"]').value },
+                body: JSON.stringify({ currentPassword, newPassword, confirmPassword, otpCode: document.getElementById('pwOtp').value.trim() })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || data.status === 'error') {

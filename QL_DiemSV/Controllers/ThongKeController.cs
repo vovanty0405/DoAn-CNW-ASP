@@ -58,7 +58,7 @@ public class ThongKeController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userKey = $"{User.Identity?.Name}:{User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value}";
-        var cacheKey = $"THONGKE_SNAP:{userKey}:{maKhoa}:{maNganh}:{maLop}:{maHK}:{maMon}:{maLHP}";
+        var cacheKey = $"THONGKE_SNAP_V2:{userKey}:{maKhoa}:{maNganh}:{maLop}:{maHK}:{maMon}:{maLHP}";
 
         if (_cache.TryGetValue(cacheKey, out CachedReportSnapshot? cached) && cached != null)
         {
@@ -90,6 +90,11 @@ public class ThongKeController : ControllerBase
 
         var lhpQuery = _db.LopHocPhans.AsNoTracking()
             .Where(l => l.MonHoc != null && l.HocKy != null);
+
+        // The trend compares semesters; retain all other filters but not the single-semester filter.
+        var trendSections = lhpQuery;
+        if (!string.IsNullOrWhiteSpace(maMon)) trendSections = trendSections.Where(l => l.MaMon == maMon);
+        if (!string.IsNullOrWhiteSpace(maLHP)) trendSections = trendSections.Where(l => l.MaLHP == maLHP);
 
         if (!string.IsNullOrWhiteSpace(maHK))
             lhpQuery = lhpQuery.Where(l => l.MaHK == maHK);
@@ -193,28 +198,34 @@ public class ThongKeController : ControllerBase
             new { range = "8.5 - 10 (A/A+)", count = gradeFrequency.Where(k => k.Score >= 8.5).Sum(k => k.Count) }
         };
 
-        var xuHuongGPA = gradeFrequency
-            .Where(k => !string.IsNullOrEmpty(k.MaHK))
-            .GroupBy(k => k.MaHK!)
-            .Select(g =>
-            {
-                var lhp = g.First();
-                int attempts = g.Sum(x => x.Count);
-                double avg10 = Math.Round(g.Sum(x => x.Score * x.Count) / attempts, 2);
-                double avg4 = Math.Round(g.Sum(x => GradeHelper.QuyDoiHe4(x.Score) * x.Count) / attempts, 2);
-                return new
-                {
-                    MaHK = lhp.MaHK,
-                    TenHK = $"{lhp.TenHK} ({lhp.NamHocBatDau}-{lhp.NamHocKetThuc})",
-                    NamHocBatDau = lhp.NamHocBatDau,
-                    GPA_He10 = avg10,
-                    GPA_He4 = avg4
-                };
-            })
-            .OrderBy(x => x.NamHocBatDau)
-            .ThenBy(x => x.MaHK)
-            .Cast<object>()
-            .ToArray();
+        var trendGrades =
+            from grade in _db.KetQuaHocTaps.AsNoTracking()
+            join section in trendSections on grade.MaLHP equals section.MaLHP
+            join student in svQuery on grade.MaSV equals student.MaSV
+            where grade.DiemTongKet != null && section.MonHoc!.SoTinChi > 0
+            select new { student.MaSV, section.MaMon, section.MaHK,
+                section.HocKy!.TenHK, section.HocKy.NamHocBatDau, section.HocKy.NamHocKetThuc,
+                Credits = section.MonHoc!.SoTinChi, Score = grade.DiemTongKet!.Value };
+        // Keep SQL grouping small; do not group by semester display text or repeat conversion CASE expressions.
+        var frequencies = await trendGrades.GroupBy(g => new { g.MaHK, g.Score, g.Credits })
+            .Select(g => new { g.Key.MaHK, g.Key.Score, g.Key.Credits, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var terms = await _db.HocKys.AsNoTracking()
+            .Select(h => new { h.MaHK, h.TenHK, h.NamHocBatDau, h.NamHocKetThuc }).ToListAsync(cancellationToken);
+        var termTotals = frequencies.GroupBy(g => g.MaHK).Select(g => new {
+            MaHK = g.Key, Credits = g.Sum(x => (double)x.Credits * x.Count),
+            Weighted10 = g.Sum(x => x.Score * x.Credits * x.Count),
+            Weighted4 = g.Sum(x => GradeHelper.QuyDoiHe4(x.Score) * x.Credits * x.Count)
+        });
+        var xuHuongGPA = termTotals.Join(terms, x => x.MaHK, h => h.MaHK, (x,h) => new { x,h })
+            .OrderBy(x => x.h.NamHocBatDau)
+            .ThenBy(x => TranscriptStatistics.TermOrder(new QL_DiemSV.Models.HocKy { TenHK = x.h.TenHK }))
+            .ThenBy(x => x.h.MaHK)
+            .Select(row => new {
+                row.h.MaHK, TenHK = $"{row.h.TenHK} ({row.h.NamHocBatDau}-{row.h.NamHocKetThuc})",
+                GPA_He10 = Math.Round(row.x.Weighted10 / row.x.Credits, 2, MidpointRounding.AwayFromZero),
+                GPA_He4 = Math.Round(row.x.Weighted4 / row.x.Credits, 2, MidpointRounding.AwayFromZero)
+            }).Cast<object>().ToArray();
 
         // Top sinh viên tiêu biểu: sắp xếp điểm cao -> thấp
         var topOrdered = studentSummaries
@@ -359,4 +370,3 @@ public class ThongKeController : ControllerBase
         return Ok(new { status = "success", data, page, pageSize, total, totalPages });
     }
 }
-
