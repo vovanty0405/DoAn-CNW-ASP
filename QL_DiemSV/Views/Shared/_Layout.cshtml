@@ -54,123 +54,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-    <style>
-        :root {
-            --font-sans: 'Inter', sans-serif;
-            --color-canvas: #10131a;
-            --color-surface: #1d2027;
-            --color-surface-hover: #32353c;
-            --color-surface-header: #191b23;
-            --color-primary: #4d8eff;
-            --color-primary-hover: #adc6ff;
-            --color-text-primary: #e1e2ec;
-            --color-text-muted: #9ca3af;
-            --color-semantic-success: #10B981;
-            --color-semantic-error: #ffb4ab;
-            --color-semantic-warning: #df7412;
-        }
-
-        html.light {
-            --color-canvas: #f3f4f6;
-            --color-surface: #ffffff;
-            --color-surface-hover: #e5e7eb;
-            --color-surface-header: #f9fafb;
-            --color-primary: #2563eb;
-            --color-primary-hover: #1d4ed8;
-            --color-text-primary: #111827;
-            --color-text-muted: #6b7280;
-            --color-semantic-success: #10B981;
-            --color-semantic-error: #ef4444;
-            --color-semantic-warning: #f59e0b;
-        }
-
-        body {
-            background-color: var(--color-canvas);
-            color: var(--color-text-primary);
-            font-family: var(--font-sans);
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .input-field {
-            background-color: var(--color-canvas);
-            color: var(--color-text-primary);
-            border: 1px solid var(--color-surface-hover);
-            border-radius: 0.75rem;
-            padding: 0.5rem 0.75rem;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .input-field:focus {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 2px rgba(77, 142, 255, 0.2);
-        }
-        .input-field option {
-            background-color: var(--color-surface);
-            color: var(--color-text-primary);
-        }
-        .input-field::placeholder {
-            color: var(--color-text-muted);
-            opacity: 0.75;
-        }
-
-        .card {
-            background-color: var(--color-surface);
-            border: 1px solid var(--color-surface-hover);
-            border-radius: 1rem;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            padding: 0.5rem 1rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .btn-primary {
-            background-color: var(--color-primary);
-            color: #ffffff;
-        }
-        .btn-primary:hover {
-            filter: brightness(1.08);
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.65rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .badge-success {
-            background-color: rgba(16, 185, 129, 0.15);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-        .badge-warning {
-            background-color: rgba(245, 158, 11, 0.15);
-            color: #fbbf24;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-        .badge-danger {
-            background-color: rgba(239, 68, 68, 0.15);
-            color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-        .badge-info {
-            background-color: rgba(77, 142, 255, 0.15);
-            color: #60a5fa;
-            border: 1px solid rgba(77, 142, 255, 0.3);
-        }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-surface-hover); border-radius: 9999px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
-    </style>
+    <link rel="stylesheet" href="~/css/admin-layout.css" asp-append-version="true" />
 
     <script>
         // Restore theme & font before paint
@@ -233,6 +117,7 @@
 <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/academic-excel.css" asp-append-version="true" />
     <script src="~/js/academic-excel.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="enterprise-admin min-h-screen flex bg-canvas text-text-primary selection:bg-primary selection:text-white">
     <!-- Toast Container -->

@@ -1,0 +1,9 @@
+.log-filter-card{padding:20px;border:1px solid var(--color-surface-hover);border-radius:16px;background:var(--color-surface)}
+.log-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.log-filter-grid label{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--color-text-primary);font-weight:600}
+.log-filter-grid input,.log-filter-grid select{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--color-surface-hover);border-radius:8px;background:var(--color-canvas);color:var(--color-text-primary);font-weight:400}
+.log-filter-buttons{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.log-filter-note{margin-top:14px;font-size:12px;color:var(--color-text-muted)}
+.log-status{margin-top:8px;font-size:13px;color:var(--color-text-primary)}
+@media(max-width:1000px){.log-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.log-filter-grid{grid-template-columns:1fr}}

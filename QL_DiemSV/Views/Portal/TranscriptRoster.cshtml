@@ -54,16 +54,9 @@
     </form>
 </dialog>
 
-<style>
-    .transcript-roster { max-width: 1050px; margin: 2rem auto; padding: 0 1rem; overflow-x: auto; }
-    .transcript-roster table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-    .transcript-roster th, .transcript-roster td { text-align: left; padding: .65rem; border-bottom: 1px solid #94a3b8; }
-    .transcript-roster nav { display: flex; align-items: center; gap: 1rem; }
-    #roster-verification { width: min(420px, 92vw); border: 1px solid #94a3b8; border-radius: .6rem; padding: 1rem; }
-    #roster-verification::backdrop { background: rgb(15 23 42 / .55); }
-    #roster-verification form { display: grid; gap: .65rem; }
-    #roster-verification input[type=password] { padding: .45rem; border: 1px solid #94a3b8; border-radius: .3rem; }
-</style>
+@section Styles {
+    <link rel="stylesheet" href="~/css/portal-transcript-roster.css" asp-append-version="true" />
+}
 <script>
     const rosterDialog = document.getElementById('roster-verification');
     document.querySelectorAll('.transcript-roster [data-student]').forEach(button => {

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using QL_DiemSV.Data;
 using QL_DiemSV.Models;
 
@@ -107,6 +108,20 @@ public static class GradeHelper
     {
         try
         {
+            if (hanhDong == "Đăng nhập" && !string.IsNullOrWhiteSpace(nguoiDung))
+            {
+                var now = DateTime.Now;
+                var cutoff = now.AddHours(-2);
+                // One atomic statement: key-range locks prevent concurrent successful logins from duplicating the entry.
+                db.Database.ExecuteSqlInterpolated($@"
+                    INSERT INTO dbo.NhatKyHoatDong (NguoiDung,HanhDong,ChiTiet,Loai,ThoiGian)
+                    SELECT {nguoiDung},{hanhDong},{chiTiet},{loai},{now}
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM dbo.NhatKyHoatDong WITH (UPDLOCK,HOLDLOCK)
+                        WHERE NguoiDung={nguoiDung} AND HanhDong={hanhDong} AND ThoiGian>{cutoff}
+                    );");
+                return;
+            }
             db.NhatKyHoatDongs.Add(new NhatKyHoatDong
             {
                 NguoiDung = string.IsNullOrWhiteSpace(nguoiDung) ? "Hệ thống" : nguoiDung,

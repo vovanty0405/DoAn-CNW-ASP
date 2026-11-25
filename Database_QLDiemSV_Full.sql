@@ -1,4 +1,4 @@
-﻿-- Academic Ledger: complete SQL Server schema, generated from ApplicationDbContext.
+-- Academic Ledger: complete SQL Server schema, generated from ApplicationDbContext.
 -- Includes tables, columns, identity keys, primary/foreign keys and indexes.
 -- No sample records, passwords, or existing user data are exported.
 -- Run in SQL Server Management Studio. This script only accepts an empty database.
@@ -67,6 +67,9 @@ CREATE TABLE [NhatKyHoatDong] (
     [Loai] nvarchar(50) NULL,
     CONSTRAINT [PK_NhatKyHoatDong] PRIMARY KEY ([MaLog])
 );
+CREATE INDEX IX_NhatKyHoatDong_NguoiDung_HanhDong_ThoiGian ON dbo.NhatKyHoatDong(NguoiDung,HanhDong,ThoiGian);
+CREATE INDEX IX_NhatKyHoatDong_ThoiGian_MaLog ON dbo.NhatKyHoatDong(ThoiGian,MaLog);
+
 
 CREATE TABLE [PhongHoc] (
     [MaPhong] nvarchar(50) NOT NULL,

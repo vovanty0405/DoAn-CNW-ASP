@@ -81,6 +81,7 @@ public class HomeController : Controller
     }
 
     [Authorize(Roles = "Admin,GiangVien,KhaoThi"), HttpGet("/diem-so")]
+    [QL_DiemSV.Services.GradePermission("VIEW")]
     public IActionResult DiemSo()
     {
         if (User.Identity?.IsAuthenticated != true) return Redirect("/login");

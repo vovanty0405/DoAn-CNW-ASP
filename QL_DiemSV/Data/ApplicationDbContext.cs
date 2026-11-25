@@ -43,6 +43,8 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<NhatKyHoatDong>().HasIndex(x => new { x.NguoiDung, x.HanhDong, x.ThoiGian });
+        modelBuilder.Entity<NhatKyHoatDong>().HasIndex(x => new { x.ThoiGian, x.MaLog });
         modelBuilder.Entity<LopHocPhan>().HasIndex(x => x.MaHK);
         modelBuilder.Entity<ClassSchedule>().HasIndex(x => new { x.MaLHP, x.Thu });
         modelBuilder.Entity<KetQuaHocTap>().HasIndex(x => new { x.MaSV, x.MaLHP })

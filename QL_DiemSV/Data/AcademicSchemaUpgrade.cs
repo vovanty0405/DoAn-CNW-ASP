@@ -17,6 +17,13 @@ public static class AcademicSchemaUpgrade
         }
         catch { }
 
+        db.Database.ExecuteSqlRaw("""
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.NhatKyHoatDong') AND name=N'IX_NhatKyHoatDong_NguoiDung_HanhDong_ThoiGian')
+                CREATE INDEX IX_NhatKyHoatDong_NguoiDung_HanhDong_ThoiGian ON dbo.NhatKyHoatDong(NguoiDung,HanhDong,ThoiGian);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.NhatKyHoatDong') AND name=N'IX_NhatKyHoatDong_ThoiGian_MaLog')
+                CREATE INDEX IX_NhatKyHoatDong_ThoiGian_MaLog ON dbo.NhatKyHoatDong(ThoiGian,MaLog);
+            """);
+
         bool schemaReady = false;
         try
         {

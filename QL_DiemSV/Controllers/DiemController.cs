@@ -103,6 +103,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpGet("lophocphan/{maLHP}")]
+    [GradePermission("VIEW")]
     public async Task<IActionResult> GetBangDiemLopHocPhan(string maLHP)
     {
         var lhp = await _db.LopHocPhans.AsNoTracking()
@@ -215,6 +216,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPut("lophocphan/{maLHP}/ty-le")]
+    [GradePermission("EDIT")]
     public async Task<IActionResult> UpdateTyLeDiemHocPhan(string maLHP, [FromBody] TyLeDiemHocPhanDto req)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -262,6 +264,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPut("lophocphan/{maLHP}/cau-hinh")]
+    [GradePermission("EDIT")]
     public async Task<IActionResult> UpdateCauHinhDiem(string maLHP, [FromBody] CauHinhDto req)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -330,6 +333,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPut("lophocphan/{maLHP}/hang-loat")]
+    [GradePermission("EDIT")]
     public async Task<IActionResult> SaveBangDiemHangLoat(string maLHP, [FromBody] SaveBangDiemDto req)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -478,6 +482,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPut("lophocphan/{maLHP}/trang-thai")]
+    [GradePermission("EDIT")]
     public async Task<IActionResult> UpdateTrangThaiNhapDiem(string maLHP, [FromBody] TrangThaiDto req)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -593,6 +598,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPost("lophocphan/{maLHP}/auto-seed")]
+    [GradePermission("CREATE", "EDIT")]
     public async Task<IActionResult> AutoSeedGradesForSection(string maLHP, [FromBody] AutoSeedGradesDto? req = null)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
@@ -620,6 +626,7 @@ public class DiemController : ControllerBase
     }
 
     [HttpPost("auto-seed-all")]
+    [GradePermission("CREATE", "EDIT")]
     [Authorize(Roles = "Admin,KhaoThi")]
     public async Task<IActionResult> AutoSeedAllSections([FromBody] AutoSeedGradesDto? req = null)
     {

@@ -1,0 +1,27 @@
+#mh-selected-tags .mh-prereq-chip {
+    background: #1e40af !important;
+    border: 1px solid #60a5fa !important;
+    color: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
+}
+#mh-selected-tags .mh-prereq-chip strong,
+#mh-selected-tags .mh-prereq-chip span {
+    color: #ffffff !important;
+}
+#mh-selected-tags .mh-prereq-remove {
+    color: #ffffff !important;
+    background: transparent;
+    border-radius: 4px;
+}
+#mh-selected-tags .mh-prereq-remove:hover {
+    background: #172554 !important;
+}
+#mh-selected-tags .mh-prereq-remove:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+#prereq-count-badge {
+    background: #dbeafe !important;
+    border-color: #93c5fd !important;
+    color: #1e3a8a !important;
+}
